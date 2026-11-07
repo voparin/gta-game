@@ -1,6 +1,6 @@
 # Sivatagi GTA
 
-Felülnézetes, GTA-szerű böngészős játék egy végtelen sivatagban: piros autó, lövöldözés, AI gyalogosok (járdán sétálnak, zebrán kelnek át) és AI autók, nyálkafoltok az utakon, rendőrségi üldözés 145 km/h feletti gyorshajtásért, homokviharok, villanyoszlopok és nappal/éjszaka váltás (30 perc nappal, 30 perc éjszaka).
+Felülnézetes, GTA-szerű böngészős játék egy végtelen sivatagban: piros autó, lövöldözés, AI gyalogosok (járdán sétálnak, zebrán kelnek át) és AI autók, rendőrségi üldözés 145 km/h feletti gyorshajtásért, homokviharok, villanyoszlopok és nappal/éjszaka váltás (30 perc nappal, 30 perc éjszaka).
 
 Élő verzió: https://voparin.github.io/gta-game/
 
@@ -18,6 +18,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 | Space | kézifék (drift, féknyom, füst) |
 | Bal klikk / F | lövés (egérrel célzás) |
 | H | homokvihar be/ki |
+| X | taxi hívása ($5 bárhova) |
 | B | bomba lerakása (3 mp múlva robban) |
 | T | gyorsított idő (60x) |
 | Esc | menü: szünet, szkin- és autóváltás, szkin- és autóbolt (a választás megmarad) |
@@ -83,3 +84,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 ## Bomba
 - **B**: lerakod (autóból hátra ejted), **3 mp** múlva felrobban: a közeli autókból roncs lesz, a házak ledőlnek, az emberek meghalnak – és téged is megsebez, ha túl közel vagy. Robbantásért ★★ körözés jár.
 - Legfeljebb 5 bombád lehet, percenként kapsz egy újat (a HUD-on: 💣 3/5).
+
+## Taxi
+- **X**: hívsz egy taxit, pár másodperc alatt odajön. Mellette **E**: választhatsz úti célt (kezdőhely, az autód, a legközelebbi benzinkút / bank / kocsma / gyár, verseny rajt) – **$5**-ért bárhova elvisz.
+- Ha beülsz az autódba, vagy a taxi 45 mp alatt nem ér oda, lemond. A tönkrement taxi nem visz. A szállítási célpontra nem visz el (a szállítást vezetned kell).

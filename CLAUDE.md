@@ -19,7 +19,7 @@ Felülnézetes, GTA-szerű böngészős játék. Tiszta HTML + JavaScript (Canva
 Fontos állandók a `game.js` elején: `WORLD` (pályaméret, a régi 10 000 px-es pálya 30-szoros területe), `CHUNK`, `ROAD_SPACING`, `HALF_CYCLE` (30 perc nappal / 30 perc éjszaka), `FADE` (alkonyat hossza).
 
 Felépítés a `game.js`-en belül:
-- **Világ chunkokban**: a pálya 1000×1000 px-es darabokból áll (`getChunk`), amelyek menet közben, determinisztikusan generálódnak (akadályok, villanyoszlopok, dűnék, nyálkafoltok). Ütközésnél és rajzolásnál mindig csak a közeli chunkokat nézd (`chunksAround`, `chunksIn`) – soha ne járd be az egész világot.
+- **Világ chunkokban**: a pálya 1000×1000 px-es darabokból áll (`getChunk`), amelyek menet közben, determinisztikusan generálódnak (akadályok, villanyoszlopok, dűnék). Ütközésnél és rajzolásnál mindig csak a közeli chunkokat nézd (`chunksAround`, `chunksIn`) – soha ne járd be az egész világot.
 - **Utak**: rácsban, `ROAD_SPACING` távolságra (`nearestRoad`, `onRoad`, `roadsIn`).
 - **Autók**: egy közös fizika (`updateCarPhysics`) a játékos és az AI autók számára; az AI a `aiCarInput`-ban dönt (sáv követése, kereszteződésben fordulás).
 - **Szereplők**: `npcs` (gyalogos / csöves), `aiCars`, `bullets`; a játékostól messze lévőket a `spawnAround` eltünteti, a közelben újakat hoz létre.
@@ -36,10 +36,11 @@ Felépítés a `game.js`-en belül:
 - **Rádió** (ADR-0026): `radio`, `makeSong(seed)`, `startRadio`, `stopRadio`, `updateRadio` (Web Audio, előre ütemezve); tesztben kamu `AudioContext` számolja a hangokat.
 - **Kocsmák, részegség**: a ház `pub` jelzője (a sorsolás a ház tulajdonságai UTÁN, hogy a meglévők ne változzanak), `PUB_FURNITURE`, `atBar`, `buyDrink`, `player.drunk` (0–100, `DRUNK_DECAY`), `drunkK()`, `passOut`/`wakeUp`, ittas vezetés `DRUNK_DRIVE` felett.
 - **Bank, gyár**: a ház `bank` / `factory` jelzője (`bankRoll`, `factoryRoll` – a meglévő sorsolások után). Bank (ADR-0028): `bank` ablak, `takeLoan`, `repayLoan`, `progress.debt`, automatikus törlesztés az `earn()`-ben. Gyár: `newFactory`, `updateFactory`, `factoryAction` (Space), fizetés `FACTORY_WAGE` / `WAGE_PERIOD`, ha abban a percben dolgozott.
+- **Taxi** (ADR-0029): `taxi` (`taxicab` jelző az `aiCars`-ban), `callTaxi` (X), `taxiInput`, `taxiDestinations`, `startTrip`, `taxiTrip` (rövid elsötétítés, utána a célnál), `TAXI_FARE`.
 - **Bomba**: `bombs`, `bombInv` (max `BOMB_MAX`, `BOMB_REGEN` mp-enként +1), `dropBomb`, `explode` (autó roncs, NPC, `destroyHouse(hs, üzenet)`, játékos sebzése), `updateBombs`, `drawBombs`.
 - **Csövesek** (`homeless` NPC): `homelessSpot`, `donate` (modális ablak, mint a menü), `DONATE_MIN`–`DONATE_MAX`; az összeg a `progress.donated`-ben.
 - **Rendőrség**: `wanted` (körözési szint), `updateWanted` (gyorshajtás `SPEED_LIMIT` felett, lerázás, letartóztatás), `policeInput` (üldözés). A rendőrautók az `aiCars`-ban vannak `police`/`chasing` jelzővel. Tesztben a `policeEnabled` kikapcsolható.
-- Tesztekben a `spawnEnabled`, `slimeEnabled`, `policeEnabled`, `missionsEnabled`, `racesEnabled` és `tornadoEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el. Ne írj olyan tesztet, ami véletlen szóráson vagy időzítési szerencsén múlik. A homokvihar a tesztben ki van kapcsolva (`storm.timer = 1e9`), mert a szél minden járművet sodor. Ha egy hely vagy döntés helyességét kell ellenőrizni, ne véletlen szimulációval teszteld, hanem emeld ki tiszta függvénybe (pl. `homelessSpot`), és azt teszteld.
+- Tesztekben a `spawnEnabled`, `policeEnabled`, `missionsEnabled`, `racesEnabled` és `tornadoEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el. Ne írj olyan tesztet, ami véletlen szóráson vagy időzítési szerencsén múlik. A homokvihar a tesztben ki van kapcsolva (`storm.timer = 1e9`), mert a szél minden járművet sodor. Ha egy hely vagy döntés helyességét kell ellenőrizni, ne véletlen szimulációval teszteld, hanem emeld ki tiszta függvénybe (pl. `homelessSpot`), és azt teszteld.
 
 ## Architekturális döntések (ADR)
 

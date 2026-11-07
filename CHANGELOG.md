@@ -5,6 +5,11 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.19.0 – 2026-11-07
+- Taxi: X – hívás (pár mp alatt odajön), E – úti cél (kezdőhely, autód, legközelebbi benzinkút / bank / kocsma / gyár, verseny rajt), $5 bárhova (ADR-0029); házból és buszról nem hívható be, autóba ülve lemondod, 45 mp után lemond, ha nem ért oda, a tönkrement taxi nem visz
+- Javítva: ha bérautó és csöves is a közelben volt, az E nem azt csinálta, amit a felirat mutatott
+- Nincsenek többé nyálkafoltok az utakon (a hozzájuk tartozó kód is törölve)
+
 ## 0.18.1 – 2026-11-07
 - Javítva: ha a saját bombád ölt meg, a rendőrségi üzenet eltakarta a „FELROBBANTÁL!” feliratot (és halottként is körözést kaptál); a házzal együtt felrobbanva az általános felirat jelent meg
 

@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.18.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.19.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -40,6 +40,7 @@ window.addEventListener('keydown', e => {
   unlockAudio();
   if (donate.open) { if (!e.repeat) donateKey(e.code); return; }
   if (bank.open) { if (!e.repeat) bankKey(e.code); return; }
+  if (taxiMenu.open) { if (!e.repeat) taxiMenuKey(e.code); return; }
   if (e.code === 'Escape') { if (!e.repeat) toggleMenu(); return; }
   if (menu.open) { if (!e.repeat) menuKey(e.code); return; }
   keys[e.code] = true;
@@ -48,6 +49,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyT') timeScale = timeScale === 1 ? 60 : 1;
   if (e.code === 'KeyH') toggleStorm();
   if (e.code === 'KeyB') dropBomb();
+  if (e.code === 'KeyX') callTaxi();
   if (e.code === 'KeyR' && player.inHouse) startRadio();                            // következő szám
   if (e.code === 'Space' && player.inHouse && player.inHouse.factory) factoryAction();
   if (e.code === 'Digit1' || e.code === 'Numpad1') buyDrink('beer');
@@ -61,6 +63,7 @@ window.addEventListener('mousedown', e => {
   mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
   if (donate.open) { if (e.button === 0) donateClick(e.clientX, e.clientY); return; }
   if (bank.open) { if (e.button === 0) bankClick(e.clientX, e.clientY); return; }
+  if (taxiMenu.open) { if (e.button === 0) taxiMenuClick(e.clientX, e.clientY); return; }
   if (menu.open) { if (e.button === 0) menuClick(e.clientX, e.clientY); return; }
   if (e.button === 0) mouse.down = true;
 });
@@ -96,7 +99,6 @@ function roadsIn(a, b) {
 
 // ===== Világ (chunkokban, menet közben generálva) =====
 const chunkCache = new Map();
-let slimeEnabled = true;    // teszteléshez kikapcsolható
 
 function chunkSeed(cx, cy) {
   return (Math.imul(cx + 1, 73856093) ^ Math.imul(cy + 1, 19349663) ^ 0x5bd1e995) | 0;
@@ -105,7 +107,7 @@ function chunkSeed(cx, cy) {
 function generateChunk(cx, cy) {
   const r = rng(chunkSeed(cx, cy));
   const x0 = cx * CHUNK, y0 = cy * CHUNK;
-  const ch = { obstacles: [], lamps: [], dunes: [], slime: [] };
+  const ch = { obstacles: [], lamps: [], dunes: [] };
   const inChunk = (x, y) => x >= x0 && x < x0 + CHUNK && y >= y0 && y < y0 + CHUNK;
 
   // villanyoszlopok az utak mentén, váltakozó oldalon
@@ -153,24 +155,6 @@ function generateChunk(cx, cy) {
     ch.dunes.push({ x: x0 + r() * CHUNK, y: y0 + r() * CHUNK, rx: 80 + r() * 220, ry: 30 + r() * 80, rot: r() * Math.PI });
   }
 
-  // nyálkafoltok az utakon
-  const makeSlime = (x, y) => {
-    const s = { x, y, r: 26 + r() * 20, blobs: [] };
-    for (let i = 0; i < 5; i++) s.blobs.push({ dx: (r() - 0.5) * s.r, dy: (r() - 0.5) * s.r, rr: s.r * (0.45 + r() * 0.35) });
-    return s;
-  };
-  for (const R of roadsIn(y0, y0 + CHUNK)) {
-    if (r() < 0.45) {
-      const x = x0 + r() * CHUNK, y = R + (r() - 0.5) * (ROAD_W - 70);
-      if (Math.abs(x - nearestRoad(x)) > ROAD_W) ch.slime.push(makeSlime(x, y));
-    }
-  }
-  for (const R of roadsIn(x0, x0 + CHUNK)) {
-    if (r() < 0.45) {
-      const y = y0 + r() * CHUNK, x = R + (r() - 0.5) * (ROAD_W - 70);
-      if (Math.abs(y - nearestRoad(y)) > ROAD_W) ch.slime.push(makeSlime(x, y));
-    }
-  }
   return ch;
 }
 
@@ -205,13 +189,6 @@ function obstacleAt(x, y, pad = 0) {
       if (ob.rect ? x > ob.rect.x0 - pad && x < ob.rect.x1 + pad && y > ob.rect.y0 - pad && y < ob.rect.y1 + pad
         : Math.hypot(x - ob.x, y - ob.y) < ob.r + pad) return true;
     }
-  }
-  return false;
-}
-
-function onSlime(x, y) {
-  for (const ch of chunksAround(x, y, 60)) {
-    for (const s of ch.slime) if (Math.hypot(x - s.x, y - s.y) < s.r + 6) return true;
   }
   return false;
 }
@@ -680,7 +657,7 @@ function rentCar(lot) {
   rentedLots.add(lot.key);
   if (!car.rental) car.ownFuel = car.fuel;         // a saját autó benzinje: a bérlés végén ez jár vissza
   applyCarModel(car, RENTAL_MODEL);
-  Object.assign(car, { x: lot.spot.x, y: lot.spot.y, angle: lot.spot.angle, vx: 0, vy: 0, spin: 0, fuel: 100, rental: true, lastWheels: null });
+  Object.assign(car, { x: lot.spot.x, y: lot.spot.y, angle: lot.spot.angle, vx: 0, vy: 0, fuel: 100, rental: true, lastWheels: null });
   player.inCar = true;
   popup(`🔑 Kibérelted az autót (-$${RENT_PRICE}) – a saját autóidat az Esc menüben választhatod vissza`, '#7f7');
   return true;
@@ -780,8 +757,8 @@ const menu = { open: false, sel: 0, skin: activeSkin,
 const MENU_ROWS = ['Folytatás', 'Szkin', 'Autó'];
 
 function makeCar(x, y, angle, color) {
-  return { x, y, angle, vx: 0, vy: 0, r: 28, len: 72, wid: 36, color, skid: false, spin: 0,
-    onSlime: false, braking: false, lastWheels: null, health: 6, wrecked: false, ai: null, ...DEFAULT_MODEL };
+  return { x, y, angle, vx: 0, vy: 0, r: 28, len: 72, wid: 36, color, skid: false,
+    braking: false, lastWheels: null, health: 6, wrecked: false, ai: null, ...DEFAULT_MODEL };
 }
 
 let nitroTank = 100;   // a nitró szintje autóváltáson át is megmarad (nem lehet váltással újratölteni)
@@ -813,7 +790,7 @@ let policeEnabled = true;   // teszteléshez kikapcsolható
 // körözés: 0 = nincs, 1 = gyorshajtás, 2 = rendőrre lőtt
 const wanted = { level: 0, lostTimer: 0, bustTimer: 0 };
 const POLICE_COUNT = [0, 2, 3];
-const controllable = () => !player.dead && !player.arrested && !(player.passedOut > 0);
+const controllable = () => !player.dead && !player.arrested && !(player.passedOut > 0) && !(taxiTrip && taxiTrip.t > 0);
 let lastCam = { x: player.x, y: player.y };
 
 // Homokvihar
@@ -922,6 +899,7 @@ function interactionPrompt() {
   if (player.inHouse) return { text: atInnerDoor() ? '🚪 E: kimenés' : 'Menj az ajtóhoz (lent) a kimenéshez', color: '#7df' };
   if (player.inCar) return null;
   if (dist(player, car) < 75) return { text: 'Nyomd meg az E-t a beszálláshoz', color: '#fff' };
+  if (taxiReady()) return { text: `🚕 E: taxi – válassz úti célt ($${TAXI_FARE})`, color: '#f2c230' };
   if (nearestBoardableBus()) return { text: `🚌 E: felszállás a buszra ($${BUS_FARE})`, color: '#f28c1e' };   // a toggleCar-ban a busz megelőzi a többit
   const ns = nearestBusStop(player.x, player.y);
   if (nearestDoor()) return { text: '🏠 E: bemenés a házba', color: '#7df' };
@@ -942,14 +920,15 @@ function toggleCar() {
     collide(player);
     return;
   }
+  if (!player.inCar && dist(player, car) >= 75 && taxiReady()) { openTaxiMenu(); return; }
   const bus = !player.inCar && dist(player, car) >= 75 ? nearestBoardableBus() : null;
   if (player.inHouse) { if (atInnerDoor()) exitHouse(); else if (atBankCounter()) openBank(); return; }
   const door = !bus && !player.inCar && dist(player, car) >= 75 ? nearestDoor() : null;
   if (door) { enterHouse(door); return; }
   const lot = !bus && !player.inCar && dist(player, car) >= 75 ? nearestRentable() : null;
-  const homeless = !bus && !lot && !player.inCar && dist(player, car) >= 75 ? nearestHomeless() : null;
-  if (homeless) { openDonate(homeless); return; }
   if (lot) { rentCar(lot); return; }
+  const homeless = !bus && !player.inCar && dist(player, car) >= 75 ? nearestHomeless() : null;
+  if (homeless) { openDonate(homeless); return; }
   if (bus) {
     if (progress.money < BUS_FARE) { popup(`A buszjegy $${BUS_FARE} – nincs elég pénzed!`, '#f66'); return; }
     progress.money -= BUS_FARE;
@@ -1159,7 +1138,7 @@ function spawnAround(dt) {
   }
   for (let i = aiCars.length - 1; i >= 0; i--) {
     const c = aiCars[i];
-    if (c.racer || c === player.riding) continue;          // a versenyzők és a busz, amin ülsz, maradnak
+    if (c.racer || c === player.riding || c === taxi) continue;   // a versenyzők, a busz, amin ülsz, és a hívott taxi maradnak
     if (dist(c, player) > (c.chasing ? 4500 : 3000)) aiCars.splice(i, 1);
   }
   if (!spawnEnabled || player.dead) return;
@@ -1298,16 +1277,11 @@ function aiCarInput(c) {
 function updateCarPhysics(c, input, dt) {
   const { up, down, steer, handbrake } = input;
   const sandy = !onRoad(c.x, c.y, SIDEWALK_W);   // a járda is szilárd burkolat
-  const slimy = slimeEnabled && onSlime(c.x, c.y);
-  if (slimy && !c.onSlime) c.spin = (rand() < 0.5 ? -1 : 1) * (2.5 + rand() * 2);   // nyálkán megpördül
-  c.onSlime = slimy;
-  c.spin *= Math.exp(-1.5 * dt);
 
   // először fordul az autó, a sebesség viszont nem fordul vele azonnal → oldalirányú csúszás
   const fwd0 = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
   const drunkSteer = c === car && player.inCar ? Math.sin(clock * 1.7) * 0.6 * drunkK() : 0;   // részegen „húz” a kormány
-  c.angle += (steer + drunkSteer) * (handbrake ? 3.4 : 2.6) * dt * clamp(fwd0 / 160, -1, 1)
-    + c.spin * dt * clamp(Math.abs(fwd0) / 200, 0, 1);
+  c.angle += (steer + drunkSteer) * (handbrake ? 3.4 : 2.6) * dt * clamp(fwd0 / 160, -1, 1);
 
   const fx = Math.cos(c.angle), fy = Math.sin(c.angle);
   let fwd = c.vx * fx + c.vy * fy;
@@ -1328,7 +1302,7 @@ function updateCarPhysics(c, input, dt) {
   // a végsebességnél megáll a gyorsulás; ha fölötte volt (pl. nitró után, homokba érve), fokozatosan lassul vissza
   if (fwd > cap) fwd = fwdBefore > cap ? Math.max(cap, Math.min(fwd, fwdBefore) - 400 * dt) : cap;
   fwd = Math.max(-180, fwd);
-  const grip = slimy ? 0.4 : handbrake ? 1.2 : 12;     // kézifékkel / nyálkán alig tapad → csúszik
+  const grip = handbrake ? 1.2 : 12;                   // kézifékkel alig tapad → csúszik
   lat *= Math.exp(-grip * dt);
 
   c.vx = fwd * fx - lat * fy + windX() * 40 * dt;
@@ -1340,7 +1314,7 @@ function updateCarPhysics(c, input, dt) {
 
   // csúszás: féknyom és füst a hátsó kerekeknél
   const speed = Math.hypot(c.vx, c.vy);
-  c.skid = speed > 90 && (Math.abs(lat) > (handbrake || slimy ? 40 : 250) || (handbrake && Math.abs(fwd) > 200));
+  c.skid = speed > 90 && (Math.abs(lat) > (handbrake ? 40 : 250) || (handbrake && Math.abs(fwd) > 200));
   const wheels = [-1, 1].map(side => {
     const lx = -c.len / 3, ly = side * (c.wid / 2 - 3);
     return { x: c.x + fx * lx - fy * ly, y: c.y + fy * lx + fx * ly };
@@ -1423,12 +1397,119 @@ function damagePlayer(n) {
   }
 }
 
+// ===== Taxi (ADR-0029): X – hívás, E – úti cél, $5; az út rövid elsötétítéssel „átugorható” (a pálya végtelen) =====
+const TAXI_FARE = 5, TAXI_WAIT = 30, TAXI_TRIP = 2.5, TAXI_COME = 45;   // ha 45 mp alatt nem ér oda, lemond
+const TAXI_MODEL = { type: 'taxicab', color: ['#f2c230', '#c09010'], len: 74, wid: 36, accel: 450, maxRoad: 620, maxSand: 380, sandDrag: 0.9, fuelUse: 1 };
+let taxi = null;                                   // a hívott taxi (aiCars-ban, taxicab jelzővel)
+let taxiTrip = null;                               // { dest, t }
+const taxiMenu = { open: false, items: [], sel: 0, hits: [] };
+
+// a játékoshoz legközelebbi sávpont (ide áll be a taxi)
+function pickupPoint() {
+  const rx = nearestRoad(player.x), ry = nearestRoad(player.y);
+  return Math.abs(player.y - ry) < Math.abs(player.x - rx)
+    ? { x: player.x, y: ry + (player.y > ry ? 40 : -40) } : { x: rx + (player.x > rx ? 40 : -40), y: player.y };
+}
+
+function callTaxi() {
+  if (!controllable() || player.inCar || player.inHouse || player.riding) return false;
+  if (taxi && aiCars.includes(taxi)) { popup('🚕 A taxi már úton van', '#f2c230'); return false; }
+  const p = pickupPoint(), horiz = Math.abs(p.y - nearestRoad(p.y)) <= 40;
+  const dir = rand() < 0.5 ? 1 : -1, along = (horiz ? p.x : p.y) - dir * 700;
+  taxi = spawnAiCar(horiz ? 'h' : 'v', dir, horiz ? nearestRoad(p.y) : nearestRoad(p.x), along);
+  applyCarModel(taxi, TAXI_MODEL);
+  Object.assign(taxi, { taxicab: true, state: 'coming', waitUntil: 0, comeUntil: clock + TAXI_COME, stuckT: 0, reverseT: 0 });
+  popup(`🚕 Hívtál egy taxit – pár mp és itt van ($${TAXI_FARE} bárhova)`, '#f2c230');
+  return true;
+}
+
+function taxiInput(c, dt) {
+  if (c.wrecked) return { up: false, down: false, steer: 0, handbrake: true };
+  if (c.state !== 'coming') return { up: false, down: Math.hypot(c.vx, c.vy) > 20, steer: 0, handbrake: Math.hypot(c.vx, c.vy) <= 20 };
+  const t = pickupPoint(), d = Math.hypot(t.x - c.x, t.y - c.y);
+  if (d < 60) { c.state = 'waiting'; c.waitUntil = clock + TAXI_WAIT; popup('🚕 Megérkezett a taxi – állj mellé, E', '#f2c230'); }
+  const diff = wrapAngle(Math.atan2(t.y - c.y, t.x - c.x) - c.angle);
+  const fwd = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
+  if (c.reverseT > 0) { c.reverseT -= dt; return { up: false, down: true, steer: -clamp(diff * 2, -1, 1), handbrake: false }; }
+  if (Math.abs(fwd) < 20 && d > 60) { c.stuckT += dt; if (c.stuckT > 1.5) { c.stuckT = 0; c.reverseT = 1; } } else c.stuckT = 0;
+  const want = Math.min(500, d * 1.1);                // a cél előtt időben lassít
+  return { up: fwd < want, down: fwd > want + 20, steer: clamp(diff * 3, -1, 1), handbrake: false };
+}
+
+const taxiReady = () => taxi && taxi.state === 'waiting' && aiCars.includes(taxi) && !taxi.wrecked && !player.inCar && !player.inHouse && !player.riding
+  && dist(player, taxi) < taxi.r + 110;   // a járdáról is elérhető
+
+// úti célok: mindig a legközelebbi (egyre nagyobb körben keresve)
+function nearestHouseOf(pred) {
+  for (let rad = 6000; rad <= 48000; rad *= 2) {
+    const hs = housesIn(player.x - rad, player.y - rad, player.x + rad, player.y + rad).filter(pred);
+    if (hs.length) return hs.reduce((a, b) => (Math.hypot(a.x - player.x, a.y - player.y) <= Math.hypot(b.x - player.x, b.y - player.y) ? a : b));
+  }
+  return null;
+}
+function taxiDestinations() {
+  const out = [{ label: '🏠 Kezdőhely', x: START_X, y: START_Y }];
+  out.push({ label: '🚗 Az autód', x: car.x + 60, y: car.y });
+  const ns = nearestStation(player.x, player.y); if (ns) out.push({ label: '⛽ Legközelebbi benzinkút', x: ns.st.sign.x, y: ns.st.sign.y });
+  for (const [label, pred] of [['🏦 Legközelebbi bank', h => h.bank], ['🍺 Legközelebbi kocsma', h => h.pub], ['🏭 Legközelebbi gyár', h => h.factory]]) {
+    const hs = nearestHouseOf(pred); if (hs) { const d = doorOf(hs); out.push({ label, x: d.x, y: d.y }); }
+  }
+  if (race.state === 'idle' && race.offer) out.push({ label: '🏁 Verseny rajt', x: race.offer.x, y: race.offer.y });
+  return out.map(o => ({ ...o, km: (Math.hypot(o.x - player.x, o.y - player.y) / 10000).toFixed(1) }));
+}
+function openTaxiMenu() { Object.assign(taxiMenu, { open: true, items: taxiDestinations(), sel: 0 }); for (const k in keys) keys[k] = false; mouse.down = false; }
+function closeTaxiMenu() { taxiMenu.open = false; }
+function startTrip(i) {
+  const dest = taxiMenu.items[i];
+  if (!dest) return false;
+  if (progress.money < TAXI_FARE) { popup(`A taxi $${TAXI_FARE} – nincs elég pénzed!`, '#f66'); return false; }
+  progress.money -= TAXI_FARE; saveProgress();
+  taxiTrip = { dest, t: TAXI_TRIP };
+  closeTaxiMenu();
+  return true;
+}
+function dismissTaxi(msg) {
+  if (taxi) { const i = aiCars.indexOf(taxi); if (i >= 0 && !taxi.wrecked) aiCars.splice(i, 1); }
+  taxi = null;
+  if (msg) popup(msg, '#f2c230');
+}
+function updateTaxi(dt) {
+  if (taxi && !aiCars.includes(taxi)) taxi = null;
+  if (taxi && !taxiTrip) {
+    if (taxi.wrecked) { taxi = null; popup('🚕 A taxi tönkrement – hívj egy másikat (X)', '#f66'); }
+    else if (player.inCar) dismissTaxi('🚕 Beültél az autódba – a taxit lemondtad');
+    else if (taxi.state === 'coming' && clock > taxi.comeUntil) dismissTaxi('🚕 A taxi nem ért oda – hívj újat (X)');
+  }
+  if (taxi && taxi.state === 'waiting' && clock > taxi.waitUntil && !taxiTrip) {   // nem szálltál be: elmegy
+    aiCars.splice(aiCars.indexOf(taxi), 1); taxi = null; popup('🚕 A taxi nem várt tovább', '#f2c230');
+  }
+  if (!taxiTrip) return;
+  taxiTrip.t -= dt;
+  if (taxiTrip.t > 0) { if (taxi) { player.x = taxi.x; player.y = taxi.y; } return; }
+  const d = taxiTrip.dest;                         // megérkezés: a cél mellett szállsz ki
+  Object.assign(player, { x: d.x, y: d.y, inCar: false, riding: null, inHouse: null });
+  collide(player);
+  if (taxi) { const i = aiCars.indexOf(taxi); if (i >= 0) aiCars.splice(i, 1); }
+  taxi = null; taxiTrip = null;
+  popup(`🚕 Megérkeztél: ${d.label.slice(2).trim()}`, '#f2c230');
+}
+function taxiMenuKey(code) {
+  if (code === 'Escape') closeTaxiMenu();
+  else if (code === 'ArrowUp' || code === 'KeyW') taxiMenu.sel = (taxiMenu.sel + taxiMenu.items.length - 1) % taxiMenu.items.length;
+  else if (code === 'ArrowDown' || code === 'KeyS') taxiMenu.sel = (taxiMenu.sel + 1) % taxiMenu.items.length;
+  else if (code === 'Enter' || code === 'Space') startTrip(taxiMenu.sel);
+}
+function taxiMenuClick(x, y) {
+  for (const h of taxiMenu.hits) if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) { if (h.cancel) closeTaxiMenu(); else startTrip(h.i); return; }
+}
+
 function respawn() {
   Object.assign(player, { x: START_X, y: START_Y, angle: 0, inCar: false, riding: null, inHouse: null, health: 100, dead: 0, arrested: 0, drunk: 0, passedOut: 0 });
+  taxiTrip = null; if (taxi) { const i = aiCars.indexOf(taxi); if (i >= 0) aiCars.splice(i, 1); taxi = null; }
   stopRadio();
   clearWanted();
   for (let i = aiCars.length - 1; i >= 0; i--) if (aiCars[i].police) aiCars.splice(i, 1);
-  Object.assign(car, { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, spin: 0, lastWheels: null, fuel: Math.max(car.fuel, 40) });
+  Object.assign(car, { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, lastWheels: null, fuel: Math.max(car.fuel, 40) });
   if (car.rental) car.ownFuel = Math.max(car.ownFuel || 0, 40);   // bérlés közben a saját autó is megkapja a minimumot
   message = { text: 'Újraéledtél', until: clock + 2 };
 }
@@ -1527,7 +1608,7 @@ function startRace() {
   const px = -dy, py = dx;                                 // oldalirány
   const slots = [[0, 40], [0, -40], [-130, 40], [-130, -40]].map(([a, l]) => ({ x: x + dx * a + px * l, y: y + dy * a + py * l }));
   race.slot = slots[2];                                    // a játékos a második sorból indul
-  Object.assign(car, { x: race.slot.x, y: race.slot.y, angle, vx: 0, vy: 0, spin: 0 });
+  Object.assign(car, { x: race.slot.x, y: race.slot.y, angle, vx: 0, vy: 0 });
   race.racers = [0, 1, 3].map((si, i) => {
     const m = RACE_RIVALS[i], c = makeCar(slots[si].x, slots[si].y, angle, m.color);
     Object.assign(c, { racer: true, number: i + 1, rivalName: m.name, cp: 0, maxRoad: m.maxRoad, maxSand: 420, accel: 430,
@@ -2037,7 +2118,7 @@ function updateTornado(dt) {
       flyAway('car', { color: c.color, len: c.len, wid: c.wid, type: c.type }, c.x, c.y);
       if (c === car) {
         if (player.inCar) tornadoKillsPlayer();
-        Object.assign(car, { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, spin: 0, lastWheels: null });   // az autó a kezdőhelyen kerül elő
+        Object.assign(car, { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, lastWheels: null });   // az autó a kezdőhelyen kerül elő
       } else {
         if (player.riding === c) tornadoKillsPlayer();
         aiCars.splice(aiCars.indexOf(c), 1);
@@ -2109,7 +2190,8 @@ function update(dt) {
   updateDrift(dt);
   updateMission(dt);
   if (player.inCar) { player.x = car.x; player.y = car.y; }
-  for (const c of aiCars) updateCarPhysics(c, c.chasing ? policeInput(c, dt) : c.racer ? racerInput(c, dt) : aiCarInput(c), dt);
+  for (const c of aiCars) updateCarPhysics(c, c.chasing ? policeInput(c, dt) : c.racer ? racerInput(c, dt) : c.taxicab ? taxiInput(c, dt) : aiCarInput(c), dt);
+  updateTaxi(dt);
   if (player.riding && controllable()) { player.x = player.riding.x; player.y = player.riding.y; }   // az utas a busz mozgása után kerül a helyére
   updateRace(dt);
   updateWanted(dt);
@@ -2160,15 +2242,6 @@ function drawLamp(l, n) {
   ctx.beginPath(); ctx.arc(l.x, l.y, 8, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = n > 0.2 ? '#fff4c2' : '#888';
   ctx.beginPath(); ctx.arc(l.hx, l.hy, 6, 0, Math.PI * 2); ctx.fill();
-}
-
-function drawSlime(s) {
-  ctx.fillStyle = 'rgba(80,190,50,0.85)';
-  ctx.beginPath();
-  for (const b of s.blobs) { ctx.moveTo(s.x + b.dx + b.rr, s.y + b.dy); ctx.arc(s.x + b.dx, s.y + b.dy, b.rr, 0, Math.PI * 2); }
-  ctx.fill();
-  ctx.fillStyle = 'rgba(190,255,140,0.55)';
-  ctx.beginPath(); ctx.arc(s.x - s.r * 0.2, s.y - s.r * 0.2, s.r * 0.18, 0, Math.PI * 2); ctx.fill();
 }
 
 function drawRoads(view) {
@@ -2542,6 +2615,10 @@ function drawCar(c, n) {
     ctx.fillStyle = '#1d6e33'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('BÉRAUTÓ', -4, -6); ctx.textAlign = 'left';
   }
+  if (c.taxicab) {                                   // taxi tábla a tetőn
+    ctx.fillStyle = '#222'; ctx.fillRect(-12, -7, 18, 14);
+    ctx.fillStyle = '#f2c230'; ctx.font = 'bold 7px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('TAXI', -3, 3); ctx.textAlign = 'left';
+  }
   if (c.racer) {                                     // rajtszám a tetőn
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-4, 0, 9, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#111'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
@@ -2761,7 +2838,7 @@ function drawHud(w, h) {
   if (tornado && tornado.power > 0.3) drawEdgeArrow(tornado.x, tornado.y, '#ff6a3a', `🌪 ${Math.round(dist(tornado, player) / 10)} m`, w, h);
   ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 176);
   ctx.fillText('Space: kézifék (drift = pénz) · Bal klikk / F: lövés', 20, 196);
-  ctx.fillText(`H: homokvihar · T: gyors idő (${timeScale}x) · Esc: menü / autóbolt`, 20, 216);
+  ctx.fillText(`H: vihar · T: gyors idő (${timeScale}x) · X: taxi · Esc: menü / autóbolt`, 20, 216);
   ctx.fillStyle = '#bbb'; ctx.font = '12px sans-serif';
   ctx.fillText(`Az úton ${SPEED_LIMIT} km/h felett jön a rendőrség · tankolni a ⛽ kutaknál lehet`, 20, 238);
 
@@ -2875,6 +2952,26 @@ function drawHomeless(p) {
   ctx.fillText('SEGÍTS', p.x - fy * 22, p.y + fx * 22 + 2.5);
   if (clock < (p.thanksUntil || 0)) { ctx.fillStyle = '#7f7'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('Köszönöm! ❤', p.x, p.y - 26); }
   ctx.textAlign = 'left';
+}
+
+function drawTaxiMenu(w, h) {
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, w, h);
+  const n = taxiMenu.items.length, PW = 440, PH = 110 + n * 40, px = (w - PW) / 2, py = (h - PH) / 2;
+  ctx.fillStyle = 'rgba(30,26,10,0.96)'; ctx.fillRect(px, py, PW, PH);
+  ctx.strokeStyle = '#f2c230'; ctx.lineWidth = 3; ctx.strokeRect(px, py, PW, PH);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#f2c230'; ctx.font = 'bold 24px sans-serif';
+  ctx.fillText(`🚕 Hova vigyelek? ($${TAXI_FARE})`, w / 2, py + 38);
+  taxiMenu.hits = [];
+  taxiMenu.items.forEach((it, i) => {
+    const y = py + 56 + i * 40, sel = i === taxiMenu.sel;
+    ctx.fillStyle = sel ? 'rgba(242,194,48,0.25)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(px + 20, y, PW - 40, 32);
+    if (sel) { ctx.strokeStyle = '#f2c230'; ctx.lineWidth = 2; ctx.strokeRect(px + 20, y, PW - 40, 32); }
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(it.label, px + 34, y + 22);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#ccc'; ctx.font = '14px sans-serif'; ctx.fillText(`${it.km} km`, px + PW - 34, y + 22);
+    taxiMenu.hits.push({ i, x: px + 20, y, w: PW - 40, h: 32 });
+  });
+  ctx.textAlign = 'center'; ctx.fillStyle = '#999'; ctx.font = '12px sans-serif';
+  ctx.fillText('↑↓: választás · Enter: indulás · Esc: mégse', w / 2, py + PH - 14); ctx.textAlign = 'left';
 }
 
 function drawBank(w, h) {
@@ -3030,7 +3127,6 @@ function render() {
   for (const hs of housesIn(view.x0, view.y0, view.x1, view.y1)) drawHouse(hs, n);
   for (const l of lotsIn(view.x0, view.y0, view.x1, view.y1)) drawParkingLot(l);
   for (const bs of busStopsIn(view.x0, view.y0, view.x1, view.y1)) { drawBusStop(bs); const f = parkingLot(bs).flag; drawHungarianFlag(f.x, f.y); }
-  if (slimeEnabled) for (const ch of chunks) for (const s of ch.slime) if (inView(s)) drawSlime(s);
   drawSkidMarks(view);
   for (const p of npcs) if (p.dead && inView(p)) drawCorpse(p.x, p.y, p.angle, p.shirt, p.head);
   for (const ch of chunks) {
@@ -3074,6 +3170,12 @@ function render() {
   if (menu.open) drawMenu(w, h);
   if (donate.open) drawDonate(w, h);
   if (bank.open) drawBank(w, h);
+  if (taxiMenu.open) drawTaxiMenu(w, h);
+  if (taxiTrip) {                                    // utazás: elsötétül, felirat
+    ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#f2c230'; ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(`🚕 Utazás: ${taxiTrip.dest.label}…`, w / 2, h / 2); ctx.textAlign = 'left';
+  }
 }
 
 // ===== Fő ciklus =====
@@ -3081,7 +3183,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (!menu.open && !donate.open && !bank.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
+  if (!menu.open && !donate.open && !bank.open && !taxiMenu.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
     time = (time + dt * timeScale) % CYCLE;
     clock += dt;
     update(dt);

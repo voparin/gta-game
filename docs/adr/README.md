@@ -33,3 +33,4 @@ Itt van naplózva minden architekturális döntés: mit, miért és milyen alter
 | [0026](0026-radio-menet-kozben-generalt-zene-web-audioval.md) | Rádió: menet közben generált zene Web Audio-val, hangfájlok nélkül | Elfogadva | 2026-11-07 |
 | [0027](0027-buszmenetrend-percenkent-a-legkozelebbi-megalloba.md) | Buszmenetrend: percenként egy busz a legközelebbi megállóba | Elfogadva | 2026-11-07 |
 | [0028](0028-bank-egy-hitel-fix-dijjal-automatikus-torlesztes.md) | Bank: egyszerre egy hitel fix díjjal és automatikus törlesztéssel | Elfogadva | 2026-11-07 |
+| [0029](0029-taxi-hivhato-uti-cel-valasztassal.md) | Taxi: hívható, úti cél választással, az utazás átugorható | Elfogadva | 2026-11-07 |

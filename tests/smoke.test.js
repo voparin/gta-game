@@ -33,12 +33,12 @@ global.requestAnimationFrame = f => (rafCb = f);
 const src = fs.readFileSync(path.join(__dirname, '..', 'game.js'), 'utf8');
 eval(src + `
 ;global.G = { player, car, aiCars, npcs, bullets, storm, skidMarks, smoke, CHUNK, C, ROAD_SPACING, chunksIn, stationsIn, nearestStation, obstacleAt,
-  getChunk, chunkCache, onRoad, onSlime, nearestRoad, spawnNpc, spawnAiCar, damageCar, damagePlayer, nightAmount,
+  getChunk, chunkCache, onRoad, nearestRoad, spawnNpc, spawnAiCar, damageCar, damagePlayer, nightAmount,
   get time(){return time}, set time(v){time=v}, get timeScale(){return timeScale},
-  set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, set police(v){policeEnabled=v}, wanted, clearWanted,
+  set spawn(v){spawnEnabled=v}, set police(v){policeEnabled=v}, wanted, clearWanted,
   SPEED_LIMIT, KMH, START_X, START_Y, progress, mission, drift, stationFor, nearPump, earn, levelOf,
   set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
-  set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, bank, LOAN_MIN, LOAN_MAX, LOAN_FEE, FACTORY_WAGE, WAGE_PERIOD, BOX_SIZE, BELT, bombs, bombInv, BOMB_FUSE, BOMB_RADIUS, BOMB_MAX, BOMB_REGEN, stationCache, STATION_CACHE_MAX, raiseWanted,
+  set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, bank, LOAN_MIN, LOAN_MAX, LOAN_FEE, FACTORY_WAGE, WAGE_PERIOD, BOX_SIZE, BELT, bombs, bombInv, BOMB_FUSE, BOMB_RADIUS, BOMB_MAX, BOMB_REGEN, get taxi(){return taxi}, get taxiTrip(){return taxiTrip}, taxiMenu, TAXI_FARE, taxiDestinations, nearestStation, stationCache, STATION_CACHE_MAX, raiseWanted,
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
@@ -55,9 +55,8 @@ function check(name, cond) {
 }
 const near = (a, b, eps = 0.01) => Math.abs(a - b) < eps;
 
-// a determinisztikus tesztekhez kikapcsoljuk a spawnolást és a nyálkát
+// a determinisztikus tesztekhez kikapcsoljuk a spawnolást
 G.spawn = false;
-G.slime = false;
 G.police = false;
 G.missions = false;
 G.races = false;
@@ -131,33 +130,13 @@ G.chunkCache.clear();
 check('a világ darabjai mindig ugyanúgy generálódnak', sig(G.getChunk(10, 10)) === s1);
 check('vannak akadályok (kaktusz, szikla)', ch1.obstacles.some(o => o.type === 'cactus') && ch1.obstacles.some(o => o.type === 'rock'));
 const roadRow = Math.floor(G.C / G.CHUNK);
-let lampCount = 0, slimes = [];
+let lampCount = 0;
 for (let cx = 0; cx < 55; cx++) {        // a régi pálya szélességében
   const ch = G.getChunk(cx, roadRow);
   lampCount += ch.lamps.length;
-  slimes.push(...ch.slime);
 }
 check('vannak villanyoszlopok az út mentén', lampCount > 50);
-check('vannak nyálkafoltok az úton', slimes.length > 5);
-check('minden nyálkafolt az úton van', slimes.every(s => G.onRoad(s.x, s.y)));
-
-// --- nyálka: kicsúszik az autó ---
-G.slime = true;
-const sl = slimes.find(s => Math.abs(s.y - G.C) < 60);
-Object.assign(G.car, { x: sl.x - 300, y: sl.y, angle: 0, vx: 450, vy: 0, spin: 0, onSlime: false });
-G.player.x = G.car.x; G.player.y = G.car.y; G.player.inCar = true;
-let sawSlime = false, maxSpin = 0;
-key('KeyW', true);
-for (let i = 0; i < 90; i++) {
-  step(1);
-  sawSlime = sawSlime || G.car.onSlime;
-  maxSpin = Math.max(maxSpin, Math.abs(G.car.spin));
-}
-key('KeyW', false);
-check('az autó ráhajt a nyálkára', sawSlime);
-check('a nyálkán megpördül az autó', maxSpin > 2 && Math.abs(Math.atan2(Math.sin(G.car.angle), Math.cos(G.car.angle))) > 0.4);
-G.slime = false;
-key('KeyE', true); key('KeyE', false);
+check('nincsenek nyálkafoltok az utakon', [...Array(55)].every((_, cx) => !('slime' in G.getChunk(cx, roadRow))));
 
 // --- lövöldözés ---
 // az út közepén, ahol nincs akadály
@@ -264,6 +243,7 @@ const strollers = [];
 for (let i = 0; i < 8; i++) {
   const p = G.spawnPedOnSidewalk(i % 2 ? 'h' : 'v', G.C, i % 4 < 2 ? -1 : 1, G.C - 200 + i * 50, i % 3 ? 1 : -1);
   Object.assign(p, { moving: true, wanderT: 99 });
+  p.startAxis = p.axis;
   strollers.push(p);
 }
 Object.assign(G.player, { x: G.C, y: G.C });
@@ -271,10 +251,10 @@ let offPaved = 0;
 for (let i = 0; i < 1500; i++) {      // ~25 mp
   step(1);
   G.player.x = G.C; G.player.y = G.C;  // a közelben maradunk, hogy ne tűnjenek el
-  for (const p of strollers) if (!paved(p)) offPaved++;
+  for (const p of strollers) { if (!paved(p)) offPaved++; if (p.axis !== p.startAxis) p.turned = true; }
 }
 check('a gyalogosok kereszteződéseken át is a járdán / zebrán maradnak', offPaved === 0);
-check('a gyalogosok a sarkon be is fordulnak', strollers.some(p => p.axis !== (strollers.indexOf(p) % 2 ? 'h' : 'v')));
+check('a gyalogosok a sarkon be is fordulnak', strollers.some(p => p.turned));
 
 const scared = G.spawnPedOnSidewalk('h', G.C, 1, G.C + 600, 1);
 Object.assign(scared, { flee: 0.5, fx: scared.x, fy: scared.y - 50 });
@@ -1361,6 +1341,80 @@ G.npcs.length = 0; G.aiCars.length = 0;
   check('házban nem lehet bombát rakni', G.player.inHouse && G.bombs.length === nb1);
   G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
   G.aiCars.length = 0; G.npcs.length = 0; G.clearWanted();
+}
+
+// --- taxi: $5 bárhova ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null;
+  Object.assign(G.player, { x: 30000, y: G.C - G.WALK_OFF, inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0, health: 100, drunk: 0 });
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  press('KeyX');
+  check('X-re taxit hívsz', !!G.taxi && G.taxi.taxicab && G.taxi.state === 'coming');
+  press('KeyX');
+  check('egyszerre csak egy taxi jön', G.aiCars.filter(c => c.taxicab).length === 1);
+  for (let i = 0; i < 60 * 20 && G.taxi.state !== 'waiting'; i++) step(1);
+  step(60);                                            // megvárjuk, hogy le is fékezzen
+  check('a taxi odajön és megáll melletted', G.taxi.state === 'waiting' && Math.hypot(G.taxi.vx, G.taxi.vy) < 15 && Math.hypot(G.taxi.x - G.player.x, G.taxi.y - G.player.y) < 160);
+  check('a taxi mellett kiírja, hogy E: taxi', /taxi/.test((G.interactionPrompt() || {}).text || ''));
+  press('KeyE');
+  check('E-re megnyílik az úti cél választó', G.taxiMenu.open && G.taxiMenu.items.length >= 6);
+  const labels = G.taxiMenu.items.map(i => i.label).join('|');
+  check('a célok között ott a kezdőhely, az autód, a benzinkút, a bank, a kocsma és a gyár', ['Kezdőhely', 'autód', 'benzinkút', 'bank', 'kocsma', 'gyár'].every(w => labels.includes(w)));
+  const clk = G.clock; step(20);
+  check('célválasztás közben áll a játék', G.clock === clk);
+  // nincs pénz
+  G.progress.money = 3;
+  const si = G.taxiMenu.items.findIndex(i => i.label.includes('benzinkút'));
+  G.taxiMenu.sel = si; press('Enter');
+  check(`$${G.TAXI_FARE} nélkül nem visz el`, G.taxiMenu.open && !G.taxiTrip && G.progress.money === 3);
+  // elvisz a legközelebbi benzinkúthoz
+  G.progress.money = 20;
+  const dest = G.taxiMenu.items[si];
+  press('Enter');
+  check(`$${G.TAXI_FARE}-ért elindul`, !!G.taxiTrip && G.progress.money === 15 && !G.taxiMenu.open);
+  step(Math.round(60 * 2.5) + 5);
+  check('megérkezel a célhoz (a legközelebbi benzinkút)', !G.taxiTrip && Math.hypot(G.player.x - dest.x, G.player.y - dest.y) < 60 && !G.taxi);
+  const ns = G.nearestStation(G.player.x, G.player.y);
+  check('a cél tényleg egy benzinkút mellett van', ns && ns.d < 400);
+  // az autódhoz
+  press('KeyX'); for (let i = 0; i < 60 * 20 && (!G.taxi || G.taxi.state !== 'waiting'); i++) step(1); step(60);
+  press('KeyE');
+  check('a megállt taxiba a járdáról is be lehet szállni', G.taxiMenu.open);
+  G.taxiMenu.sel = G.taxiMenu.items.findIndex(i => i.label.includes('autód')); press('Enter');
+  step(160);
+  check('a taxi az autódhoz is elvisz', Math.hypot(G.player.x - G.car.x, G.player.y - G.car.y) < 120);
+  // ha nem szállsz be, a taxi elmegy
+  Object.assign(G.player, { x: 40000, y: G.C - G.WALK_OFF });
+  press('KeyX'); for (let i = 0; i < 60 * 20 && (!G.taxi || G.taxi.state !== 'waiting'); i++) step(1);
+  step(60 * 32);
+  check('ha nem szállsz be, a taxi 30 mp után elmegy', !G.taxi);
+  G.aiCars.length = 0;
+  // kódátnézés után: házban nem nyílik a taxi; autóba ülve lemondod; nem érkező taxi lemond; roncs taxi nem visz; a szállítási cél nem úti cél
+  const hsT = G.housesIn(G.C + 66000, G.C - 400, G.C + 68000, G.C)[0];
+  Object.assign(G.player, G.doorOf(hsT), { inCar: false, inHouse: null });
+  press('KeyX'); for (let i = 0; i < 60 * 20 && (!G.taxi || G.taxi.state !== 'waiting'); i++) step(1); step(60);
+  check('az ajtó előtt a várakozó taxi felirata és az E ugyanazt csinálja', /taxi/.test(G.interactionPrompt().text));
+  G.enterHouse(hsT);                                   // bemegyünk, miközben a taxi kint vár
+  G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = 60;
+  press('KeyE');
+  check('házban az E nem a taxit nyitja', !G.taxiMenu.open && !!G.player.inHouse);
+  G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
+  Object.assign(G.car, { x: G.player.x + 40, y: G.player.y, vx: 0, vy: 0 });
+  press('KeyE');
+  step(2);
+  check('autóba ülve a taxit lemondod', G.player.inCar && !G.taxi);
+  press('KeyE');
+  Object.assign(G.car, { x: G.C - 20000, y: G.C });
+  press('KeyX'); G.taxi.comeUntil = G.clock + 0.1; step(10);
+  check('ha a taxi nem ér oda időben, lemond (újat lehet hívni)', !G.taxi);
+  press('KeyX'); for (let i = 0; i < 60 * 20 && (!G.taxi || G.taxi.state !== 'waiting'); i++) step(1); step(60);
+  const tx = G.taxi; G.damageCar(tx); for (let i = 0; i < 20; i++) G.damageCar(tx);
+  step(2);
+  check('a tönkrement taxiba nem lehet beülni', tx.wrecked && !G.taxi && !(G.interactionPrompt() || { text: '' }).text.includes('taxi'));
+  G.mission.active = true; G.mission.tx = 1; G.mission.ty = 1;
+  check('a szállítási célpont nem taxi-úti cél (különben kiváltaná a szállítást)', !G.taxiDestinations().some(d => d.label.includes('Szállítás')));
+  G.mission.active = false;
+  G.aiCars.length = 0;
 }
 
 // --- zöld busz: csak a játékosé ---
