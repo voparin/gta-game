@@ -5,6 +5,16 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.10.0 – 2026-11-07
+- Végtelen pálya: nincs pályaszél, bármerre lehet menni (ADR-0019)
+- Autóversenyek: rajt a közelben, visszaszámlálás, 3 AI ellenfél, 6 ellenőrzőpont, díj a helyezésért (ADR-0020)
+- Buszmegállók és járó narancs városi buszok; E-vel fel- és leszállás, a jegy $2 (ADR-0021)
+- Zöld busz: csak a játékosé, alapból a garázsban
+- A szállítási dobozokat nem kell időre megtalálni; a sorozat csak halálnál vagy letartóztatásnál vész el
+- Javítva: az AI autók a járdán álló gyalogosokra is fékeztek
+- Javítva: a legközelebbi benzinkút keresése nem mindig a legközelebbit adta
+- Kódátnézés után javítva: a megállón kicsit túlfutó busz kihagyta a megállót; halálnál/letartóztatáskor a holttest a buszon utazott tovább; mozgó buszon is le lehetett tartóztatni; verseny közbeni halálnál eltűnt a „MEGHALTÁL” üzenet; a benzinkút-tároló korlát nélkül nőtt
+
 ## 0.9.2 – 2026-11-07
 - Kódátnézés és refaktorálás bekerült a fejlesztési folyamatba (CLAUDE.md, ADR-0017, ADR-0018)
 - Javítva: pénz nélkül ingyen lehetett tankolni; most csak annyi benzin jár, amennyit ki tudsz fizetni

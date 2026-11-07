@@ -23,12 +23,14 @@ global.requestAnimationFrame = f => (rafCb = f);
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'game.js'), 'utf8');
 eval(src + `
-;global.G = { player, car, aiCars, npcs, bullets, storm, skidMarks, smoke, WORLD, OLD_WORLD, CHUNK, C,
+;global.G = { player, car, aiCars, npcs, bullets, storm, skidMarks, smoke, CHUNK, C, ROAD_SPACING, chunksIn, stationsIn, nearestStation, obstacleAt,
   getChunk, chunkCache, onRoad, onSlime, nearestRoad, spawnNpc, spawnAiCar, damageCar, damagePlayer, nightAmount,
   get time(){return time}, set time(v){time=v}, get timeScale(){return timeScale},
   set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, set police(v){policeEnabled=v}, wanted, clearWanted,
-  SPEED_LIMIT, KMH, START_X, START_Y, progress, mission, drift, stationFor, allStations, nearPump, earn, levelOf,
-  set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
+  SPEED_LIMIT, KMH, START_X, START_Y, progress, mission, drift, stationFor, nearPump, earn, levelOf,
+  set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
+  set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, stationCache, STATION_CACHE_MAX, raiseWanted,
+  get message(){return message}, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
@@ -47,6 +49,7 @@ G.spawn = false;
 G.slime = false;
 G.police = false;
 G.missions = false;
+G.races = false;
 
 step(10);
 check('a játék elindul és fut', typeof rafCb === 'function');
@@ -86,9 +89,28 @@ check('a féknyom 5 mp alatt eltűnik', G.skidMarks.length === 0);
 
 key('KeyE', true); key('KeyE', false);
 check('ki lehet szállni az autóból', G.player.inCar === false);
+{
+  // a régi pályaszélen (0. koordináta) túl is lehet gyalogolni – az úton, ahol nincs akadály
+  const px = G.player.x, py = G.player.y;
+  Object.assign(G.player, { x: 40, y: G.C, inCar: false });
+  key('KeyA', true); step(60); key('KeyA', false);
+  check('a régi pályaszélen túl is lehet menni (negatív koordináta)', G.player.x < -80);
+  Object.assign(G.player, { x: px, y: py });
+}
 
 // --- pálya ---
-check('a pálya legalább 30x akkora területű', G.WORLD * G.WORLD >= 30 * G.OLD_WORLD * G.OLD_WORLD);
+// végtelen pálya: nagyon messze és negatív koordinátákon is van világ
+{
+  const far = [[-300000, 800000], [-12345, -67890], [5e6, -2e6]];
+  check('a pálya végtelen: messze is generálódnak pályadarabok', far.every(([x, y]) =>
+    G.chunksIn(x, y, x + 10, y + 10).length === 1 && G.chunksIn(x, y, x + 10, y + 10)[0].obstacles.length > 0));
+  check('a végtelen pályán is vannak utak', far.every(([x, y]) => G.onRoad(x, G.nearestRoad(y)) && G.onRoad(G.nearestRoad(x), y)));
+  check('a végtelen pályán is van benzinkút a közelben', far.every(([x, y]) => { const ns = G.nearestStation(x, y); return ns && ns.d < 4 * G.ROAD_SPACING; }));
+  const ns0 = G.nearestStation(G.C + 1234, G.C - 4321);
+  const brute = G.stationsIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000).map(st =>
+    Math.hypot(G.C + 1234 - (st.canopy.x0 + st.canopy.x1) / 2, G.C - 4321 - (st.canopy.y0 + st.canopy.y1) / 2));
+  check('a legközelebbi kút keresése tényleg a legközelebbit adja', Math.abs(ns0.d - Math.min(...brute)) < 1e-6);
+}
 const ch1 = G.getChunk(10, 10);
 const sig = c => c.obstacles.length + ':' + c.obstacles.map(o => o.x.toFixed(1)).join(',');
 const s1 = sig(ch1);
@@ -97,7 +119,7 @@ check('a világ darabjai mindig ugyanúgy generálódnak', sig(G.getChunk(10, 10
 check('vannak akadályok (kaktusz, szikla)', ch1.obstacles.some(o => o.type === 'cactus') && ch1.obstacles.some(o => o.type === 'rock'));
 const roadRow = Math.floor(G.C / G.CHUNK);
 let lampCount = 0, slimes = [];
-for (let cx = 0; cx < G.WORLD / G.CHUNK; cx++) {
+for (let cx = 0; cx < 55; cx++) {        // a régi pálya szélességében
   const ch = G.getChunk(cx, roadRow);
   lampCount += ch.lamps.length;
   slimes.push(...ch.slime);
@@ -179,6 +201,8 @@ step(300);
 check('megjelennek AI gyalogosok', G.npcs.some(p => p.kind === 'ped'));
 check('a megjelenő gyalogosok a járdán / zebrán vannak', G.npcs.filter(p => p.kind === 'ped' && !p.dead).every(p => G.onRoad(p.x, p.y, G.SIDEWALK_W)));
 check('megjelennek AI autók', G.aiCars.length > 0);
+for (let i = 0; i < 1800 && !G.aiCars.some(c => c.citybus); i++) step(1);
+check('magától járnak városi buszok', G.aiCars.some(c => c.citybus));
 G.spawn = false;
 
 // --- homokvihar ---
@@ -292,9 +316,10 @@ G.police = false;
 G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted();
 const st = G.stationFor(5, 5);   // a kezdőhely melletti kereszteződés
 check('a kezdőhely mellett van benzinkút', !!st);
-check('a pályán sok benzinkút van', G.allStations().length >= 20);
+const oldArea = G.stationsIn(0, 0, 55000, 55000);
+check('a régi pályaterületen is sok benzinkút van', oldArea.length >= 20);
 let cactiInStations = 0, pumps = 0;
-for (const s2 of G.allStations().slice(0, 15)) {
+for (const s2 of oldArea.slice(0, 15)) {
   for (let cx = Math.floor(s2.rect.x0 / G.CHUNK); cx <= Math.floor(s2.rect.x1 / G.CHUNK); cx++)
     for (let cy = Math.floor(s2.rect.y0 / G.CHUNK); cy <= Math.floor(s2.rect.y1 / G.CHUNK); cy++)
       for (const o of G.getChunk(cx, cy).obstacles) {
@@ -335,7 +360,7 @@ key('KeyE', true); key('KeyE', false);
 G.missions = true;
 G.mission.cooldown = 0;
 step(2);
-check('magától indul szállítási küldetés', G.mission.active && G.mission.timeLeft > 20);
+check('magától indul szállítási küldetés', G.mission.active && G.mission.reward > 60);
 const md = Math.hypot(G.mission.tx - G.player.x, G.mission.ty - G.player.y);
 check('a célpont messze, járdán van', md > 1000 && G.onRoad(G.mission.tx, G.mission.ty, G.SIDEWALK_W));
 const money0 = G.progress.money;
@@ -349,9 +374,13 @@ Object.assign(G.player, { x: G.mission.tx, y: G.mission.ty });
 step(1);
 check('a sorozat szorzója nő (x1.25)', G.progress.money - money1 >= Math.round(reward2 * 1.25) && G.mission.streak === 2);
 step(150);
-G.mission.timeLeft = 0.01;
-step(2);
-check('lejárt időnél elvész a sorozat', G.mission.streak === 0 && !G.mission.active);
+check('a harmadik szállítás is elindul', G.mission.active);
+Object.assign(G.player, { x: G.mission.tx + 3000, y: G.mission.ty, inCar: false });
+step(60 * 150);   // 2,5 perc várakozás
+check('a szállításnak nincs időlimitje', G.mission.active && G.mission.streak === 2);
+G.damagePlayer(1000);
+check('halálnál elvész a sorozat', G.mission.streak === 0);
+step(200);
 G.missions = false;
 
 // --- jutalmak, szintek ---
@@ -461,7 +490,7 @@ G.npcs.length = 0; G.aiCars.length = 0;
   const p3 = G.sanitizeProgress(null);
   check('érvénytelen autó-index a mentésben nem omlasztja össze a játékot', p1.activeCar === 0 && !p1.owned.includes(7));
   check('hibás típusú mentés alapértékre javul', p2.money === 0 && p2.xp === 0 && Array.isArray(p2.owned) && p2.owned[0] === 0);
-  check('üres mentés alapállapot', p3.money === 0 && p3.owned.length === 1 && p3.activeCar === 0);
+  check('üres mentés alapállapot', p3.money === 0 && p3.owned.length === 2 && p3.activeCar === 0);
 }
 // a pályadarab-tárolóból a legrégebben HASZNÁLT darab esik ki
 {
@@ -469,6 +498,171 @@ G.npcs.length = 0; G.aiCars.length = 0;
   const first = G.getChunk(0, 0);
   for (let i = 1; i < 700; i++) { G.getChunk(i % 50, 1 + Math.floor(i / 50)); G.getChunk(0, 0); }
   check('a folyamatosan használt pályadarab nem esik ki a tárolóból', G.getChunk(0, 0) === first);
+}
+
+// --- autóversenyek ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.police = false;
+  Object.assign(G.player, { x: G.C + 1200, y: G.C, inCar: true, dead: 0, arrested: 0, health: 100 });
+  Object.assign(G.car, { x: G.C + 1200, y: G.C, angle: 0, vx: 0, vy: 0, fuel: 100 });
+  G.races = true; G.race.cooldown = 0;
+  step(2);
+  check('megjelenik egy verseny a közelben', G.race.state === 'idle' && !!G.race.offer);
+  check('a verseny útvonala az úton halad', G.race.route.length === 6 && G.race.route.every(p => G.onRoad(p.x, p.y)));
+  Object.assign(G.car, { x: G.race.offer.x, y: G.race.offer.y, vx: 0, vy: 0 });
+  step(1);
+  check('a rajtba hajtva indul a visszaszámlálás', G.race.state === 'countdown' && G.race.racers.length === 3);
+  const sx = G.car.x, sy = G.car.y;
+  key('KeyW', true); step(60); key('KeyW', false);
+  check('visszaszámlálás alatt senki nem indulhat el', G.car.x === sx && G.car.y === sy && G.race.racers.every(r => r.x === r.slot.x));
+  step(130);
+  check('a visszaszámlálás után indul a verseny', G.race.state === 'running');
+  const r0 = G.race.racers[0], d0 = Math.hypot(r0.x - G.race.route[0].x, r0.y - G.race.route[0].y);
+  step(120);
+  check('az ellenfelek az ellenőrzőpont felé hajtanak', Math.hypot(r0.x - G.race.route[0].x, r0.y - G.race.route[0].y) < d0 - 400);
+  Object.assign(G.player, { x: 10, y: 10 });   // messze vagyunk, de a versenyzők nem tűnhetnek el
+  step(1);
+  check('a versenyzők nem tűnnek el, ha messze vannak', G.race.racers.every(r => G.aiCars.includes(r)));
+  // ellenőrzőpontok sorrendben: a 2.-ra ugrva nem számít
+  Object.assign(G.car, { x: G.race.route[1].x, y: G.race.route[1].y, vx: 0, vy: 0 });
+  step(1);
+  check('az ellenőrzőpontokat sorrendben kell érinteni', G.race.cp === 0);
+  // a játékos végigmegy, mielőtt bárki célba ér → 1. hely
+  G.race.racers.forEach(r => { r.cp = 0; });
+  const money0 = G.progress.money;
+  for (let i = 0; i < 6; i++) { Object.assign(G.car, { x: G.race.route[i].x, y: G.race.route[i].y, vx: 0, vy: 0 }); step(1); }
+  check('célba érve 1. hely és fődíj', G.race.state === 'idle' && G.progress.money >= money0 + G.RACE_PRIZES[0]);
+  check('a verseny után az ellenfelek eltűnnek', !G.aiCars.some(c => c.racer));
+  // második verseny: az ellenfelek előbb érnek célba → 4. hely, nincs díj
+  G.race.cooldown = 0; step(2);
+  Object.assign(G.car, { x: G.race.offer.x, y: G.race.offer.y, vx: 0, vy: 0 }); step(200);
+  G.race.racers.forEach(r => { r.cp = 6; G.race.finished.push(r); });
+  check('élőben számolt helyezés (utolsó)', G.racePosition() === 4);
+  const money1 = G.progress.money;
+  for (let i = 0; i < 6; i++) { Object.assign(G.car, { x: G.race.route[i].x, y: G.race.route[i].y, vx: 0, vy: 0 }); step(1); }
+  check('utolsó helyért nincs díj', G.race.state === 'idle' && G.progress.money === money1);
+  // harmadik verseny: kiszállás = feladás
+  G.race.cooldown = 0; step(2);
+  Object.assign(G.car, { x: G.race.offer.x, y: G.race.offer.y, vx: 0, vy: 0 }); step(200);
+  key('KeyE', true); key('KeyE', false); step(1);
+  check('kiszállva feladod a versenyt', G.race.state === 'idle' && !G.aiCars.some(c => c.racer));
+  G.races = false;
+}
+
+// --- buszmegállók és városi buszok ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted();
+  const stops = G.busStopsIn(G.C - 6000, G.C - 200, G.C + 6000, G.C + 200);
+  check('vannak buszmegállók az út mentén, mindkét oldalon', stops.length >= 8 && stops.some(s => s.side === 1) && stops.some(s => s.side === -1));
+  check('a megállók a járdán vannak, távol a kereszteződésektől', stops.every(s => G.onRoad(s.x, s.y, G.SIDEWALK_W) && !G.onRoad(s.x, s.y)
+    && Math.abs((s.axis === 'h' ? s.x : s.y) - G.nearestRoad(s.axis === 'h' ? s.x : s.y)) >= 1000));
+  // busz a vízszintes úton kelet felé, a következő megálló előtt
+  const stopX = 1250 + 2500 * Math.ceil((G.C + 3000 - 1250) / 2500);
+  Object.assign(G.player, { x: stopX, y: G.C + G.WALK_OFF, inCar: false, riding: null, dead: 0, arrested: 0 });
+  const bus = G.spawnCityBus('h', 1, G.C, stopX - 900);
+  check('a városi busz nem a zöld busz', bus.type === 'citybus' && bus.color !== G.CAR_MODELS[G.BUS].color);
+  let stoppedAt = null;
+  for (let i = 0; i < 600 && !stoppedAt; i++) { step(1); if (G.clock < bus.dwellUntil) stoppedAt = bus.x; }
+  check('a busz megáll a megállóban', stoppedAt !== null && Math.abs(stoppedAt - stopX) < 40);
+  step(30);
+  check('a busz áll, amíg a megállóban vár', Math.hypot(bus.vx, bus.vy) < 15);
+  // felszállás: a megállóban, a busz mellett
+  Object.assign(G.player, { x: bus.x, y: bus.y + bus.wid / 2 + 20 });
+  G.progress.money = 1;
+  key('KeyE', true); key('KeyE', false);
+  check(`$${G.BUS_FARE} nélkül nem lehet felszállni`, !G.player.riding && G.progress.money === 1);
+  G.progress.money = 10;
+  key('KeyE', true); key('KeyE', false);
+  check(`a megálló buszra fel lehet szállni, a jegy $${G.BUS_FARE}`, G.player.riding === bus && G.progress.money === 10 - G.BUS_FARE);
+  step(60 * (G.BUS_DWELL + 3));
+  check('a busz továbbindul, és viszi az utast', bus.x > stopX + 300 && G.player.x === bus.x && G.player.y === bus.y);
+  // menet közben nem lehet leszállni
+  if (Math.hypot(bus.vx, bus.vy) > 100) { key('KeyE', true); key('KeyE', false); }
+  check('menet közben nem lehet leszállni', G.player.riding === bus);
+  // a következő megállóban leszállunk
+  let stopped2 = false;
+  for (let i = 0; i < 1200 && !stopped2; i++) { step(1); stopped2 = G.clock < bus.dwellUntil && Math.hypot(bus.vx, bus.vy) < 15; }
+  // a kereszteződésben el is fordulhat, ezért bármelyik megállót elfogadjuk: a sávja mentén 1250 + k·2500 px-nél
+  const alongNow = bus.ai.axis === 'h' ? bus.x : bus.y;
+  const offStop = Math.abs(((alongNow - 1250) % G.STOP_SPACING + G.STOP_SPACING) % G.STOP_SPACING);
+  check('a busz a következő megállóban is megáll', stopped2 && Math.min(offStop, G.STOP_SPACING - offStop) < 40);
+  key('KeyE', true); key('KeyE', false);
+  const offD = Math.hypot(G.player.x - bus.x, G.player.y - bus.y);
+  check('megálláskor le lehet szállni, a busz mellé (járdára)', !G.player.riding && Math.abs(offD - (bus.wid / 2 + 22)) < 3
+    && G.onRoad(G.player.x, G.player.y, G.SIDEWALK_W) && !G.onRoad(G.player.x, G.player.y));
+  // a járdán álló gyalogos miatt nem fékez az autó (csak a saját sávjában lévőre)
+  G.aiCars.length = 0;
+  const car2 = G.spawnAiCar('h', 1, G.C, 40000);
+  const walker2 = G.spawnNpc('ped', 40120, G.C + G.WALK_OFF);
+  Object.assign(walker2, { moving: false, wanderT: 99 });
+  Object.assign(G.player, { x: 40000, y: G.C - 400, riding: null });
+  step(60);
+  check('a járdán álló gyalogos miatt nem fékez az autó', car2.x > 40000 + 200);
+  const blocker = G.spawnNpc('ped', car2.x + 120, car2.y);
+  Object.assign(blocker, { moving: false, wanderT: 99 });
+  step(60);
+  check('a sávjában álló gyalogos előtt megáll', Math.hypot(car2.vx, car2.vy) < 30 && blocker.dead === 0);
+  G.aiCars.length = 0; G.npcs.length = 0;
+}
+
+// --- kódátnézés (v0.10.0): javított hibák ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted();
+  // 1. a kicsit túlfutott megállóban is megáll a busz
+  const stopX2 = 1250 + 2500 * Math.ceil((G.C + 9000 - 1250) / 2500);
+  Object.assign(G.player, { x: stopX2, y: G.C - 600, inCar: false, riding: null, dead: 0, arrested: 0 });
+  const busO = G.spawnCityBus('h', 1, G.C, stopX2 + 10);    // már 10 px-rel túl van a megállón
+  Object.assign(busO, { vx: 60, vy: 0 });
+  let dwelt = false;
+  for (let i = 0; i < 120 && !dwelt; i++) { step(1); dwelt = G.clock < busO.dwellUntil; }
+  check('a kicsit túlfutott megállóban is megáll a busz', dwelt && busO.x < stopX2 + 60);
+  // 2–3. utasként: mozgó buszon nem tartóztatnak le, halálnál leszállsz
+  busO.dwellUntil = 0; busO.lastStop = 'x';
+  G.progress.money = 50;
+  Object.assign(G.player, { x: busO.x, y: busO.y + busO.wid / 2 + 20 });
+  Object.assign(busO, { vx: 0, vy: 0 });
+  key('KeyE', true); key('KeyE', false);
+  for (let i = 0; i < 900 && Math.hypot(busO.vx, busO.vy) < 200; i++) step(1);   // megvárjuk, amíg a busz menetsebességgel halad
+  const cop = Object.assign(G.spawnAiCar('h', 1, G.C, busO.x - 60), { police: true, chasing: false });
+  G.wanted.level = 1; G.wanted.lostTimer = 0;
+  for (let i = 0; i < 110; i++) { Object.assign(cop, { x: busO.x - 60, y: busO.y, vx: busO.vx, vy: busO.vy }); cop.chasing = true; step(1); }
+  check('mozgó buszon nem lehet letartóztatni', !(G.player.arrested > 0) && Math.hypot(busO.vx, busO.vy) > 40);
+  G.clearWanted(); G.aiCars.splice(G.aiCars.indexOf(cop), 1);
+  const deathX = G.player.x;
+  G.damagePlayer(1000);
+  step(30);
+  check('halálkor leszállsz a buszról, a holttest nem utazik tovább', !G.player.riding && G.player.x === deathX);
+  step(200);
+  // 4. verseny közbeni halálnál a halál üzenete marad
+  G.aiCars.length = 0;
+  Object.assign(G.player, { x: G.C + 1200, y: G.C, inCar: true, dead: 0, arrested: 0, health: 100 });
+  Object.assign(G.car, { x: G.C + 1200, y: G.C, angle: 0, vx: 0, vy: 0 });
+  G.races = true; G.race.cooldown = 0; step(2);
+  Object.assign(G.car, { x: G.race.offer.x, y: G.race.offer.y, vx: 0, vy: 0 }); step(200);
+  G.damagePlayer(1000);
+  step(2);
+  check('verseny közbeni halálnál a „MEGHALTÁL” üzenet marad', G.race.state === 'idle' && G.message.text === 'MEGHALTÁL');
+  G.races = false;
+  step(200);
+  // 5. a benzinkút-tároló korlátos
+  for (let i = 0; i < 400; i++) G.nearestStation(1e6 + i * 60000, -1e6);   // korlát nélkül ~10 000 bejegyzés lenne
+  check('a benzinkút-tároló mérete korlátos', G.stationCache.size <= G.STATION_CACHE_MAX);
+  G.aiCars.length = 0;
+}
+
+// --- zöld busz: csak a játékosé ---
+{
+  const bus = G.CAR_MODELS[G.BUS];
+  check('van zöld busz', bus && bus.type === 'bus' && bus.name === 'Zöld busz');
+  check('a busz alapból a játékosé', G.sanitizeProgress(null).owned.includes(G.BUS) && G.progress.owned.includes(G.BUS));
+  const prev = G.progress.activeCar;
+  G.selectCar(G.BUS);
+  check('a busz kiválasztható, és busz-tulajdonságai vannak', G.car.type === 'bus' && G.car.len === bus.len && G.car.maxRoad === bus.maxRoad);
+  G.aiCars.length = 0;
+  for (let i = 0; i < 40; i++) G.spawnAiCar('h', 1, G.C, 10000 + i * 300);
+  check('AI sosem vezet buszt', G.aiCars.every(c => c.type !== 'bus' && c.color !== bus.color));
+  G.aiCars.length = 0;
+  G.selectCar(prev);
 }
 
 // --- verzió ---

@@ -1,6 +1,6 @@
 # Sivatagi GTA
 
-Felülnézetes, GTA-szerű böngészős játék egy hatalmas (~55 000 × 55 000 px-es) sivatagban: piros autó, lövöldözés, AI gyalogosok (járdán sétálnak, zebrán kelnek át), banditák és AI autók, nyálkafoltok az utakon, rendőrségi üldözés 145 km/h feletti gyorshajtásért, homokviharok, villanyoszlopok és nappal/éjszaka váltás (30 perc nappal, 30 perc éjszaka).
+Felülnézetes, GTA-szerű böngészős játék egy végtelen sivatagban: piros autó, lövöldözés, AI gyalogosok (járdán sétálnak, zebrán kelnek át), banditák és AI autók, nyálkafoltok az utakon, rendőrségi üldözés 145 km/h feletti gyorshajtásért, homokviharok, villanyoszlopok és nappal/éjszaka váltás (30 perc nappal, 30 perc éjszaka).
 
 Élő verzió: https://voparin.github.io/gta-game/
 
@@ -30,8 +30,17 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Kevés benzinnél a képernyő szélén nyíl mutatja a legközelebbi kutat; a térképen a kutak narancssárga négyzetek.
 
 ## Pénz, küldetések, fejlődés
-- **Szállítás:** mindig van egy célpont (📦, sárga nyíl). Érj oda időben – minden sikeres szállítás után nő a sorozatszorzó (x1.25, x1.5…), lejárt időnél elvész.
+- **Szállítás:** mindig van egy célpont (📦, sárga nyíl), időlimit nélkül. Minden sikeres szállítás után nő a sorozatszorzó (x1.25, x1.5…); halálnál vagy letartóztatásnál elvész.
 - **Drift-kombó:** kézifékes driftelésért pénz jár; minél tovább driftelsz ütközés nélkül, annál nagyobb a szorzó (max x5).
 - **Fejpénz:** bandita lelövése $50, a rendőrök lerázása $150 / csillag. Letartóztatáskor 10% bírság.
 - **Szintek:** minden megkeresett dollár XP is; szintlépéskor bónusz jár.
 - **Autóbolt (Esc):** a pénzből új autókat vehetsz. A pénz, a megvett autók és a rekordok (legjobb drift, leghosszabb sorozat) megmaradnak a böngészőben.
+
+## Autóversenyek
+- A közelben mindig felbukkan egy verseny (🏁, kék nyíl). Hajts be a rajtba: 3 mp visszaszámlálás, majd 3 ellenfél ellen 6 ellenőrzőponton át kell célba érni.
+- Díj: 1. hely $600, 2. hely $250, 3. hely $100. Ha kiszállsz, feladod a versenyt.
+
+## Buszok
+- Az utak mentén buszmegállók vannak; a narancs városi buszok megállnak bennük.
+- A megálló busz mellett **E**: felszállás ($2), **E** újra: leszállás, amikor a busz megáll.
+- A **zöld busz** csak a tiéd – az Esc menüben választhatod ki.

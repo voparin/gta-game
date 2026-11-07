@@ -26,8 +26,11 @@ Felépítés a `game.js`-en belül:
 - **Időjárás**: `storm` (homokvihar), napszak: `nightAmount`.
 - **Benzinkutak**: `stationFor(i, j)` kereszteződésenként determinisztikusan; `stationsIn`, `nearPump`, `nearestStation`. Benzin: `car.fuel`, `updateFuel`.
 - **Előrehaladás**: `progress` (pénz, XP, megvett autók, rekordok – localStorage), `earn()` minden jutalomhoz, `levelOf`. Küldetés: `mission`, `updateMission`; drift-kombó: `drift`, `updateDrift`; autóbolt: `buyCar`.
+- **Végtelen pálya** (ADR-0019): nincs `WORLD` határ; „egész pályás” keresés helyett mindig korlátos sugarú keresés (pl. `nearestStation`).
+- **Versenyek** (ADR-0020): `race` állapot, `planRace`, `startRace`, `updateRace`, `racerInput`; versenyzők az `aiCars`-ban `racer` jelzővel.
+- **Buszok** (ADR-0021): `busStopsIn` (analitikus megállók), `spawnCityBus` (`citybus` jelző), `player.riding` (utas), `BUS_FARE`. A zöld busz (`BUS`) csak a játékosé.
 - **Rendőrség**: `wanted` (körözési szint), `updateWanted` (gyorshajtás `SPEED_LIMIT` felett, lerázás, letartóztatás), `policeInput` (üldözés). A rendőrautók az `aiCars`-ban vannak `police`/`chasing` jelzővel. Tesztben a `policeEnabled` kikapcsolható.
-- Tesztekben a `spawnEnabled`, `slimeEnabled`, `policeEnabled` és `missionsEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el. Ne írj olyan tesztet, ami véletlen szóráson vagy időzítési szerencsén múlik.
+- Tesztekben a `spawnEnabled`, `slimeEnabled`, `policeEnabled`, `missionsEnabled` és `racesEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el. Ne írj olyan tesztet, ami véletlen szóráson vagy időzítési szerencsén múlik.
 
 ## Architekturális döntések (ADR)
 

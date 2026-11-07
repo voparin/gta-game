@@ -23,3 +23,6 @@ Itt van naplózva minden architekturális döntés: mit, miért és milyen alter
 | [0016](0016-jutalmazasi-rendszer-szerencsejatek-elemek-nelkul.md) | Jutalmazási rendszer szerencsejáték-elemek nélkül | Elfogadva | 2026-11-07 |
 | [0017](0017-architekturalis-dontesek-naplozasa-adr-ekben.md) | Architekturális döntések naplózása ADR-ekben, teszttel ellenőrizve | Elfogadva | 2026-11-07 |
 | [0018](0018-kodatnezes-es-refaktoralas-a-fejlesztesi-folyamatban.md) | Kódátnézés és refaktorálás a fejlesztési folyamatban | Elfogadva | 2026-11-07 |
+| [0019](0019-vegtelen-palya.md) | Végtelen pálya | Elfogadva | 2026-11-07 |
+| [0020](0020-autoversenyek-ellenorzopontokkal-a-racson.md) | Autóversenyek ellenőrzőpontokkal a rácson, versenyzők az aiCars-ban | Elfogadva | 2026-11-07 |
+| [0021](0021-varosi-buszok-buszmegallok-es-utazas.md) | Városi buszok, buszmegállók és utazás a buszon | Elfogadva | 2026-11-07 |
