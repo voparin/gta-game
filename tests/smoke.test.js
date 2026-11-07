@@ -30,7 +30,9 @@ eval(src + `
   SPEED_LIMIT, KMH, START_X, START_Y, progress, mission, drift, stationFor, nearPump, earn, levelOf,
   set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
   set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, stationCache, STATION_CACHE_MAX, raiseWanted,
-  get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
+  get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
+  get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
+  get activeSkin(){return activeSkin}, buySkin, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
@@ -51,6 +53,7 @@ G.police = false;
 G.missions = false;
 G.races = false;
 G.storm.timer = 1e9;      // a homokvihar csak a saját tesztjében jöjjön (a szél sodor mindent)
+G.tornadoes = false;
 
 step(10);
 check('a játék elindul és fut', typeof rafCb === 'function');
@@ -809,6 +812,173 @@ G.npcs.length = 0; G.aiCars.length = 0;
   }));
   check('a ház akadályt a golyó is érzékeli a saroknál', cornersIn.every(({ x, y }) => G.obstacleAt(x, y)));
   check('a házak mindig ugyanott vannak', JSON.stringify(G.housesIn(...area).map(h => [h.x, h.y, h.roof])) === JSON.stringify(hs.map(h => [h.x, h.y, h.roof])));
+}
+
+// --- házak belseje ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null;
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  const hs = G.housesIn(G.C + 31000, G.C - 400, G.C + 33000, G.C)[0];
+  const door = G.doorOf(hs);
+  check('az ajtó a ház és a járda között van (a bejárati úton)', !G.onRoad(door.x, door.y, G.SIDEWALK_W) && G.onRoad(door.x, door.y, G.SIDEWALK_W + 30)
+    && !(door.x > hs.x0 && door.x < hs.x1 && door.y > hs.y0 && door.y < hs.y1));
+  Object.assign(G.player, { x: door.x, y: door.y, inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0, health: 40, lastHit: -99 });
+  press('KeyE');
+  check('az ajtónál E-vel be lehet menni a házba', !!G.player.inHouse && G.player.inHouse.hs.id === hs.id);
+  const H = G.player.inHouse, ix0 = H.ix, iy0 = H.iy;
+  key('KeyW', true); step(30); key('KeyW', false);
+  check('a házban lehet járkálni', H.iy < iy0 - 30 && G.player.x === door.x);
+  key('KeyA', true); step(400); key('KeyA', false);
+  check('a falon nem lehet átmenni', H.ix >= 14 + 12 - 1e-6);
+  const insideFurniture = (x, y) => H.furniture.some(f => x > f.x && x < f.x + f.w && y > f.y && y < f.y + f.h);
+  let walkedIntoFurniture = false;
+  for (const f of H.furniture) {                        // arról az oldalról közelítünk, ahol van hely
+    const fromAbove = f.y - 40 > 14 + 12;
+    H.ix = f.x + f.w / 2; H.iy = fromAbove ? f.y - 30 : f.y + f.h + 30;
+    if (insideFurniture(H.ix, H.iy)) continue;
+    const k = fromAbove ? 'KeyS' : 'KeyW';
+    key(k, true); step(90); key(k, false);
+    if (insideFurniture(H.ix, H.iy)) walkedIntoFurniture = true;
+  }
+  check('a bútorok szilárdak', !walkedIntoFurniture);
+  const doorClear = G.furnitureOf(hs).every(f => !(f.x < G.ROOM_W / 2 + 45 && f.x + f.w > G.ROOM_W / 2 - 45 && f.y + f.h > G.ROOM_H - 100));
+  check('az ajtó előtt nincs bútor', doorClear);
+  // bent: rendőrség, gyógyulás
+  G.wanted.level = 1; G.wanted.lostTimer = 0;
+  const cop = Object.assign(G.spawnAiCar('h', 1, G.C, door.x), { police: true, chasing: true, stuckT: 0, reverseT: 0 });
+  Object.assign(cop, { x: door.x, y: door.y + (hs.side > 0 ? -60 : 60), vx: 0, vy: 0 });
+  G.police = false;
+  for (let i = 0; i < 60 * 13; i++) { Object.assign(cop, { x: door.x, y: door.y + (hs.side > 0 ? -60 : 60), vx: 0, vy: 0 }); step(1); }
+  check('a házban nem tartóztatnak le', !(G.player.arrested > 0) && !!G.player.inHouse);
+  check('a házban 12 mp után leráztad a rendőröket (az ajtó előtt álló rendőr sem lát)', G.wanted.level === 0);
+  check('otthon gyorsabban gyógyulsz', G.player.health === 100);
+  G.aiCars.length = 0;
+  // kimenés
+  H.ix = G.ROOM_W / 2; H.iy = G.ROOM_H - 30;
+  press('KeyE');
+  check('az ajtónál E-vel ki lehet menni', !G.player.inHouse && Math.hypot(G.player.x - door.x, G.player.y - door.y) < 1);
+  press('KeyE');
+  H.ix = G.ROOM_W / 2; H.iy = 60;                       // a szoba közepén nem lehet kimenni
+  const H2 = G.player.inHouse; if (H2) { H2.ix = G.ROOM_W / 2; H2.iy = 60; }
+  press('KeyE');
+  check('csak az ajtónál lehet kimenni', !!G.player.inHouse);
+  // a tornádó a házzal együtt elvisz
+  G.destroyHouse(hs);
+  check('ha a tornádó elviszi a házat, téged is elvisz', !G.player.inHouse && G.player.dead > 0);
+  step(200);
+  Object.assign(G.player, { x: door.x, y: door.y });
+  press('KeyE');
+  check('lerombolt házba nem lehet bemenni', !G.player.inHouse);
+}
+
+// --- kódátnézés (v0.12.0): javított hibák ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null;
+  // 1. házban a felirat a kimenésről szól, akkor is, ha az autó az ajtó mellett áll
+  const hsA = G.housesIn(G.C + 36000, G.C - 400, G.C + 38000, G.C)[0];
+  Object.assign(G.player, { inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0 });
+  G.enterHouse(hsA);
+  const dA = G.doorOf(hsA);
+  Object.assign(G.car, { x: dA.x + 20, y: dA.y, vx: 0, vy: 0 });
+  check('házban a felirat a kimenésről szól, akkor is, ha az autó az ajtónál áll', /kimen/.test(G.interactionPrompt().text));
+  G.exitHouse();
+  Object.assign(G.car, { x: G.C - 20000, y: G.C });
+  // 2. függőleges út melletti házból kilépve az út felé nézel
+  const hsV = G.housesIn(G.C - 400, G.C + 6000, G.C, G.C + 9000).find(h => h.axis === 'v');
+  G.enterHouse(hsV); G.exitHouse();
+  const faceX = Math.cos(G.player.angle), faceY = Math.sin(G.player.angle);
+  check('függőleges út melletti házból kilépve az út felé nézel', Math.abs(faceY) < 1e-6 && Math.sign(faceX) === Math.sign(hsV.road - G.player.x));
+  // 3. alacsony ablakban is látszik a szoba alja (az ajtó) és a lenti felirat
+  check('alacsony ablakban is látszik a szoba ajtaja', [[1280, 720], [1280, 500], [800, 450], [400, 600]].every(([w, h]) => {
+    const L = G.roomLayout(w, h);
+    return L.oy >= 0 && L.oy + G.ROOM_H * L.sc <= h - 60 && L.ox >= 0 && L.ox + G.ROOM_W * L.sc <= w;
+  }));
+  // 4. a tornádó által elvitt versenyző kiesik a versenyből
+  Object.assign(G.player, { x: G.C + 1200, y: G.C, inCar: true });
+  Object.assign(G.car, { x: G.C + 1200, y: G.C, angle: 0, vx: 0, vy: 0 });
+  G.races = true; G.race.cooldown = 0; step(2);
+  Object.assign(G.car, { x: G.race.offer.x, y: G.race.offer.y, vx: 0, vy: 0 }); step(200);
+  const rv = G.race.racers[0];
+  G.spawnTornado(rv.x, rv.y); G.tornado.power = 1; G.tornado.life = 1e9;
+  step(1);
+  check('a tornádó által elvitt versenyző kiesik a versenyből', !G.race.racers.includes(rv) && G.race.racers.length === 2);
+  G.tornado = null; G.races = false;
+  key('KeyE', true); key('KeyE', false); step(2);
+  G.aiCars.length = 0;
+}
+
+// --- Pókhős szkin ($900) ---
+{
+  const spi = G.SKINS.findIndex(k => k.name === 'Pókhős');
+  check('van Pókhős szkin, $900-ért, hálómintás', spi >= 0 && G.SKINS[spi].price === 900 && G.SKINS[spi].pattern === 'web');
+  check('a Pókhős szkin alapból nincs meg, a többi ingyenes megvan', !G.ownsSkin(spi) && G.SKINS.every((k, i) => i === spi || G.ownsSkin(i)));
+  press('Escape');
+  press('ArrowDown');                                   // a szkin sor
+  while (G.menu.skin !== (spi + G.SKINS.length - 1) % G.SKINS.length) press('ArrowRight');   // lapozás közben a megvettek felkerülnek
+  const before = G.activeSkin;
+  press('ArrowRight');
+  check('a meg nem vett szkin nem vehető fel', G.menu.skin === spi && G.activeSkin === before);
+  G.progress.money = 500;
+  press('Enter');
+  check('$900 nélkül nem lehet megvenni', !G.ownsSkin(spi) && G.progress.money === 500);
+  press('Escape');
+  check('menü bezárásakor a viselt szkin marad kiválasztva', G.menu.skin === before && G.activeSkin === before);
+  G.progress.money = 1000;
+  press('Escape'); press('ArrowDown');
+  while (G.menu.skin !== spi) press('ArrowRight');
+  press('Enter');
+  check('$900-ért megvehető, és rögtön rajtad van', G.ownsSkin(spi) && G.activeSkin === spi && G.progress.money === 100);
+  press('ArrowRight'); press('ArrowLeft');
+  check('a megvett szkinre vissza lehet váltani', G.activeSkin === spi);
+  press('Escape');
+  check('a megvett szkin a mentésben is megmarad', G.sanitizeProgress({ money: 0, ownedSkins: [spi, 99, -1, 'x'] }).ownedSkins.includes(spi)
+    && !G.sanitizeProgress({ money: 0, ownedSkins: [99] }).ownedSkins.includes(99));
+  step(5);
+  check('a Pókhős szkinnel is fut a játék (rajzolás hiba nélkül)', true);
+}
+
+// --- tornádó a homokviharban ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null;
+  Object.assign(G.player, { x: G.C + 20000, y: G.C - 1500, inCar: false, riding: null, dead: 0, arrested: 0, health: 100 });
+  G.tornadoes = true;
+  G.storm.level = G.storm.target = 0; step(600);
+  check('homokvihar nélkül nincs tornádó', G.tornado === null);
+  G.storm.level = G.storm.target = 1; G.storm.timer = 1e9;
+  for (let i = 0; i < 60 * 120 && !G.tornado; i++) step(1);
+  check('erős homokviharban tornádó támad', !!G.tornado);
+  G.tornadoes = false;
+  // rögzített helyzet: a tornádó egy ház, egy autó és egy gyalogos mellett
+  const hs = G.housesIn(G.C + 21000, G.C - 400, G.C + 23000, G.C)[0];
+  G.spawnTornado(hs.x, hs.y);
+  const T0 = G.tornado; T0.power = 1; T0.life = 1e9; T0.wander = 0;
+  const victimCar = G.spawnAiCar('h', 1, G.C, hs.x + 30); Object.assign(victimCar, { x: hs.x + 30, y: hs.y, vx: 0, vy: 0 });
+  const victim = G.spawnNpc('ped', hs.x - 30, hs.y); Object.assign(victim, { moving: false, wanderT: 99 });
+  const farCar = G.spawnAiCar('h', 1, G.C, hs.x + 250); Object.assign(farCar, { x: hs.x + 250, y: hs.y, vx: 0, vy: 0 });
+  Object.assign(G.player, { x: hs.x + 2000, y: hs.y });
+  step(2);
+  check('a tornádó felszippantja a házat (rom marad)', G.destroyedHouses.has(hs.id) && !G.housesIn(hs.x0, hs.y0, hs.x1, hs.y1).some(h => h.id === hs.id));
+  const probe = { x: hs.x, y: hs.y, r: 12 }; G.collideTest(probe);
+  check('a lerombolt ház már nem akadály', Math.hypot(probe.x - hs.x, probe.y - hs.y) < 1);
+  G.chunkCache.clear();
+  check('a lerombolt ház újragenerálás után sem tér vissza', !G.housesIn(hs.x0, hs.y0, hs.x1, hs.y1).some(h => h.id === hs.id));
+  check('a tornádó felszippantja az autót', !G.aiCars.includes(victimCar));
+  check('a tornádó felszippantja az embert', !G.npcs.includes(victim));
+  check('a felszippantott dolgok a tornádóban repülnek', G.tornado.flying.length >= 3);
+  const fd0 = Math.hypot(G.tornado.x - farCar.x, G.tornado.y - farCar.y), fa0 = Math.atan2(farCar.y - G.tornado.y, farCar.x - G.tornado.x);
+  step(30);
+  const fd1 = Math.hypot(G.tornado.x - farCar.x, G.tornado.y - farCar.y), fa1 = Math.atan2(farCar.y - G.tornado.y, farCar.x - G.tornado.x);
+  check('a távolabbi autót beszívja és megpörgeti', !G.aiCars.includes(farCar) || (fd1 < fd0 - 40 && Math.abs(Math.atan2(Math.sin(fa1 - fa0), Math.cos(fa1 - fa0))) > 0.1));
+  // a játékost is elviszi
+  Object.assign(G.player, { x: G.tornado.x + 20, y: G.tornado.y, inCar: false, riding: null });
+  step(2);
+  check('a gyalogos játékost is elviszi a tornádó', G.player.dead > 0 && G.message.text === 'ELVITT A TORNÁDÓ!');
+  step(200);
+  // a vihar végén eltűnik
+  G.storm.level = G.storm.target = 0; T0.life = 0;
+  step(240);
+  check('a vihar végén a tornádó elül', G.tornado === null);
+  G.aiCars.length = 0; G.npcs.length = 0; G.storm.timer = 1e9;
 }
 
 // --- zöld busz: csak a játékosé ---

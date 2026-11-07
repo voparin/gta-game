@@ -19,7 +19,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 | Bal klikk / F | lövés (egérrel célzás) |
 | H | homokvihar be/ki |
 | T | gyorsított idő (60x) |
-| Esc | menü: szünet, szkin- és autóváltás (a választás megmarad) |
+| Esc | menü: szünet, szkin- és autóváltás, szkin- és autóbolt (a választás megmarad) |
 
 ## Rendőrség
 - Az utakon (és járdán) **145 km/h** a sebességkorlát – a táblák is jelzik. Ha túlléped, körözni kezdenek (★), rendőrre lövésért ★★.
@@ -55,3 +55,13 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 ## Csövesek
 - A járdán csövesek ülnek („SEGÍTS” tábla, pohár). Mellettük **E**: adományozhatsz **$1 és $200** között.
 - Az összes adományod az Esc menüben, a rekordok között látszik.
+
+## Tornádó
+- Erős homokviharban tornádó támadhat (🌪, piros nyíl és pötty a térképen). Beszív és megpörget; a közepén felszippantja a házakat, autókat, embereket – téged is. Menekülj előle!
+
+## Házak
+- A ház ajtajánál **E**: bemész. Bent nem talál meg a rendőrség (12 mp után leráztad őket), a banditák nem érnek el, és gyorsabban gyógyulsz. Kimenni az ajtónál **E**-vel lehet.
+- Vigyázz: ha a tornádó elviszi a házat, téged is elvisz.
+
+## Szkinek
+- Az Esc menüben választhatsz szkint. A **Pókhős** (piros-kék, hálómintás) **$900**-ba kerül; a többi ingyenes.
