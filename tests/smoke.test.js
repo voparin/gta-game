@@ -26,10 +26,12 @@ eval(src + `
 ;global.G = { player, car, aiCars, npcs, bullets, storm, skidMarks, smoke, WORLD, OLD_WORLD, CHUNK, C,
   getChunk, chunkCache, onRoad, onSlime, nearestRoad, spawnNpc, spawnAiCar, damageCar, damagePlayer, nightAmount,
   get time(){return time}, set time(v){time=v}, get timeScale(){return timeScale},
-  set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v} };`);
+  set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, menu, SKINS, CAR_MODELS,
+  get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
 const key = (code, down) => listeners[down ? 'keydown' : 'keyup']({ code, repeat: false });
+const press = code => { key(code, true); key(code, false); };
 
 let failed = 0;
 function check(name, cond) {
@@ -179,6 +181,38 @@ check('H gombra homokvihar támad', G.storm.level > 0.9 && G.storm.particles.len
 key('KeyH', true); key('KeyH', false);
 step(300);
 check('H gombra eláll a homokvihar', G.storm.level < 0.1);
+
+// --- Esc menü: szünet, szkin- és autóváltás ---
+Object.assign(G.player, { x: 10000, y: G.C, inCar: false });
+press('Escape');
+check('Esc-re megnyílik a menü', G.menu.open === true);
+const clk = G.clock, px0 = G.player.x;
+key('KeyD', true); step(60); key('KeyD', false);
+check('menüben megáll a játék', G.clock === clk && G.player.x === px0);
+const skin0 = G.menu.skin;
+press('ArrowDown'); press('ArrowRight');
+check('a menüben lehet szkint váltani', G.menu.skin === (skin0 + 1) % G.SKINS.length);
+press('ArrowLeft');
+check('vissza is lehet lapozni a szkint', G.menu.skin === skin0);
+press('ArrowDown'); press('ArrowRight');
+const model = G.CAR_MODELS[G.menu.carModel];
+check('a menüben lehet autót váltani', G.menu.carModel === 1 && G.car.color === model.color && G.car.maxSand === model.maxSand);
+// egérrel: a kirajzolt menü jobb nyilára kattintás
+step(1);
+const arrow = G.menu.hits.find(h => h.row === 2 && h.delta === 1);
+listeners.mousedown({ button: 0, clientX: arrow.x + arrow.w / 2, clientY: arrow.y + arrow.h / 2 });
+check('egérrel is lehet autót váltani', G.menu.carModel === 2 && G.car.color === G.CAR_MODELS[2].color);
+const resume = G.menu.hits.find(h => h.row === 0);
+listeners.mousedown({ button: 0, clientX: resume.x + 5, clientY: resume.y + 5 });
+check('a Folytatás gomb bezárja a menüt', G.menu.open === false);
+step(5);
+check('menü után újra megy a játék', G.clock > clk);
+press('Escape'); press('Enter');
+check('Enter a Folytatáson bezárja a menüt', G.menu.open === false);
+press('Escape'); press('Escape');
+check('Esc újra megnyomva visszavisz a játékba', G.menu.open === false);
+// a terepjáró homokban gyorsabb, mint a sportkocsi
+check('a terepjáró homokban gyorsabb a sportkocsinál', G.CAR_MODELS[1].maxSand > G.CAR_MODELS[0].maxSand);
 
 // --- nappal / éjszaka ---
 check('nappal: 0–29 perc', near(G.nightAmount(60), 0) && near(G.nightAmount(1000), 0));

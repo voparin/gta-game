@@ -32,6 +32,8 @@ const keys = {};
 const mouse = { x: 0, y: 0, down: false, active: false };
 let timeScale = 1;
 window.addEventListener('keydown', e => {
+  if (e.code === 'Escape') { if (!e.repeat) toggleMenu(); return; }
+  if (menu.open) { if (!e.repeat) menuKey(e.code); return; }
   keys[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyE') toggleCar();
@@ -42,6 +44,7 @@ window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; });
 window.addEventListener('mousedown', e => {
   mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+  if (menu.open) { if (e.button === 0) menuClick(e.clientX, e.clientY); return; }
   if (e.button === 0) mouse.down = true;
 });
 window.addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
@@ -199,14 +202,46 @@ const CAR_COLORS = [['#2f6fd0', '#1f4f9a'], ['#e6e6e6', '#b4b4b4'], ['#f2c230', 
 const PED_SHIRTS = ['#e05a5a', '#5ab0e0', '#e0c05a', '#70c070', '#c070c0', '#f0f0f0', '#8a6040'];
 const PED_HAIR = ['#3a2615', '#111', '#c8a060', '#7a4a20', '#999'];
 
+// Választható szkinek és autók (a menüben, Esc)
+const SKINS = [
+  { name: 'Klasszikus', shirt: '#2f6fd0', head: '#3a2615', legs: '#2b2b4a' },
+  { name: 'Cowboy', shirt: '#8a5a2b', head: '#5a3a1a', legs: '#3a5a8a', hat: '#6b4420' },
+  { name: 'Sivatagi katona', shirt: '#b9a26a', head: '#2a2a2a', legs: '#7d6d45', hat: '#8a7a4a' },
+  { name: 'Rózsaszín párduc', shirt: '#ff6fb5', head: '#f2d27a', legs: '#ffffff' },
+  { name: 'Ninja', shirt: '#151515', head: '#151515', legs: '#151515', hat: '#c01010' },
+  { name: 'Turista', shirt: '#ffd23a', head: '#c8a060', legs: '#e0e0e0', hat: '#f5f5f5' },
+];
+const CAR_MODELS = [
+  { name: 'Piros sportkocsi', color: ['#d42020', '#a31515'], len: 72, wid: 36, accel: 420, maxRoad: 620, maxSand: 380, sandDrag: 0.9, desc: 'gyors aszfalton' },
+  { name: 'Fekete terepjáró', color: ['#2a2a2a', '#151515'], len: 80, wid: 42, accel: 360, maxRoad: 500, maxSand: 470, sandDrag: 0.35, desc: 'homokban is gyors' },
+  { name: 'Sárga taxi', color: ['#f2c230', '#c09010'], len: 74, wid: 36, accel: 380, maxRoad: 560, maxSand: 340, sandDrag: 0.9, desc: 'kiegyensúlyozott' },
+  { name: 'Kék rakétaautó', color: ['#2f6fd0', '#1f4f9a'], len: 70, wid: 32, accel: 560, maxRoad: 760, maxSand: 330, sandDrag: 1.2, desc: 'nagyon gyors, homokban lassú' },
+  { name: 'Zöld pickup', color: ['#3a9a4a', '#257035'], len: 84, wid: 40, accel: 330, maxRoad: 520, maxSand: 420, sandDrag: 0.5, desc: 'strapabíró' },
+];
+const DEFAULT_MODEL = { accel: 420, maxRoad: 620, maxSand: 380, sandDrag: 0.9 };
+
+function loadChoice(key, max) {
+  try { const v = parseInt(window.localStorage.getItem(key), 10); return v >= 0 && v < max ? v : 0; } catch (e) { return 0; }
+}
+function saveChoice(key, v) { try { window.localStorage.setItem(key, String(v)); } catch (e) { /* nincs tárhely */ } }
+
+const menu = { open: false, sel: 0, skin: loadChoice('gta.skin', SKINS.length), carModel: loadChoice('gta.car', CAR_MODELS.length), hits: [] };
+const MENU_ROWS = ['Folytatás', 'Szkin', 'Autó'];
+
 function makeCar(x, y, angle, color) {
   return { x, y, angle, vx: 0, vy: 0, r: 28, len: 72, wid: 36, color, skid: false, spin: 0,
-    onSlime: false, braking: false, lastWheels: null, health: 6, wrecked: false, ai: null };
+    onSlime: false, braking: false, lastWheels: null, health: 6, wrecked: false, ai: null, ...DEFAULT_MODEL };
+}
+
+function applyCarModel(c, m) {
+  Object.assign(c, { color: m.color, len: m.len, wid: m.wid, r: Math.max(m.len, m.wid * 2) * 0.39,
+    accel: m.accel, maxRoad: m.maxRoad, maxSand: m.maxSand, sandDrag: m.sandDrag });
 }
 
 const player = { x: START_X, y: START_Y, angle: 0, r: 12, inCar: false, walk: 0,
   health: 100, dead: 0, cooldown: 0, kills: 0, lastHit: -99 };
 const car = makeCar(START_X + 100, START_Y - 50, 0, ['#d42020', '#a31515']);
+applyCarModel(car, CAR_MODELS[menu.carModel]);
 const aiCars = [];      // AI által vezetett autók
 const npcs = [];        // gyalogosok ('ped') és banditák ('bandit')
 const bullets = [];     // {x, y, vx, vy, life, from}
@@ -227,6 +262,44 @@ function toggleStorm() {
   storm.target = storm.target > 0 ? 0 : 1;
   storm.timer = storm.target ? 35 + rand() * 25 : 120 + rand() * 120;
   if (storm.target) storm.angle = rand() * Math.PI * 2;
+}
+
+function toggleMenu() {
+  menu.open = !menu.open;
+  menu.sel = 0;
+  for (const k in keys) keys[k] = false;   // ne ragadjon be egy gomb
+  mouse.down = false;
+}
+
+function changeChoice(row, delta) {
+  if (row === 1) {
+    menu.skin = (menu.skin + delta + SKINS.length) % SKINS.length;
+    saveChoice('gta.skin', menu.skin);
+  } else if (row === 2) {
+    menu.carModel = (menu.carModel + delta + CAR_MODELS.length) % CAR_MODELS.length;
+    applyCarModel(car, CAR_MODELS[menu.carModel]);
+    saveChoice('gta.car', menu.carModel);
+  }
+}
+
+function menuKey(code) {
+  if (code === 'ArrowUp' || code === 'KeyW') menu.sel = (menu.sel + MENU_ROWS.length - 1) % MENU_ROWS.length;
+  else if (code === 'ArrowDown' || code === 'KeyS') menu.sel = (menu.sel + 1) % MENU_ROWS.length;
+  else if (code === 'ArrowLeft' || code === 'KeyA') changeChoice(menu.sel, -1);
+  else if (code === 'ArrowRight' || code === 'KeyD') changeChoice(menu.sel, 1);
+  else if (code === 'Enter' || code === 'Space') {
+    if (menu.sel === 0) toggleMenu(); else changeChoice(menu.sel, 1);
+  }
+}
+
+function menuClick(x, y) {
+  for (const h of menu.hits) {
+    if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
+      menu.sel = h.row;
+      if (h.row === 0) toggleMenu(); else changeChoice(h.row, h.delta);
+      return;
+    }
+  }
 }
 
 function toggleCar() {
@@ -424,12 +497,12 @@ function updateCarPhysics(c, input, dt) {
   let fwd = c.vx * fx + c.vy * fy;
   let lat = -c.vx * fy + c.vy * fx;
 
-  if (up) fwd += 420 * dt;
+  if (up) fwd += c.accel * dt;
   if (down) fwd -= (fwd > 20 ? 700 : 300) * dt;
   if (handbrake) fwd *= Math.exp(-1.5 * dt);
-  fwd *= Math.exp(-(sandy ? 0.9 : 0.4) * dt);          // homokban lassabb
+  fwd *= Math.exp(-(sandy ? c.sandDrag : 0.4) * dt);    // homokban lassabb
   if (!up && !down && Math.abs(fwd) < 5) fwd = 0;
-  fwd = clamp(fwd, -180, sandy ? 380 : 620);
+  fwd = clamp(fwd, -180, sandy ? c.maxSand : c.maxRoad);
   const grip = slimy ? 0.4 : handbrake ? 1.2 : 12;     // kézifékkel / nyálkán alig tapad → csúszik
   lat *= Math.exp(-grip * dt);
 
@@ -800,11 +873,11 @@ function drawCar(c, n) {
   ctx.restore();
 }
 
-function drawPerson(x, y, angle, walk, shirt, head, gun) {
+function drawPerson(x, y, angle, walk, shirt, head, gun, legs = '#2b2b4a', hat = null) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
   const swing = Math.sin(walk) * 6;
   ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(4, 4, 12, 14, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#2b2b4a';                                     // lábak
+  ctx.fillStyle = legs;                                          // lábak
   ctx.fillRect(swing - 4, -7, 8, 5); ctx.fillRect(-swing - 4, 2, 8, 5);
   ctx.fillStyle = shirt;                                         // póló
   ctx.beginPath(); ctx.ellipse(0, 0, 8, 13, 0, 0, Math.PI * 2); ctx.fill();
@@ -813,6 +886,12 @@ function drawPerson(x, y, angle, walk, shirt, head, gun) {
   if (gun) { ctx.fillStyle = '#222'; ctx.fillRect(2, 11, 14, 4); }  // pisztoly
   ctx.fillStyle = head;                                          // fej (haj)
   ctx.beginPath(); ctx.arc(1, 0, 7, 0, Math.PI * 2); ctx.fill();
+  if (hat) {                                                     // kalap
+    ctx.fillStyle = hat;
+    ctx.beginPath(); ctx.arc(1, 0, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath(); ctx.arc(1, 0, 5.5, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.restore();
 }
 
@@ -914,7 +993,7 @@ function drawHud(w, h) {
   if (storm.level > 0.3) { ctx.fillStyle = '#ffb040'; ctx.fillText('⚠ Homokvihar!', 245, 80); ctx.fillStyle = '#fff'; }
   ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 104);
   ctx.fillText('Space: kézifék · Bal klikk / F: lövés', 20, 124);
-  ctx.fillText(`H: homokvihar · T: gyorsított idő (${timeScale}x)`, 20, 144);
+  ctx.fillText(`H: homokvihar · T: gyors idő (${timeScale}x) · Esc: menü`, 20, 144);
   ctx.fillStyle = '#bbb'; ctx.font = '12px sans-serif';
   ctx.fillText('Vigyázz a zöld nyálkafoltokkal az úton!', 20, 164);
 
@@ -960,6 +1039,51 @@ function drawMinimap(w) {
   ctx.restore();
 }
 
+function drawMenu(w, h) {
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  ctx.fillRect(0, 0, w, h);
+  const PW = 560, PH = 420, px = (w - PW) / 2, py = (h - PH) / 2;
+  ctx.fillStyle = 'rgba(30,24,16,0.95)'; ctx.fillRect(px, py, PW, PH);
+  ctx.strokeStyle = '#e2c27d'; ctx.lineWidth = 3; ctx.strokeRect(px, py, PW, PH);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#e2c27d'; ctx.font = 'bold 34px sans-serif';
+  ctx.fillText('SIVATAGI GTA – MENÜ', w / 2, py + 50);
+
+  menu.hits = [];
+  const values = [null, SKINS[menu.skin].name, CAR_MODELS[menu.carModel].name];
+  for (let i = 0; i < MENU_ROWS.length; i++) {
+    const ry = py + 90 + i * 62, rx = px + 30, rw = PW - 60, rh = 48;
+    const sel = menu.sel === i;
+    ctx.fillStyle = sel ? 'rgba(226,194,125,0.25)' : 'rgba(255,255,255,0.06)';
+    ctx.fillRect(rx, ry, rw, rh);
+    if (sel) { ctx.strokeStyle = '#e2c27d'; ctx.lineWidth = 2; ctx.strokeRect(rx, ry, rw, rh); }
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 20px sans-serif';
+    if (values[i] === null) {
+      ctx.fillText(MENU_ROWS[i], w / 2, ry + 31);
+      menu.hits.push({ row: i, delta: 0, x: rx, y: ry, w: rw, h: rh });
+    } else {
+      ctx.textAlign = 'left'; ctx.fillText(MENU_ROWS[i] + ':', rx + 16, ry + 31);
+      ctx.textAlign = 'center'; ctx.fillText('◀  ' + values[i] + '  ▶', rx + rw / 2 + 50, ry + 31);
+      menu.hits.push({ row: i, delta: -1, x: rx + 110, y: ry, w: 60, h: rh });
+      menu.hits.push({ row: i, delta: 1, x: rx + rw - 60, y: ry, w: 60, h: rh });
+    }
+  }
+
+  // előnézet
+  const m = CAR_MODELS[menu.carModel], sk = SKINS[menu.skin], prevY = py + 320;
+  ctx.save(); ctx.translate(px + 150, prevY); ctx.scale(2.2, 2.2);
+  drawPerson(0, 0, -Math.PI / 2, clock * 6, sk.shirt, sk.head, true, sk.legs, sk.hat);
+  ctx.restore();
+  const preview = { ...car, x: 0, y: 0, angle: 0, wrecked: false, braking: false };
+  ctx.save(); ctx.translate(px + 390, prevY); ctx.scale(1.6, 1.6); drawCar(preview, 0); ctx.restore();
+  ctx.fillStyle = '#ccc'; ctx.font = '14px sans-serif';
+  ctx.fillText(m.desc + ` · végsebesség ${Math.round(m.maxRoad / 4)} km/h`, px + 390, prevY + 62);
+
+  ctx.fillStyle = '#999'; ctx.font = '13px sans-serif';
+  ctx.fillText('↑↓: választás · ←→: váltás · Enter: Folytatás · Esc: vissza a játékba · egérrel is kattintható', w / 2, py + PH - 14);
+  ctx.textAlign = 'left';
+}
+
 function render() {
   const w = canvas.width, h = canvas.height;
   const cam = { x: clamp(player.x, w / 2, WORLD - w / 2), y: clamp(player.y, h / 2, WORLD - h / 2) };
@@ -998,8 +1122,9 @@ function render() {
     }
   }
   for (const p of npcs) if (!p.dead && inView(p)) drawPerson(p.x, p.y, p.angle, p.walk, p.shirt, p.head, p.kind === 'bandit');
-  if (player.dead) drawCorpse(player.x, player.y, player.angle, '#2f6fd0', '#3a2615');
-  else if (!player.inCar) drawPerson(player.x, player.y, player.angle, player.walk, '#2f6fd0', '#3a2615', true);
+  const sk = SKINS[menu.skin];
+  if (player.dead) drawCorpse(player.x, player.y, player.angle, sk.shirt, sk.head);
+  else if (!player.inCar) drawPerson(player.x, player.y, player.angle, player.walk, sk.shirt, sk.head, true, sk.legs, sk.hat);
   for (const c of cars) drawCar(c, n);
   ctx.strokeStyle = '#ffe680'; ctx.lineWidth = 2;
   ctx.beginPath();
@@ -1015,6 +1140,7 @@ function render() {
   drawStorm(w, h, n);
   drawHud(w, h);
   drawMinimap(w);
+  if (menu.open) drawMenu(w, h);
 }
 
 // ===== Fő ciklus =====
@@ -1022,9 +1148,11 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  time = (time + dt * timeScale) % CYCLE;
-  clock += dt;
-  update(dt);
+  if (!menu.open) {                // menüben megáll a játék
+    time = (time + dt * timeScale) % CYCLE;
+    clock += dt;
+    update(dt);
+  }
   render();
   requestAnimationFrame(frame);
 }

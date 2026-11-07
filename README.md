@@ -17,3 +17,4 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 | Bal klikk / F | lövés (egérrel célzás) |
 | H | homokvihar be/ki |
 | T | gyorsított idő (60x) |
+| Esc | menü: szünet, szkin- és autóváltás (a választás megmarad) |
