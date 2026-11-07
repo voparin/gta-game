@@ -22,7 +22,7 @@ Felépítés a `game.js`-en belül:
 - **Világ chunkokban**: a pálya 1000×1000 px-es darabokból áll (`getChunk`), amelyek menet közben, determinisztikusan generálódnak (akadályok, villanyoszlopok, dűnék, nyálkafoltok). Ütközésnél és rajzolásnál mindig csak a közeli chunkokat nézd (`chunksAround`, `chunksIn`) – soha ne járd be az egész világot.
 - **Utak**: rácsban, `ROAD_SPACING` távolságra (`nearestRoad`, `onRoad`, `roadsIn`).
 - **Autók**: egy közös fizika (`updateCarPhysics`) a játékos és az AI autók számára; az AI a `aiCarInput`-ban dönt (sáv követése, kereszteződésben fordulás).
-- **Szereplők**: `npcs` (gyalogos / bandita), `aiCars`, `bullets`; a játékostól messze lévőket a `spawnAround` eltünteti, a közelben újakat hoz létre.
+- **Szereplők**: `npcs` (gyalogos / csöves), `aiCars`, `bullets`; a játékostól messze lévőket a `spawnAround` eltünteti, a közelben újakat hoz létre.
 - **Időjárás**: `storm` (homokvihar), napszak: `nightAmount`.
 - **Benzinkutak**: `stationFor(i, j)` kereszteződésenként determinisztikusan; `stationsIn`, `nearPump`, `nearestStation`. Benzin: `car.fuel`, `updateFuel`.
 - **Előrehaladás**: `progress` (pénz, XP, megvett autók, rekordok – localStorage), `earn()` minden jutalomhoz, `levelOf`. Küldetés: `mission`, `updateMission`; drift-kombó: `drift`, `updateDrift`; autóbolt: `buyCar`.
@@ -98,6 +98,8 @@ Szabályok:
 - Nagyobb refaktorálás után a kódátnézést is futtasd újra.
 
 ## Szabályok
+
+- **Új autót (`CAR_MODELS`) és szkint (`SKINS`) csak a lista végére szabad felvenni**, a meglévők sorrendjét tilos megváltoztatni: a mentés sorszám szerint tárolja őket (`progress.owned`, `activeCar`, `ownedSkins`), átsorolásnál a régi mentések rossz (akár fizetős) elemet kapnának. A teszt rögzíti a sorrendet; új elemnél a tesztben a listát a végén bővítsd.
 
 - Ha a helyi teszt elbukik, **nem szabad** commitolni vagy pusholni – előbb javítsd.
 - Csak a `main` ágra dolgozunk; force push tilos.

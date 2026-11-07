@@ -184,13 +184,15 @@ victim.wanderT = 99; victim.moving = false;
 step(20);
 check('a gyors autó elüti a gyalogost', victim.dead > 0);
 
-// --- banditák ---
+// --- nincsenek banditák: senki nem lő a játékosra ---
 G.npcs.length = 0;
 Object.assign(G.player, { x: 8000, y: 9000, inCar: false, health: 100, lastHit: -99 });
-G.spawnNpc('bandit', 8200, 9000);   // közelről, hogy a szórás ellenére is találjon
+G.spawn = true;
 step(600);
-check('a bandita rálő a játékosra', G.player.health < 100);
-G.npcs.length = 0;
+G.spawn = false;
+check('nincsenek banditák, senki nem lő a játékosra', !G.npcs.some(p => p.kind !== 'ped' && p.kind !== 'homeless')
+  && G.player.health === 100 && G.bullets.length === 0);
+G.npcs.length = 0; G.aiCars.length = 0;
 
 // --- halál és újraéledés ---
 G.player.health = 5;
@@ -399,12 +401,6 @@ G.missions = false;
 // --- jutalmak, szintek ---
 G.npcs.length = 0;
 Object.assign(G.player, { x: 10000, y: G.C, angle: 0, inCar: false, health: 100 });
-const bandit = G.spawnNpc('bandit', 10150, G.C);
-const money2 = G.progress.money;
-key('KeyF', true); step(40); key('KeyF', false);
-step(10);
-check('bandita lelövéséért fejpénz jár', bandit.dead > 0 && G.progress.money >= money2 + 50);
-G.npcs.length = 0;
 const lvl0 = G.levelOf(G.progress.xp), m3 = G.progress.money;
 G.earn(5000, 'teszt');
 check('elég XP-vel szintet lépsz, és szintbónuszt kapsz', G.levelOf(G.progress.xp) > lvl0 && G.progress.money > m3 + 5000);
@@ -924,6 +920,54 @@ G.npcs.length = 0; G.aiCars.length = 0;
   if (G.player.riding) { Object.assign(busB, { vx: 0, vy: 0 }); press('KeyE'); }
   if (G.player.inHouse) G.exitHouse();
   G.aiCars.length = 0;
+}
+
+// --- Nitró Villám: 140 km/h, nitróval 200 km/h ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.police = false;
+  const ni = G.CAR_MODELS.findIndex(m => m.name === 'Nitró Villám');
+  check('van Nitró Villám a boltban', ni >= 0 && G.CAR_MODELS[ni].price > 0 && !!G.CAR_MODELS[ni].nitro);
+  G.progress.owned.push(ni); G.selectCar(ni);
+  const kmh = () => Math.hypot(G.car.vx, G.car.vy) / G.KMH;
+  const drive = (frames, nitro) => { key('KeyW', true); if (nitro) key('ShiftLeft', true); let mx = 0; for (let i = 0; i < frames; i++) { step(1); mx = Math.max(mx, kmh()); } key('KeyW', false); key('ShiftLeft', false); return mx; };
+  Object.assign(G.player, { x: 1000, y: G.C, inCar: true, riding: null, inHouse: null, dead: 0, arrested: 0 });
+  Object.assign(G.car, { x: 1000, y: G.C, angle: 0, vx: 0, vy: 0, fuel: 100, nitro: 100 });
+  const normal = drive(300, false);
+  check('nitró nélkül legfeljebb 140 km/h', normal > 135 && normal <= 140.5);
+  check('140 km/h-val nem üldöz a rendőrség (a korlát 145)', G.wanted.level === 0);
+  Object.assign(G.car, { x: 1000, y: G.C, angle: 0, vx: 0, vy: 0, fuel: 100, nitro: 100 });
+  const boosted = drive(240, true);
+  check('nitróval 200 km/h-ig gyorsul', boosted > 190 && boosted <= 200.5);
+  check('a nitró fogy, és elfogy', G.car.nitro === 0);
+  key('KeyW', true); step(120); key('KeyW', false);
+  check('elfogyó nitró után fokozatosan visszalassul 140-re', kmh() <= 140.5 && kmh() > 120);
+  const n0 = G.car.nitro; step(120);
+  check('a nitró használat nélkül visszatöltődik', G.car.nitro > n0 + 10);
+  check('nitrózva az úton üldözni kezd a rendőrség', G.wanted.level === 1);
+  G.clearWanted();
+  G.selectCar(0);
+  Object.assign(G.car, { x: 1000, y: G.C, angle: 0, vx: 0, vy: 0, fuel: 100 });
+  const sport = drive(400, true);
+  check('más autóban a Shift nem ad nitrót', sport <= 155.5 && !G.car.nitroCfg);
+  G.clearWanted(); G.aiCars.length = 0;
+}
+
+// --- kódátnézés (v0.13.0): a mentés sorszám szerint tárol ---
+{
+  const carOrder = ['Piros sportkocsi', 'Fekete terepjáró', 'Sárga taxi', 'Kék rakétaautó', 'Zöld pickup', 'Zöld busz', 'Nitró Villám'];
+  const skinOrder = ['Klasszikus', 'Cowboy', 'Sivatagi katona', 'Rózsaszín párduc', 'Ninja', 'Turista', 'Pókhős'];
+  check('a meglévő autók sorrendje nem változott (új autó csak a végére kerülhet)', carOrder.every((n, i) => G.CAR_MODELS[i] && G.CAR_MODELS[i].name === n));
+  check('a meglévő szkinek sorrendje nem változott (új szkin csak a végére kerülhet)', skinOrder.every((n, i) => G.SKINS[i] && G.SKINS[i].name === n));
+  const old = G.sanitizeProgress({ money: 0, owned: [0, 5], activeCar: 5 });   // egy v0.12-es mentés, a busszal
+  const ni = G.CAR_MODELS.findIndex(m => m.name === 'Nitró Villám');
+  check('régi mentésben nem jár ingyen a Nitró Villám, és a busz marad a busz', !old.owned.includes(ni) && G.CAR_MODELS[old.activeCar].name === 'Zöld busz');
+  // autóváltással nem lehet újratölteni a nitrót
+  const owned0 = G.progress.owned.slice();
+  if (!G.progress.owned.includes(ni)) G.progress.owned.push(ni);
+  G.selectCar(ni); G.car.nitro = 0;
+  G.selectCar(0); G.selectCar(ni);
+  check('autóváltással nem lehet újratölteni a nitrót', G.car.nitro === 0);
+  G.selectCar(0); G.progress.owned = owned0;
 }
 
 // --- Pókhős szkin ($900) ---

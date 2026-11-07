@@ -1,6 +1,6 @@
 # Sivatagi GTA
 
-Felülnézetes, GTA-szerű böngészős játék egy végtelen sivatagban: piros autó, lövöldözés, AI gyalogosok (járdán sétálnak, zebrán kelnek át), banditák és AI autók, nyálkafoltok az utakon, rendőrségi üldözés 145 km/h feletti gyorshajtásért, homokviharok, villanyoszlopok és nappal/éjszaka váltás (30 perc nappal, 30 perc éjszaka).
+Felülnézetes, GTA-szerű böngészős játék egy végtelen sivatagban: piros autó, lövöldözés, AI gyalogosok (járdán sétálnak, zebrán kelnek át) és AI autók, nyálkafoltok az utakon, rendőrségi üldözés 145 km/h feletti gyorshajtásért, homokviharok, villanyoszlopok és nappal/éjszaka váltás (30 perc nappal, 30 perc éjszaka).
 
 Élő verzió: https://voparin.github.io/gta-game/
 
@@ -34,7 +34,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 ## Pénz, küldetések, fejlődés
 - **Szállítás:** mindig van egy célpont (📦, sárga nyíl), időlimit nélkül. Minden sikeres szállítás után nő a sorozatszorzó (x1.25, x1.5…); halálnál vagy letartóztatásnál elvész.
 - **Drift-kombó:** kézifékes driftelésért pénz jár; minél tovább driftelsz ütközés nélkül, annál nagyobb a szorzó (max x5).
-- **Fejpénz:** bandita lelövése $50, a rendőrök lerázása $150 / csillag. Letartóztatáskor 10% bírság.
+- **Jutalom:** a rendőrök lerázása $150 / csillag. Letartóztatáskor 10% bírság.
 - **Szintek:** minden megkeresett dollár XP is; szintlépéskor bónusz jár.
 - **Autóbolt (Esc):** a pénzből új autókat vehetsz. A pénz, a megvett autók és a rekordok (legjobb drift, leghosszabb sorozat) megmaradnak a böngészőben.
 
@@ -60,7 +60,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Erős homokviharban tornádó támadhat (🌪, piros nyíl és pötty a térképen). Beszív és megpörget; a közepén felszippantja a házakat, autókat, embereket – téged is. Menekülj előle!
 
 ## Házak
-- A ház ajtajánál **E**: bemész. Bent nem talál meg a rendőrség (12 mp után leráztad őket), a banditák nem érnek el, és gyorsabban gyógyulsz. Kimenni az ajtónál **E**-vel lehet.
+- A ház ajtajánál **E**: bemész. Bent nem talál meg a rendőrség (12 mp után leráztad őket), és gyorsabban gyógyulsz. Kimenni az ajtónál **E**-vel lehet.
 - Vigyázz: ha a tornádó elviszi a házat, téged is elvisz.
 
 ## Szkinek

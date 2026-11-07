@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.12.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.13.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -482,7 +482,11 @@ const CAR_MODELS = [
   { name: 'Kék rakétaautó', color: ['#2f6fd0', '#1f4f9a'], len: 70, wid: 32, accel: 560, maxRoad: 760, maxSand: 330, sandDrag: 1.2, fuelUse: 2, price: 8000, desc: 'nagyon gyors, sokat eszik' },
   { name: 'Zöld pickup', color: ['#3a9a4a', '#257035'], len: 84, wid: 40, accel: 330, maxRoad: 520, maxSand: 420, sandDrag: 0.5, fuelUse: 1.1, price: 1500, desc: 'strapabíró' },
   { name: 'Zöld busz', type: 'bus', color: ['#1e9e48', '#137a35'], len: 130, wid: 46, accel: 260, maxRoad: 460, maxSand: 300, sandDrag: 0.8, fuelUse: 1.6, price: 0, desc: 'csak a tiéd – nagy és erős' },
+  { name: 'Nitró Villám', type: 'nitro', color: ['#6a1fb0', '#3d0f6b'], len: 74, wid: 36, accel: 400, maxRoad: 560, maxSand: 340, sandDrag: 0.9, fuelUse: 1.2, price: 2500,
+    nitro: { max: 800, accel: 650, burn: 25, regen: 8 }, desc: '140 km/h, nitróval (Shift / N) 200 km/h' },
 ];
+// FONTOS: a mentés sorszám szerint tárolja az autókat (progress.owned, activeCar), ezért új autót CSAK a lista
+// VÉGÉRE szabad felvenni, a meglévők sorrendje nem változhat. Ugyanez igaz a SKINS listára.
 // A játékosnak ezek alapból megvannak. A busz csak a játékosé: az AI sosem kap CAR_MODELS-beli járművet.
 const BUS = CAR_MODELS.findIndex(m => m.type === 'bus');
 const FREE_CARS = [0, BUS];
@@ -537,9 +541,12 @@ function makeCar(x, y, angle, color) {
     onSlime: false, braking: false, lastWheels: null, health: 6, wrecked: false, ai: null, ...DEFAULT_MODEL };
 }
 
+let nitroTank = 100;   // a nitró szintje autóváltáson át is megmarad (nem lehet váltással újratölteni)
 function applyCarModel(c, m) {
+  if (c === car && c.nitroCfg) nitroTank = c.nitro;
   Object.assign(c, { color: m.color, len: m.len, wid: m.wid, r: Math.max(m.len, m.wid * 2) * 0.39,
-    accel: m.accel, maxRoad: m.maxRoad, maxSand: m.maxSand, sandDrag: m.sandDrag, fuelUse: m.fuelUse || 1, type: m.type || 'car' });
+    accel: m.accel, maxRoad: m.maxRoad, maxSand: m.maxSand, sandDrag: m.sandDrag, fuelUse: m.fuelUse || 1, type: m.type || 'car',
+    nitroCfg: m.nitro || null, nitro: m.nitro ? nitroTank : 0, nitroOn: false });
 }
 
 const player = { x: START_X, y: START_Y, angle: 0, r: 12, inCar: false, walk: 0,
@@ -548,7 +555,7 @@ const car = makeCar(START_X + 100, START_Y - 50, 0, ['#d42020', '#a31515']);
 applyCarModel(car, CAR_MODELS[menu.carModel]);
 car.fuel = 100;          // benzin %
 const aiCars = [];      // AI által vezetett autók
-const npcs = [];        // gyalogosok ('ped') és banditák ('bandit')
+const npcs = [];        // gyalogosok ('ped') és csövesek ('homeless')
 const bullets = [];     // {x, y, vx, vy, life, from}
 const flashes = [];     // torkolattűz
 const skidMarks = [];   // féknyomok: {x1, y1, x2, y2, born}
@@ -811,10 +818,8 @@ function donateClick(x, y) {
 // ===== Spawnolás =====
 function spawnNpc(kind, x, y) {
   const p = { kind, x, y, r: 11, angle: rand() * Math.PI * 2, speed: 0, walk: 0,
-    health: kind === 'bandit' ? 3 : 1, dead: 0, wanderT: 0, moving: false, flee: 0, fx: 0, fy: 0,
-    cooldown: 1 + rand(),
-    shirt: kind === 'bandit' ? '#1c1c1c' : PED_SHIRTS[(rand() * PED_SHIRTS.length) | 0],
-    head: kind === 'bandit' ? '#b01010' : PED_HAIR[(rand() * PED_HAIR.length) | 0] };
+    health: 1, dead: 0, wanderT: 0, moving: false, flee: 0, fx: 0, fy: 0,
+    shirt: PED_SHIRTS[(rand() * PED_SHIRTS.length) | 0], head: PED_HAIR[(rand() * PED_HAIR.length) | 0] };
   if (kind === 'ped') assignSidewalk(p);
   if (kind === 'homeless') Object.assign(p, { shirt: '#6b5a44', head: '#8a8a80', health: 1 });
   npcs.push(p);
@@ -874,10 +879,6 @@ function spawnAround(dt) {
   }
   if (!spawnEnabled || player.dead) return;
 
-  const ring = (a, b) => {
-    const ang = rand() * Math.PI * 2, d = a + rand() * (b - a);
-    return { x: player.x + Math.cos(ang) * d, y: player.y + Math.sin(ang) * d };
-  };
   const alive = kind => npcs.filter(p => p.kind === kind && !p.dead).length;
 
   if (alive('ped') < 14) {           // gyalogosok a közeli járdákon
@@ -898,10 +899,6 @@ function spawnAround(dt) {
       const h = spawnNpc('homeless', pos.x, pos.y);
       h.angle = axis === 'h' ? (side > 0 ? -Math.PI / 2 : Math.PI / 2) : (side > 0 ? Math.PI : 0);   // az út felé néz
     }
-  }
-  if (alive('bandit') < 2 && rand() < dt * 0.2) {
-    const pos = ring(1000, 1400);
-    if (!obstacleAt(pos.x, pos.y, 15)) spawnNpc('bandit', pos.x, pos.y);
   }
   if (aiCars.filter(c => c.citybus).length < 2 && rand() < dt) {          // városi buszok
     const axis = rand() < 0.5 ? 'h' : 'v', dir = rand() < 0.5 ? 1 : -1;
@@ -958,6 +955,7 @@ function playerCarInput() {
     down: drive && !!(keys.KeyS || keys.ArrowDown),
     steer: drive ? ((keys.KeyD || keys.ArrowRight) ? 1 : 0) - ((keys.KeyA || keys.ArrowLeft) ? 1 : 0) : 0,
     handbrake: drive && !!keys.Space,
+    nitro: drive && !!(keys.ShiftLeft || keys.ShiftRight || keys.KeyN),
   };
 }
 
@@ -1034,12 +1032,20 @@ function updateCarPhysics(c, input, dt) {
   let lat = -c.vx * fy + c.vy * fx;
 
   const empty = c.fuel !== undefined && c.fuel <= 0;   // üres tankkal csak vánszorog
-  if (up) fwd += (empty ? 120 : c.accel) * dt;
+  // nitró: amíg van a tartályban, erősebb gyorsulás és magasabb végsebesség; használat nélkül visszatöltődik
+  const nc = c.nitroCfg;
+  c.nitroOn = !!(nc && input.nitro && up && c.nitro > 0 && !empty);
+  if (nc) c.nitro = c.nitroOn ? Math.max(0, c.nitro - nc.burn * dt) : input.nitro ? c.nitro : Math.min(100, c.nitro + nc.regen * dt);
+  const fwdBefore = fwd;
+  if (up) fwd += (empty ? 120 : c.accel + (c.nitroOn ? nc.accel : 0)) * dt;
   if (down) fwd -= (fwd > 20 ? 700 : 300) * dt;
   if (handbrake) fwd *= Math.exp(-1.5 * dt);
   fwd *= Math.exp(-(sandy ? c.sandDrag : 0.4) * dt);    // homokban lassabb
   if (!up && !down && Math.abs(fwd) < 5) fwd = 0;
-  fwd = clamp(fwd, -180, empty ? 60 : sandy ? c.maxSand : c.maxRoad);
+  const cap = empty ? 60 : c.nitroOn ? (sandy ? c.maxSand + 120 : nc.max) : sandy ? c.maxSand : c.maxRoad;
+  // a végsebességnél megáll a gyorsulás; ha fölötte volt (pl. nitró után, homokba érve), fokozatosan lassul vissza
+  if (fwd > cap) fwd = fwdBefore > cap ? Math.max(cap, Math.min(fwd, fwdBefore) - 400 * dt) : cap;
+  fwd = Math.max(-180, fwd);
   const grip = slimy ? 0.4 : handbrake ? 1.2 : 12;     // kézifékkel / nyálkán alig tapad → csúszik
   lat *= Math.exp(-grip * dt);
 
@@ -1118,7 +1124,6 @@ function killNpc(p, byPlayer) {
   if (p.dead) return;
   p.dead = clock;
   if (byPlayer) player.kills++;
-  if (byPlayer && p.kind === 'bandit') earn(50, 'bandita');
   alertPeds(p.x, p.y);
 }
 
@@ -1142,7 +1147,6 @@ function respawn() {
   for (let i = aiCars.length - 1; i >= 0; i--) if (aiCars[i].police) aiCars.splice(i, 1);
   Object.assign(car, { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, spin: 0, lastWheels: null, fuel: Math.max(car.fuel, 40) });
   if (car.rental) car.ownFuel = Math.max(car.ownFuel || 0, 40);   // bérlés közben a saját autó is megkapja a minimumot
-  for (let i = npcs.length - 1; i >= 0; i--) if (npcs[i].kind === 'bandit') npcs.splice(i, 1);
   message = { text: 'Újraéledtél', until: clock + 2 };
 }
 
@@ -1408,9 +1412,6 @@ function updateBullets(dt) {
             break;
           }
         }
-      } else if (!player.dead && !player.inHouse) {
-        const t = player.inCar ? car : player;
-        if (Math.hypot(t.x - b.x, t.y - b.y) < t.r + 3) { damagePlayer(player.inCar ? 5 : 10); hit = true; }
       }
     }
     b.life -= dt;
@@ -1419,37 +1420,21 @@ function updateBullets(dt) {
   for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].until < clock) flashes.splice(i, 1);
 }
 
-// ===== AI gyalogosok és banditák =====
+// ===== AI gyalogosok =====
 function updateNpcs(dt) {
   for (const p of npcs) {
     if (p.dead) continue;
     let speed = 0;
     if (p.kind === 'homeless') continue;     // ül a helyén: a szél sem sodorja (nem tudna visszaülni)
-    if (p.kind === 'ped') {
-      if (p.flee > 0) {
-        p.flee -= dt;
-        p.angle = Math.atan2(p.y - p.fy, p.x - p.fx);
-        speed = 200;
-        if (p.flee <= 0) assignSidewalk(p);   // megnyugodva visszamegy a járdára
-      } else {
-        p.wanderT -= dt;
-        if (p.wanderT <= 0) { p.moving = rand() < 0.85; p.wanderT = p.moving ? 4 + rand() * 8 : 1 + rand() * 2; }
-        if (p.moving) { walkSidewalk(p); speed = 60; }
-      }
+    if (p.flee > 0) {
+      p.flee -= dt;
+      p.angle = Math.atan2(p.y - p.fy, p.x - p.fx);
+      speed = 200;
+      if (p.flee <= 0) assignSidewalk(p);     // megnyugodva visszamegy a járdára
     } else {
-      const d = dist(p, player);
-      if (!player.dead && !player.inHouse && d < 900) {
-        p.angle = Math.atan2(player.y - p.y, player.x - p.x);
-        speed = d > 280 ? 110 : 0;
-        p.cooldown -= dt;
-        if (p.cooldown <= 0 && d < 650) {
-          shoot(p.x, p.y, p.angle + (rand() - 0.5) * 0.25, 'enemy', p.r + 8);
-          p.cooldown = 0.9 + rand() * 0.6;
-        }
-      } else if (!player.dead) {
-        p.angle = Math.atan2(player.y - p.y, player.x - p.x);
-        speed = 90;
-      }
+      p.wanderT -= dt;
+      if (p.wanderT <= 0) { p.moving = rand() < 0.85; p.wanderT = p.moving ? 4 + rand() * 8 : 1 + rand() * 2; }
+      if (p.moving) { walkSidewalk(p); speed = 60; }
     }
     p.x += Math.cos(p.angle) * speed * dt + windX() * 30 * dt;
     p.y += Math.sin(p.angle) * speed * dt + windY() * 30 * dt;
@@ -2127,6 +2112,16 @@ function drawCar(c, n) {
   ctx.fillRect(L / 2 - 4, -W / 2 + 3, 4, 7); ctx.fillRect(L / 2 - 4, W / 2 - 10, 4, 7);
   ctx.fillStyle = c.braking && !c.wrecked ? '#ff3030' : '#801010';
   ctx.fillRect(-L / 2, -W / 2 + 3, 3, 7); ctx.fillRect(-L / 2, W / 2 - 10, 3, 7);
+  if (c.nitroOn) {                                  // nitróláng a kipufogóból
+    const fl = 14 + Math.random() * 10;
+    ctx.fillStyle = 'rgba(80,170,255,0.85)';
+    for (const sy of [-W / 4, W / 4]) { ctx.beginPath(); ctx.moveTo(-L / 2, sy - 4); ctx.lineTo(-L / 2 - fl, sy); ctx.lineTo(-L / 2, sy + 4); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = 'rgba(230,245,255,0.95)';
+    for (const sy of [-W / 4, W / 4]) { ctx.beginPath(); ctx.moveTo(-L / 2, sy - 2); ctx.lineTo(-L / 2 - fl * 0.5, sy); ctx.lineTo(-L / 2, sy + 2); ctx.closePath(); ctx.fill(); }
+  }
+  if (c.type === 'nitro') {                         // NOS csíkok a motorháztetőn
+    ctx.fillStyle = '#4ab0ff'; ctx.fillRect(L / 2 - 30, -W / 2 + 6, 24, 3); ctx.fillRect(L / 2 - 30, W / 2 - 9, 24, 3);
+  }
   if (c.type === 'rental') {                        // bérautó: zöld csík és felirat
     ctx.fillStyle = '#2e9e48'; ctx.fillRect(-L / 2 + 2, -2, L - 4, 4);
     ctx.fillStyle = '#1d6e33'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center';
@@ -2293,6 +2288,11 @@ function drawHud(w, h) {
   const speeding = player.inCar && onRoad(car.x, car.y, SIDEWALK_W) && speed > SPEED_LIMIT;
   ctx.fillStyle = speeding ? '#f55' : '#fff';
   ctx.fillText(player.inCar ? `Sebesség: ${speed} km/h (korlát: ${SPEED_LIMIT})` : 'Gyalog', 20, 80);
+  if (player.inCar && car.nitroCfg) {                // nitrótartály
+    ctx.fillStyle = '#333'; ctx.fillRect(300, 70, 90, 10);
+    ctx.fillStyle = car.nitroOn ? '#9fe0ff' : '#4ab0ff'; ctx.fillRect(300, 70, 90 * car.nitro / 100, 10);
+    ctx.fillStyle = '#9fe0ff'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('NITRÓ (Shift)', 300, 92); ctx.font = '14px sans-serif';
+  }
   ctx.fillStyle = '#fff';
   if (wanted.level) {
     ctx.fillStyle = Math.floor(clock * 4) % 2 ? '#4af' : '#f44';
@@ -2412,7 +2412,6 @@ function drawMinimap(w) {
     ctx.fillRect(px(c.x) - sz / 2, py(c.y) - sz / 2, sz, sz);
   }
   ctx.fillStyle = '#e33';
-  for (const p of npcs) if (p.kind === 'bandit' && !p.dead) { ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 2.5, 0, Math.PI * 2); ctx.fill(); }
   ctx.fillStyle = '#ff8a1f';
   for (const st of stationsIn(player.x - RAD, player.y - RAD, player.x + RAD, player.y + RAD)) {
     ctx.fillRect(px((st.rect.x0 + st.rect.x1) / 2) - 4, py((st.rect.y0 + st.rect.y1) / 2) - 4, 8, 8);
@@ -2585,7 +2584,7 @@ function render() {
   for (const p of npcs) {
     if (p.dead || !inView(p)) continue;
     if (p.kind === 'homeless') drawHomeless(p);
-    else drawPerson(p.x, p.y, p.angle, p.walk, p.shirt, p.head, p.kind === 'bandit');
+    else drawPerson(p.x, p.y, p.angle, p.walk, p.shirt, p.head, false);
   }
   const sk = SKINS[activeSkin];
   if (player.dead) drawCorpse(player.x, player.y, player.angle, sk.shirt, sk.head);
