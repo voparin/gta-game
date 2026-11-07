@@ -5,6 +5,10 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.16.0 – 2026-11-07
+- Buszmenetrend: percenként jön egy busz a hozzád legközelebbi megállóba; a megállóban látszik, hány mp múlva jön a következő (ADR-0027)
+- Kódátnézés után javítva (kiadás előtt): a busz nem indul foglalt helyről (ilyenkor egy másik közeli megállóba jön); széles képernyőn messzebbről indul, hogy ne a szemed előtt jelenjen meg
+
 ## 0.15.1 – 2026-11-07
 - Ittas vezetés: már egy ital után is üldöz a rendőrség (eddig csak 50% részegség felett), és nem csak az úton, hanem bárhol
 

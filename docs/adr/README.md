@@ -31,3 +31,4 @@ Itt van naplózva minden architekturális döntés: mit, miért és milyen alter
 | [0024](0024-tornado-es-lerombolhato-hazak.md) | Tornádó és lerombolható házak (kivétel a változatlan chunk-tartalom alól) | Elfogadva | 2026-11-07 |
 | [0025](0025-hazak-belseje-kulon-koordinata-rendszeru-szoba.md) | Házak belseje: külön koordináta-rendszerű szoba | Elfogadva | 2026-11-07 |
 | [0026](0026-radio-menet-kozben-generalt-zene-web-audioval.md) | Rádió: menet közben generált zene Web Audio-val, hangfájlok nélkül | Elfogadva | 2026-11-07 |
+| [0027](0027-buszmenetrend-percenkent-a-legkozelebbi-megalloba.md) | Buszmenetrend: percenként egy busz a legközelebbi megállóba | Elfogadva | 2026-11-07 |

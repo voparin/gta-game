@@ -43,7 +43,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Díj: 1. hely $600, 2. hely $250, 3. hely $100. Ha kiszállsz, feladod a versenyt.
 
 ## Buszok
-- Az utak mentén buszmegállók vannak; a narancs városi buszok megállnak bennük.
+- Az utak mentén buszmegállók vannak. **Percenként** jön egy narancs városi busz a hozzád legközelebbi megállóba; a megállóban kiírja, hány mp múlva jön a következő.
 - A megálló busz mellett **E**: felszállás ($2), **E** újra: leszállás, amikor a busz megáll.
 - A **zöld busz** csak a tiéd – az Esc menüben választhatod ki.
 - Minden megállóban ki van tűzve a 🇭🇺 magyar zászló.

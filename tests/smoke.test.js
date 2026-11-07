@@ -38,7 +38,7 @@ eval(src + `
   set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, set police(v){policeEnabled=v}, wanted, clearWanted,
   SPEED_LIMIT, KMH, START_X, START_Y, progress, mission, drift, stationFor, nearPump, earn, levelOf,
   set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
-  set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, stationCache, STATION_CACHE_MAX, raiseWanted,
+  set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, stationCache, STATION_CACHE_MAX, raiseWanted,
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
@@ -218,7 +218,7 @@ for (let i = 0; i < 1800 && !G.npcs.some(p => p.kind === 'homeless'); i++) step(
 check('magától megjelennek csövesek a járdán', G.npcs.some(p => p.kind === 'homeless'));
 check('a megjelenő gyalogosok a járdán / zebrán vannak', G.npcs.filter(p => p.kind === 'ped' && !p.dead).every(p => G.onRoad(p.x, p.y, G.SIDEWALK_W)));
 check('megjelennek AI autók', G.aiCars.length > 0);
-for (let i = 0; i < 1800 && !G.aiCars.some(c => c.citybus); i++) step(1);
+for (let i = 0; i < 60 * 65 && !G.aiCars.some(c => c.citybus); i++) step(1);   // a busz percenként jár
 check('magától járnak városi buszok', G.aiCars.some(c => c.citybus));
 G.spawn = false;
 
@@ -1167,7 +1167,7 @@ G.npcs.length = 0; G.aiCars.length = 0;
   check('a tornádó felszippantja az embert', !G.npcs.includes(victim));
   check('a felszippantott dolgok a tornádóban repülnek', G.tornado.flying.length >= 3);
   const fd0 = Math.hypot(G.tornado.x - farCar.x, G.tornado.y - farCar.y), fa0 = Math.atan2(farCar.y - G.tornado.y, farCar.x - G.tornado.x);
-  step(30);
+  step(60);                          // elég hosszan, hogy ne határeseten múljon (ADR-0012)
   const fd1 = Math.hypot(G.tornado.x - farCar.x, G.tornado.y - farCar.y), fa1 = Math.atan2(farCar.y - G.tornado.y, farCar.x - G.tornado.x);
   check('a távolabbi autót beszívja és megpörgeti', !G.aiCars.includes(farCar) || (fd1 < fd0 - 40 && Math.abs(Math.atan2(Math.sin(fa1 - fa0), Math.cos(fa1 - fa0))) > 0.1));
   // a játékost is elviszi
@@ -1180,6 +1180,49 @@ G.npcs.length = 0; G.aiCars.length = 0;
   step(240);
   check('a vihar végén a tornádó elül', G.tornado === null);
   G.aiCars.length = 0; G.npcs.length = 0; G.storm.timer = 1e9;
+}
+
+// --- menetrend: percenként egy busz a legközelebbi megállóba ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null;
+  check('a busz percenként jár', G.BUS_INTERVAL === 60);
+  const bs = G.nearestBusStop(G.C + 3750, G.C + 120);
+  Object.assign(G.player, { x: bs.x + (bs.axis === 'h' ? 0 : 20), y: bs.y + (bs.axis === 'h' ? 20 : 0), inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0 });
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  G.busSchedule.next = G.clock + 30;
+  const waitText = (G.interactionPrompt() || {}).text || '';
+  check('a megállóban kiírja, hány mp múlva jön a következő busz', /percenként/.test(waitText) && /~3[45] mp/.test(waitText));
+  G.spawn = true;
+  G.busSchedule.next = G.clock + 1;
+  const d0 = G.busSchedule.dispatched;
+  let arrived = null, t0 = G.clock, tArr = 0;
+  for (let i = 0; i < 60 * 25 && !arrived; i++) {
+    step(1);
+    G.npcs.length = 0;                                   // a teszt csak a buszt figyeli
+    arrived = G.aiCars.find(c => c.citybus && G.clock < c.dwellUntil && Math.hypot(c.x - bs.x, c.y - bs.y) < 160);
+    if (arrived) tArr = G.clock - t0;
+  }
+  check('a busz a legközelebbi megállóba érkezik, és ott megáll', !!arrived && G.busSchedule.dispatched === d0 + 1 && tArr < 15);
+  // 3 perc alatt pontosan 3 busz indul
+  const d1 = G.busSchedule.dispatched;
+  for (let i = 0; i < 60 * 180; i++) { step(1); G.npcs.length = 0; if (i % 600 === 0) G.aiCars.length = 0; }
+  check('3 perc alatt pontosan 3 busz indul (percenként egy)', G.busSchedule.dispatched - d1 === 3);
+  // kódátnézés után: foglalt indulóhelyre nem indít buszt; széles képernyőn messzebbről indul, és mégis a megállóba ér
+  G.aiCars.length = 0;
+  const lead0 = 1000, startAt = bs.along - bs.dir * lead0;
+  const blocker = G.spawnAiCar(bs.axis, bs.dir, bs.road, startAt); Object.assign(blocker, { vx: 0, vy: 0, wrecked: true });
+  const d2 = G.busSchedule.dispatched;
+  const alt = G.dispatchBus();
+  check('foglalt indulóhelyre nem indul busz, helyette egy másik megállóba jön', alt && Math.hypot(alt.x - blocker.x, alt.y - blocker.y) > 300 && G.busSchedule.dispatched === d2 + 1);
+  G.aiCars.length = 0;
+  const w0 = G.canvas.width; G.canvas.width = 3000;
+  const wide = G.dispatchBus();
+  const leadW = Math.abs((bs.axis === 'h' ? wide.x : wide.y) - bs.along);
+  let arrivedW = false;
+  for (let i = 0; i < 60 * 25 && !arrivedW; i++) { step(1); G.npcs.length = 0; arrivedW = G.clock < wide.dwellUntil && Math.hypot(wide.x - bs.x, wide.y - bs.y) < 160; }
+  check('széles képernyőn messzebbről indul (nem a szemed előtt jelenik meg), és a megállóba ér', leadW > 1500 && arrivedW);
+  G.canvas.width = w0;
+  G.spawn = false; G.aiCars.length = 0;
 }
 
 // --- zöld busz: csak a játékosé ---

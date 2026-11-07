@@ -28,7 +28,7 @@ Felépítés a `game.js`-en belül:
 - **Előrehaladás**: `progress` (pénz, XP, megvett autók, rekordok – localStorage), `earn()` minden jutalomhoz, `levelOf`. Küldetés: `mission`, `updateMission`; drift-kombó: `drift`, `updateDrift`; autóbolt: `buyCar`.
 - **Végtelen pálya** (ADR-0019): nincs `WORLD` határ; „egész pályás” keresés helyett mindig korlátos sugarú keresés (pl. `nearestStation`).
 - **Versenyek** (ADR-0020): `race` állapot, `planRace`, `startRace`, `updateRace`, `racerInput`; versenyzők az `aiCars`-ban `racer` jelzővel.
-- **Buszok** (ADR-0021): `busStopsIn` (analitikus megállók), `spawnCityBus` (`citybus` jelző), `player.riding` (utas), `BUS_FARE`. A zöld busz (`BUS`) csak a játékosé.
+- **Buszok** (ADR-0021): `busStopsIn` (analitikus megállók), `spawnCityBus` (`citybus` jelző), `player.riding` (utas), `BUS_FARE`; menetrend (ADR-0027): `busSchedule`, `dispatchBus`, `BUS_INTERVAL`, `BUS_LEAD`. A zöld busz (`BUS`) csak a játékosé.
 - **Parkolók, bérlés** (ADR-0022): `parkingLot`, `lotsIn`, `rentCar`, `RENT_PRICE`, `rentedLots`; zászló: `HU_FLAG`. Bérléskor a `car` veszi fel a `RENTAL_MODEL`-t (nincs második játékosautó).
 - **Házak**: `housesIn` (analitikus, 420 px-enként, nincs a kereszteződések/kutak 650 px-es körzetében és a parkolóknál), ütközés: téglalap-akadály (`rect`, ADR-0023, `pushOutOfRect`, `OB_REACH`), `insideHouse`.
 - **Tornádó** (ADR-0024): `tornado`, `spawnTornado`, `updateTornado`; lerombolt házak: `destroyedHouses` (az egyetlen kivétel a változatlan chunk-tartalom alól). Tesztben a `tornadoEnabled` kikapcsolható.

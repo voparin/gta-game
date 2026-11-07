@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.15.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.16.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -288,6 +288,9 @@ const STOP_SPACING = 2500, STOP_OFFSET = 1250;
 const CITY_BUS = { type: 'citybus', color: ['#f28c1e', '#c96a0a'], len: 120, wid: 44, accel: 240, maxRoad: 360, maxSand: 250, sandDrag: 0.9, fuelUse: 1 };
 const BUS_DWELL = 4;          // ennyi másodpercig áll a busz a megállóban
 const BUS_FARE = 2;           // buszjegy ára ($)
+// Menetrend (ADR-0027): percenként egy busz a játékoshoz legközelebbi megállóba
+const BUS_INTERVAL = 60, BUS_LEAD = 1000;   // indulás a megálló előtt legalább 1000 px-rel
+const busSchedule = { next: 15, dispatched: 0 };
 
 // side: az út melyik oldalán (±1); dir: az a haladási irány, amelyik itt áll meg (jobb oldali közlekedés)
 function busStopsIn(xa, ya, xb, yb) {
@@ -805,9 +808,11 @@ function interactionPrompt() {
   if (player.inCar) return null;
   if (dist(player, car) < 75) return { text: 'Nyomd meg az E-t a beszálláshoz', color: '#fff' };
   if (nearestBoardableBus()) return { text: `🚌 E: felszállás a buszra ($${BUS_FARE})`, color: '#f28c1e' };   // a toggleCar-ban a busz megelőzi a többit
+  const ns = nearestBusStop(player.x, player.y);
   if (nearestDoor()) return { text: '🏠 E: bemenés a házba', color: '#7df' };
   if (nearestRentable()) return { text: `🔑 E: autóbérlés ($${RENT_PRICE})`, color: '#7f7' };
   if (nearestHomeless()) return { text: `🤲 E: adományozás ($${DONATE_MIN}–$${DONATE_MAX})`, color: '#7f7' };
+  if (ns && Math.hypot(ns.x - player.x, ns.y - player.y) < 160) return { text: `🚌 Buszmegálló – a busz percenként jár, a következő ~${Math.ceil(nextBusIn())} mp múlva`, color: '#f28c1e' };
   return null;
 }
 
@@ -998,6 +1003,39 @@ function spawnCityBus(axis, dir, road, along) {
   return c;
 }
 
+function nearestBusStop(x, y) {
+  let best = null, bd = Infinity;
+  for (const bs of busStopsIn(x - 2600, y - 2600, x + 2600, y + 2600)) {
+    const d = Math.hypot(bs.x - x, bs.y - y);
+    if (d < bd) { bd = d; best = bs; }
+  }
+  return best;
+}
+
+// az indulás távolsága: legalább BUS_LEAD, széles képernyőn messzebb (ne a játékos szeme előtt jelenjen meg),
+// de kevesebb, mint a megállók távolsága, így közben nincs másik megálló
+const busLead = () => clamp(Math.max(BUS_LEAD, canvas.width / 2 + 300), BUS_LEAD, STOP_SPACING - 100);
+
+// a busz a megálló előtt indul, a megálló sávjában; ha közben kereszteződés van, ott egyenesen megy
+function dispatchBus() {
+  const lead = busLead();
+  // a legközelebbi megállótól kezdve az első, amelynek az indulóhelye szabad (parkoló autó, roncs, másik busz nincs ott)
+  const stops = busStopsIn(player.x - 2600, player.y - 2600, player.x + 2600, player.y + 2600)
+    .sort((a, b) => Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y)).slice(0, 6);
+  for (const bs of stops) {
+    const along = bs.along - bs.dir * lead;
+    const lane = bs.axis === 'h' ? { x: along, y: bs.road + bs.dir * 40 } : { x: bs.road - bs.dir * 40, y: along };
+    if ([car, ...aiCars].some(c => dist(c, lane) < 300)) continue;
+    const c = spawnCityBus(bs.axis, bs.dir, bs.road, along);
+    c.ai.lastCross = bs.axis + bs.road + ':' + (bs.along - bs.dir * STOP_OFFSET);   // a köztes kereszteződésben nem fordul el
+    busSchedule.dispatched++;
+    return c;
+  }
+  return null;                                          // mind foglalt: 2 mp múlva újra próbálja
+}
+
+const nextBusIn = () => Math.max(0, busSchedule.next - clock) + busLead() / 300 + 1.5;
+
 function spawnAround(dt) {
   // a távoliakat eltüntetjük
   for (let i = npcs.length - 1; i >= 0; i--) {
@@ -1032,13 +1070,8 @@ function spawnAround(dt) {
       h.angle = axis === 'h' ? (side > 0 ? -Math.PI / 2 : Math.PI / 2) : (side > 0 ? Math.PI : 0);   // az út felé néz
     }
   }
-  if (aiCars.filter(c => c.citybus).length < 2 && rand() < dt) {          // városi buszok
-    const axis = rand() < 0.5 ? 'h' : 'v', dir = rand() < 0.5 ? 1 : -1;
-    const road = nearestRoad(axis === 'h' ? player.y : player.x);
-    const along = (axis === 'h' ? player.x : player.y) + (rand() < 0.5 ? -1 : 1) * (900 + rand() * 700);
-    const pos = axis === 'h' ? { x: along, y: road } : { x: road, y: along };
-    const d = dist(pos, player);
-    if (d > 700 && d < 2400 && ![car, ...aiCars].some(c => dist(c, pos) < 300)) spawnCityBus(axis, dir, road, along);
+  if (clock >= busSchedule.next) {                  // percenként egy városi busz (menetrend)
+    busSchedule.next = clock + (dispatchBus() ? BUS_INTERVAL : 2);   // ha foglalt az indulóhely, 2 mp múlva újra próbálja
   }
   if (aiCars.filter(c => !c.police && !c.racer && !c.citybus).length < 6 && rand() < dt) {
     const axis = rand() < 0.5 ? 'h' : 'v', dir = rand() < 0.5 ? 1 : -1;
