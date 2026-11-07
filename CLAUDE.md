@@ -22,8 +22,10 @@ Felépítés a `game.js`-en belül:
 - **Autók**: egy közös fizika (`updateCarPhysics`) a játékos és az AI autók számára; az AI a `aiCarInput`-ban dönt (sáv követése, kereszteződésben fordulás).
 - **Szereplők**: `npcs` (gyalogos / bandita), `aiCars`, `bullets`; a játékostól messze lévőket a `spawnAround` eltünteti, a közelben újakat hoz létre.
 - **Időjárás**: `storm` (homokvihar), napszak: `nightAmount`.
+- **Benzinkutak**: `stationFor(i, j)` kereszteződésenként determinisztikusan; `stationsIn`, `nearPump`, `nearestStation`. Benzin: `car.fuel`, `updateFuel`.
+- **Előrehaladás**: `progress` (pénz, XP, megvett autók, rekordok – localStorage), `earn()` minden jutalomhoz, `levelOf`. Küldetés: `mission`, `updateMission`; drift-kombó: `drift`, `updateDrift`; autóbolt: `buyCar`.
 - **Rendőrség**: `wanted` (körözési szint), `updateWanted` (gyorshajtás `SPEED_LIMIT` felett, lerázás, letartóztatás), `policeInput` (üldözés). A rendőrautók az `aiCars`-ban vannak `police`/`chasing` jelzővel. Tesztben a `policeEnabled` kikapcsolható.
-- Tesztekben a `spawnEnabled`, `slimeEnabled` és `policeEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el.
+- Tesztekben a `spawnEnabled`, `slimeEnabled`, `policeEnabled` és `missionsEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el. Ne írj olyan tesztet, ami véletlen szóráson vagy időzítési szerencsén múlik.
 
 ## Szokásos fejlesztési flow
 

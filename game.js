@@ -110,6 +110,11 @@ function generateChunk(cx, cy) {
     }
   }
   for (const l of ch.lamps) ch.obstacles.push({ x: l.x, y: l.y, r: 8, type: 'lamp' });
+  // benzinkutak: kutak és az épület fala
+  for (const st of stationsIn(x0, y0, x0 + CHUNK, y0 + CHUNK)) {
+    for (const q of st.pumps) if (inChunk(q.x, q.y)) ch.obstacles.push({ x: q.x, y: q.y, r: 10, type: 'pump' });
+    for (const q of st.walls) if (inChunk(q.x, q.y)) ch.obstacles.push({ x: q.x, y: q.y, r: 34, type: 'wall' });
+  }
 
   // kaktuszok és sziklák (nem az úton, nem a kezdőhelyen)
   const place = (count, type, rMin, rMax) => {
@@ -119,6 +124,7 @@ function generateChunk(cx, cy) {
       if (x < 60 || y < 60 || x > WORLD - 60 || y > WORLD - 60) continue;
       if (onRoad(x, y, rad + 40 + SIDEWALK_W)) continue;   // úton és járdán nincs akadály
       if (Math.hypot(x - START_X, y - START_Y) < 250) continue;
+      if (insideStation(x, y, rad + 20)) continue;
       ch.obstacles.push({ x, y, r: rad, type, rot, seed });
     }
   };
@@ -184,6 +190,67 @@ function onSlime(x, y) {
   return false;
 }
 
+// ===== Benzinkutak: néhány kereszteződés egyik sarkán =====
+const ROAD_COUNT = Math.floor((WORLD - ROAD_OFFSET) / ROAD_SPACING) + 1;
+const stationCache = new Map();
+function stationFor(i, j) {
+  const key = i + ',' + j;
+  if (stationCache.has(key)) return stationCache.get(key);
+  const X = ROAD_OFFSET + i * ROAD_SPACING, Y = ROAD_OFFSET + j * ROAD_SPACING;
+  const center = X === C && Y === C;          // a kezdőhely melletti kereszteződésben mindig van
+  const h = rng(chunkSeed(i + 1000, j + 1000));
+  let st = null;
+  if (center || h() < 0.45) {
+    const qx = center ? 1 : (h() < 0.5 ? -1 : 1), qy = center ? -1 : (h() < 0.5 ? -1 : 1);
+    const ox = X + qx * (EDGE + 10), oy = Y + qy * (EDGE + 10);
+    const L = (a, b) => ({ x: ox + qx * a, y: oy + qy * b });   // a: távolság a függőleges úttól, b: a vízszintestől
+    const box = (a0, b0, a1, b1) => {
+      const p = L(a0, b0), q = L(a1, b1);
+      return { x0: Math.min(p.x, q.x), y0: Math.min(p.y, q.y), x1: Math.max(p.x, q.x), y1: Math.max(p.y, q.y) };
+    };
+    st = { X, Y, qx, qy, rect: box(0, 0, 320, 240), building: box(56, 168, 304, 236), canopy: box(60, 55, 280, 135),
+      pumps: [L(110, 95), L(230, 95)], walls: [90, 150, 210, 270].map(a => L(a, 202)), sign: L(-20, -20) };
+  }
+  stationCache.set(key, st);
+  return st;
+}
+
+function stationsIn(xa, ya, xb, yb) {
+  const out = [];
+  const i0 = clamp(Math.floor((xa - ROAD_OFFSET - 500) / ROAD_SPACING), 0, ROAD_COUNT - 1);
+  const i1 = clamp(Math.ceil((xb - ROAD_OFFSET + 500) / ROAD_SPACING), 0, ROAD_COUNT - 1);
+  const j0 = clamp(Math.floor((ya - ROAD_OFFSET - 500) / ROAD_SPACING), 0, ROAD_COUNT - 1);
+  const j1 = clamp(Math.ceil((yb - ROAD_OFFSET + 500) / ROAD_SPACING), 0, ROAD_COUNT - 1);
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const st = stationFor(i, j);
+    if (st && st.rect.x1 >= xa && st.rect.x0 <= xb && st.rect.y1 >= ya && st.rect.y0 <= yb) out.push(st);
+  }
+  return out;
+}
+let allStationsCache = null;
+const allStations = () => allStationsCache || (allStationsCache = stationsIn(0, 0, WORLD, WORLD));
+
+function insideStation(x, y, pad = 0) {
+  return stationsIn(x - pad, y - pad, x + pad, y + pad).some(st =>
+    x > st.rect.x0 - pad && x < st.rect.x1 + pad && y > st.rect.y0 - pad && y < st.rect.y1 + pad);
+}
+
+function nearPump(x, y) {
+  for (const st of stationsIn(x - 100, y - 100, x + 100, y + 100)) {
+    for (const p of st.pumps) if (Math.hypot(x - p.x, y - p.y) < 75) return p;
+  }
+  return null;
+}
+
+function nearestStation(x, y) {
+  let best = null, bd = Infinity;
+  for (const st of allStations()) {
+    const cx = (st.canopy.x0 + st.canopy.x1) / 2, cy = (st.canopy.y0 + st.canopy.y1) / 2, d = Math.hypot(x - cx, y - cy);
+    if (d < bd) { bd = d; best = { st, x: cx, y: cy, d }; }
+  }
+  return best;
+}
+
 // Homok textúra
 const sandTile = document.createElement('canvas');
 sandTile.width = sandTile.height = 256;
@@ -215,13 +282,14 @@ const SKINS = [
   { name: 'Turista', shirt: '#ffd23a', head: '#c8a060', legs: '#e0e0e0', hat: '#f5f5f5' },
 ];
 const CAR_MODELS = [
-  { name: 'Piros sportkocsi', color: ['#d42020', '#a31515'], len: 72, wid: 36, accel: 420, maxRoad: 620, maxSand: 380, sandDrag: 0.9, desc: 'gyors aszfalton' },
-  { name: 'Fekete terepjáró', color: ['#2a2a2a', '#151515'], len: 80, wid: 42, accel: 360, maxRoad: 500, maxSand: 470, sandDrag: 0.35, desc: 'homokban is gyors' },
-  { name: 'Sárga taxi', color: ['#f2c230', '#c09010'], len: 74, wid: 36, accel: 380, maxRoad: 560, maxSand: 340, sandDrag: 0.9, desc: 'kiegyensúlyozott' },
-  { name: 'Kék rakétaautó', color: ['#2f6fd0', '#1f4f9a'], len: 70, wid: 32, accel: 560, maxRoad: 760, maxSand: 330, sandDrag: 1.2, desc: 'nagyon gyors, homokban lassú' },
-  { name: 'Zöld pickup', color: ['#3a9a4a', '#257035'], len: 84, wid: 40, accel: 330, maxRoad: 520, maxSand: 420, sandDrag: 0.5, desc: 'strapabíró' },
+  { name: 'Piros sportkocsi', color: ['#d42020', '#a31515'], len: 72, wid: 36, accel: 420, maxRoad: 620, maxSand: 380, sandDrag: 0.9, fuelUse: 1, price: 0, desc: 'gyors aszfalton' },
+  { name: 'Fekete terepjáró', color: ['#2a2a2a', '#151515'], len: 80, wid: 42, accel: 360, maxRoad: 500, maxSand: 470, sandDrag: 0.35, fuelUse: 1.3, price: 3000, desc: 'homokban is gyors' },
+  { name: 'Sárga taxi', color: ['#f2c230', '#c09010'], len: 74, wid: 36, accel: 380, maxRoad: 560, maxSand: 340, sandDrag: 0.9, fuelUse: 0.7, price: 800, desc: 'takarékos' },
+  { name: 'Kék rakétaautó', color: ['#2f6fd0', '#1f4f9a'], len: 70, wid: 32, accel: 560, maxRoad: 760, maxSand: 330, sandDrag: 1.2, fuelUse: 2, price: 8000, desc: 'nagyon gyors, sokat eszik' },
+  { name: 'Zöld pickup', color: ['#3a9a4a', '#257035'], len: 84, wid: 40, accel: 330, maxRoad: 520, maxSand: 420, sandDrag: 0.5, fuelUse: 1.1, price: 1500, desc: 'strapabíró' },
 ];
-const DEFAULT_MODEL = { accel: 420, maxRoad: 620, maxSand: 380, sandDrag: 0.9 };
+const DEFAULT_MODEL = { accel: 420, maxRoad: 620, maxSand: 380, sandDrag: 0.9, fuelUse: 1 };
+const FUEL_PRICE = 1;            // $ / 1% benzin
 const POLICE_MODEL = { name: 'Rendőrautó', color: ['#f4f4f4', '#1d2a4a'], len: 76, wid: 36, accel: 520, maxRoad: 680, maxSand: 450, sandDrag: 0.4 };
 const SPEED_LIMIT = 60;          // km/h – aki ennél gyorsabban megy az úton, azt üldözi a rendőrség
 const KMH = 4;                   // 1 km/h = 4 px/s (a HUD is így számol)
@@ -231,7 +299,24 @@ function loadChoice(key, max) {
 }
 function saveChoice(key, v) { try { window.localStorage.setItem(key, String(v)); } catch (e) { /* nincs tárhely */ } }
 
-const menu = { open: false, sel: 0, skin: loadChoice('gta.skin', SKINS.length), carModel: loadChoice('gta.car', CAR_MODELS.length), hits: [] };
+// Előrehaladás (pénz, XP, megvett autók, rekordok) – a böngésző megjegyzi
+const PROGRESS_KEY = 'gta.progress';
+function loadProgress() {
+  const def = { money: 0, xp: 0, owned: [0], activeCar: 0, bestDrift: 0, bestStreak: 0, missions: 0 };
+  try {
+    const p = JSON.parse(window.localStorage.getItem(PROGRESS_KEY));
+    if (p && typeof p.money === 'number') return { ...def, ...p };
+  } catch (e) { /* nincs mentés */ }
+  return def;
+}
+const progress = loadProgress();
+function saveProgress() { try { window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (e) { /* nincs tárhely */ } }
+const levelOf = xp => Math.floor(Math.sqrt(xp / 150)) + 1;
+const xpForLevel = l => 150 * (l - 1) * (l - 1);
+const owns = i => progress.owned.includes(i);
+
+const menu = { open: false, sel: 0, skin: loadChoice('gta.skin', SKINS.length),
+  carModel: owns(progress.activeCar) ? progress.activeCar : 0, hits: [], note: '' };
 const MENU_ROWS = ['Folytatás', 'Szkin', 'Autó'];
 
 function makeCar(x, y, angle, color) {
@@ -241,13 +326,14 @@ function makeCar(x, y, angle, color) {
 
 function applyCarModel(c, m) {
   Object.assign(c, { color: m.color, len: m.len, wid: m.wid, r: Math.max(m.len, m.wid * 2) * 0.39,
-    accel: m.accel, maxRoad: m.maxRoad, maxSand: m.maxSand, sandDrag: m.sandDrag });
+    accel: m.accel, maxRoad: m.maxRoad, maxSand: m.maxSand, sandDrag: m.sandDrag, fuelUse: m.fuelUse || 1 });
 }
 
 const player = { x: START_X, y: START_Y, angle: 0, r: 12, inCar: false, walk: 0,
   health: 100, dead: 0, arrested: 0, cooldown: 0, kills: 0, lastHit: -99 };
 const car = makeCar(START_X + 100, START_Y - 50, 0, ['#d42020', '#a31515']);
 applyCarModel(car, CAR_MODELS[menu.carModel]);
+car.fuel = 100;          // benzin %
 const aiCars = [];      // AI által vezetett autók
 const npcs = [];        // gyalogosok ('ped') és banditák ('bandit')
 const bullets = [];     // {x, y, vx, vy, life, from}
@@ -278,6 +364,8 @@ function toggleStorm() {
 function toggleMenu() {
   menu.open = !menu.open;
   menu.sel = 0;
+  menu.note = '';
+  if (!menu.open && !owns(menu.carModel)) menu.carModel = progress.activeCar;   // a meg nem vett autó nem marad kiválasztva
   for (const k in keys) keys[k] = false;   // ne ragadjon be egy gomb
   mouse.down = false;
 }
@@ -288,9 +376,27 @@ function changeChoice(row, delta) {
     saveChoice('gta.skin', menu.skin);
   } else if (row === 2) {
     menu.carModel = (menu.carModel + delta + CAR_MODELS.length) % CAR_MODELS.length;
-    applyCarModel(car, CAR_MODELS[menu.carModel]);
-    saveChoice('gta.car', menu.carModel);
+    menu.note = '';
+    if (owns(menu.carModel)) selectCar(menu.carModel);
   }
+}
+
+function selectCar(i) {
+  applyCarModel(car, CAR_MODELS[i]);
+  progress.activeCar = i;
+  saveProgress();
+}
+
+function buyCar(i) {
+  const m = CAR_MODELS[i];
+  if (owns(i)) return true;
+  if (progress.money < m.price) { menu.note = `Nincs elég pénzed! Még $${m.price - Math.floor(progress.money)} kell.`; return false; }
+  progress.money -= m.price;
+  progress.owned.push(i);
+  selectCar(i);
+  menu.note = `Megvetted: ${m.name}!`;
+  popup(`Új autó: ${m.name}!`, '#7f7');
+  return true;
 }
 
 function menuKey(code) {
@@ -299,7 +405,9 @@ function menuKey(code) {
   else if (code === 'ArrowLeft' || code === 'KeyA') changeChoice(menu.sel, -1);
   else if (code === 'ArrowRight' || code === 'KeyD') changeChoice(menu.sel, 1);
   else if (code === 'Enter' || code === 'Space') {
-    if (menu.sel === 0) toggleMenu(); else changeChoice(menu.sel, 1);
+    if (menu.sel === 0) toggleMenu();
+    else if (menu.sel === 2 && !owns(menu.carModel)) buyCar(menu.carModel);
+    else changeChoice(menu.sel, 1);
   }
 }
 
@@ -307,7 +415,9 @@ function menuClick(x, y) {
   for (const h of menu.hits) {
     if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
       menu.sel = h.row;
-      if (h.row === 0) toggleMenu(); else changeChoice(h.row, h.delta);
+      if (h.row === 0) toggleMenu();
+      else if (h.buy) buyCar(menu.carModel);
+      else changeChoice(h.row, h.delta);
       return;
     }
   }
@@ -338,6 +448,7 @@ function collide(o, bounce) {
         if (bounce) {
           const vn = o.vx * nx + o.vy * ny;
           if (vn < 0) { o.vx -= 1.4 * vn * nx; o.vy -= 1.4 * vn * ny; o.vx *= 0.6; o.vy *= 0.6; }
+          if (vn < -150) o.crashT = clock;
         }
       }
     }
@@ -532,12 +643,13 @@ function updateCarPhysics(c, input, dt) {
   let fwd = c.vx * fx + c.vy * fy;
   let lat = -c.vx * fy + c.vy * fx;
 
-  if (up) fwd += c.accel * dt;
+  const empty = c.fuel !== undefined && c.fuel <= 0;   // üres tankkal csak vánszorog
+  if (up) fwd += (empty ? 120 : c.accel) * dt;
   if (down) fwd -= (fwd > 20 ? 700 : 300) * dt;
   if (handbrake) fwd *= Math.exp(-1.5 * dt);
   fwd *= Math.exp(-(sandy ? c.sandDrag : 0.4) * dt);    // homokban lassabb
   if (!up && !down && Math.abs(fwd) < 5) fwd = 0;
-  fwd = clamp(fwd, -180, sandy ? c.maxSand : c.maxRoad);
+  fwd = clamp(fwd, -180, empty ? 60 : sandy ? c.maxSand : c.maxRoad);
   const grip = slimy ? 0.4 : handbrake ? 1.2 : 12;     // kézifékkel / nyálkán alig tapad → csúszik
   lat *= Math.exp(-grip * dt);
 
@@ -613,6 +725,7 @@ function killNpc(p, byPlayer) {
   if (p.dead) return;
   p.dead = clock;
   if (byPlayer) player.kills++;
+  if (byPlayer && p.kind === 'bandit') earn(50, 'bandita');
   alertPeds(p.x, p.y);
 }
 
@@ -625,6 +738,8 @@ function damagePlayer(n) {
     player.dead = 3;
     if (player.inCar) { player.inCar = false; player.x = car.x; player.y = car.y; }
     message = { text: 'MEGHALTÁL', until: clock + 3 };
+    if (mission.streak) popup(`Sorozat elveszett (${mission.streak})`, '#f66');
+    mission.streak = 0;
   }
 }
 
@@ -632,7 +747,7 @@ function respawn() {
   Object.assign(player, { x: START_X, y: START_Y, angle: 0, inCar: false, health: 100, dead: 0, arrested: 0 });
   clearWanted();
   for (let i = aiCars.length - 1; i >= 0; i--) if (aiCars[i].police) aiCars.splice(i, 1);
-  Object.assign(car, { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, spin: 0, lastWheels: null });
+  Object.assign(car, { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, spin: 0, lastWheels: null, fuel: Math.max(car.fuel, 40) });
   for (let i = npcs.length - 1; i >= 0; i--) if (npcs[i].kind === 'bandit') npcs.splice(i, 1);
   message = { text: 'Újraéledtél', until: clock + 2 };
 }
@@ -687,7 +802,9 @@ function policeInput(c, dt) {
   }
   if (Math.abs(fwd) < 20 && d > 160) { c.stuckT += dt; if (c.stuckT > 1.5) { c.stuckT = 0; c.reverseT = 1; } }
   else c.stuckT = 0;
-  const want = d < 160 ? Math.max(0, Math.hypot(tvx, tvy) - 30) : 700;
+  // közel lassít, és szorosan (a letartóztatási távolságon belül) mellé áll
+  const tsp = Math.hypot(tvx, tvy);
+  const want = d < 85 ? Math.max(0, tsp - 30) : d < 260 ? Math.max(120, tsp) : 700;
   return {
     up: fwd < want,
     down: fwd > want + 40,
@@ -710,7 +827,9 @@ function updateWanted(dt) {
   if (cops.some(c => dist(c, t) < 1500)) wanted.lostTimer = 0;
   else wanted.lostTimer += dt;
   if (wanted.lostTimer > 12) {
+    const lvl = wanted.level;
     clearWanted();
+    earn(150 * lvl, 'lerázás');
     message = { text: 'Leráztad a rendőröket!', until: clock + 2.5, color: '#7f7' };
     return;
   }
@@ -721,7 +840,10 @@ function updateWanted(dt) {
   if (wanted.bustTimer > 1.5) {
     player.arrested = 3;
     if (player.inCar) { player.inCar = false; player.x = car.x + 40; player.y = car.y; }
-    message = { text: 'LETARTÓZTATTAK!', until: clock + 3, color: '#4af' };
+    const fine = Math.round(progress.money * 0.1);
+    progress.money -= fine;
+    saveProgress();
+    message = { text: fine ? `LETARTÓZTATTAK! -$${fine}` : 'LETARTÓZTATTAK!', until: clock + 3, color: '#4af' };
   }
 }
 
@@ -886,6 +1008,121 @@ function updateStorm(dt) {
   }
 }
 
+// ===== Pénz, szintek, felugró üzenetek =====
+const popups = [];        // {text, color, born}
+function popup(text, color = '#fff') {
+  popups.push({ text, color, born: clock });
+  if (popups.length > 6) popups.shift();
+}
+
+function earn(amount, label) {
+  amount = Math.round(amount);
+  if (amount <= 0) return;
+  const before = levelOf(progress.xp);
+  progress.money += amount;
+  progress.xp += amount;
+  popup(`+$${amount} ${label}`, '#7f7');
+  const after = levelOf(progress.xp);
+  if (after > before) {
+    const bonus = after * 50;
+    progress.money += bonus;
+    message = { text: `SZINTLÉPÉS! ${after}. szint`, until: clock + 2.5, color: '#ffd23a' };
+    popup(`+$${bonus} szintbónusz`, '#ffd23a');
+  }
+  saveProgress();
+}
+
+// ===== Benzin =====
+function updateFuel(dt, input) {
+  car.refueling = false;
+  if (!player.inCar) return;
+  const moving = Math.hypot(car.vx, car.vy) > 20;     // álló autó (alapjárat) nem fogyaszt
+  car.fuel = Math.max(0, car.fuel - (input.up ? 0.45 * car.fuelUse : moving ? 0.03 : 0) * dt);
+  if (car.fuel <= 0 && !car.emptyWarned) {
+    car.emptyWarned = true;
+    message = { text: 'KIFOGYOTT A BENZIN!', until: clock + 2.5, color: '#ff8a1f' };
+  }
+  if (car.fuel > 5) car.emptyWarned = false;
+  if (car.fuel < 20 && !car.lowWarned) { car.lowWarned = true; popup('⛽ Kevés a benzin – keress egy kutat!', '#ff8a1f'); }
+  if (car.fuel > 30) car.lowWarned = false;
+  // tankolás: állj meg egy kút mellett
+  if (car.fuel < 99.9 && nearPump(car.x, car.y) && Math.hypot(car.vx, car.vy) < 100) {
+    car.refueling = true;
+    const add = Math.min(100 - car.fuel, 30 * dt);
+    car.fuel += add;
+    progress.money = Math.max(0, progress.money - add * FUEL_PRICE);
+    if (car.fuel >= 99.9) { car.fuel = 100; popup('Tele a tank!', '#7f7'); saveProgress(); }
+  }
+}
+
+// ===== Drift-kombó: minél tovább driftelsz ütközés nélkül, annál nagyobb a szorzó =====
+const drift = { active: false, time: 0, points: 0, idle: 0, mult: 1, seenCrash: 0 };
+function updateDrift(dt) {
+  if (car.crashT && car.crashT !== drift.seenCrash) {
+    drift.seenCrash = car.crashT;
+    if (drift.active && drift.points > 5) popup('Drift elveszett – ütközés!', '#f66');
+    Object.assign(drift, { active: false, time: 0, points: 0, idle: 0, mult: 1 });
+  }
+  const speed = Math.hypot(car.vx, car.vy);
+  if (player.inCar && car.skid && speed > 150) {
+    drift.active = true; drift.idle = 0; drift.time += dt;
+    drift.mult = Math.min(5, 1 + Math.floor(drift.time / 1.5));
+    drift.points += speed * dt * 0.08 * drift.mult;
+  } else if (drift.active) {
+    drift.idle += dt;
+    if (drift.idle > 0.8) {
+      const pts = Math.round(drift.points);
+      if (pts >= 5) {
+        progress.bestDrift = Math.max(progress.bestDrift, pts);
+        earn(pts, `drift x${drift.mult}`);
+      }
+      Object.assign(drift, { active: false, time: 0, points: 0, idle: 0, mult: 1 });
+    }
+  }
+}
+
+// ===== Szállítási küldetések: egymás után, sorozatszorzóval =====
+const mission = { active: false, tx: 0, ty: 0, reward: 0, timeLeft: 0, total: 0, cooldown: 3, streak: 0 };
+let missionsEnabled = true;   // teszteléshez kikapcsolható
+const streakMult = () => 1 + 0.25 * mission.streak;
+
+function newMission() {
+  const axis = rand() < 0.5 ? 'h' : 'v';
+  const base = nearestRoad(axis === 'h' ? player.y : player.x);
+  const road = clamp(base + (Math.floor(rand() * 3) - 1) * ROAD_SPACING, ROAD_OFFSET, WORLD - ROAD_OFFSET);
+  const along = clamp((axis === 'h' ? player.x : player.y) + (rand() < 0.5 ? -1 : 1) * (1500 + rand() * 2500), 300, WORLD - 300);
+  const line = road + (rand() < 0.5 ? -1 : 1) * WALK_OFF;
+  const t = axis === 'h' ? { x: along, y: line } : { x: line, y: along };
+  const d = dist(t, player);
+  const timeLeft = Math.round(20 + d / 280);
+  Object.assign(mission, { active: true, tx: t.x, ty: t.y, reward: Math.round(60 + d / 12), timeLeft, total: timeLeft });
+  popup(`📦 Új szállítás: ${Math.round(d / 10)} m, ${timeLeft} mp`, '#ffd23a');
+}
+
+function updateMission(dt) {
+  if (!mission.active) {
+    mission.cooldown -= dt;
+    if (mission.cooldown <= 0 && missionsEnabled && controllable()) newMission();
+    return;
+  }
+  mission.timeLeft -= dt;
+  if (controllable() && Math.hypot(player.x - mission.tx, player.y - mission.ty) < 80) {
+    const mult = streakMult();
+    const pay = mission.reward * mult + mission.timeLeft * 3;
+    mission.streak++;
+    progress.missions++;
+    progress.bestStreak = Math.max(progress.bestStreak, mission.streak);
+    earn(pay, `szállítás x${mult.toFixed(2)}`);
+    message = { text: `SZÁLLÍTÁS KÉSZ! Sorozat: ${mission.streak}`, until: clock + 1.8, color: '#ffd23a' };
+    mission.active = false; mission.cooldown = 2;
+  } else if (mission.timeLeft <= 0) {
+    if (mission.streak) popup(`Sorozat elveszett (${mission.streak})`, '#f66');
+    mission.streak = 0;
+    message = { text: 'LEJÁRT AZ IDŐ!', until: clock + 1.8, color: '#f66' };
+    mission.active = false; mission.cooldown = 3;
+  }
+}
+
 // Éjszaka mértéke: 0 = nappal, 1 = teljes éjszaka
 function nightAmount(t) {
   if (t >= HALF_CYCLE - FADE / 2 && t < HALF_CYCLE + FADE / 2) return (t - (HALF_CYCLE - FADE / 2)) / FADE;
@@ -907,7 +1144,11 @@ function update(dt) {
     updatePlayer(dt);
   }
   updatePlayerShooting(dt);
-  updateCarPhysics(car, playerCarInput(), dt);
+  const pin = playerCarInput();
+  updateCarPhysics(car, pin, dt);
+  updateFuel(dt, pin);
+  updateDrift(dt);
+  updateMission(dt);
   if (player.inCar) { player.x = car.x; player.y = car.y; }
   for (const c of aiCars) updateCarPhysics(c, c.chasing ? policeInput(c, dt) : aiCarInput(c), dt);
   updateWanted(dt);
@@ -918,6 +1159,7 @@ function update(dt) {
   updateSkidMarks();
   spawnAround(dt);
   if (!player.dead && clock - player.lastHit > 4) player.health = Math.min(100, player.health + 4 * dt);  // gyógyul
+  while (popups.length && clock - popups[0].born > 2.5) popups.shift();
 }
 
 // ===== Rajzolás =====
@@ -1021,6 +1263,53 @@ function drawRoads(view) {
       }
     }
   }
+}
+
+function drawStation(st, n) {
+  const r = st.rect, b = st.building, c = st.canopy;
+  ctx.fillStyle = '#a7a296'; ctx.fillRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);          // beton
+  ctx.strokeStyle = '#7d786c'; ctx.lineWidth = 2; ctx.strokeRect(r.x0, r.y0, r.x1 - r.x0, r.y1 - r.y0);
+  ctx.fillStyle = 'rgba(255,138,31,0.18)'; ctx.fillRect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);   // tankolósáv
+  ctx.strokeStyle = '#ff8a1f'; ctx.lineWidth = 2; ctx.strokeRect(c.x0, c.y0, c.x1 - c.x0, c.y1 - c.y0);
+  for (const p of st.pumps) {
+    ctx.fillStyle = '#333'; ctx.fillRect(p.x - 9, p.y - 13, 18, 26);
+    ctx.fillStyle = '#ff8a1f'; ctx.fillRect(p.x - 9, p.y - 13, 18, 7);
+    ctx.fillStyle = n > 0.2 ? '#bfffbf' : '#7c7'; ctx.fillRect(p.x - 5, p.y - 2, 10, 6);
+  }
+  ctx.fillStyle = '#eee6d2'; ctx.fillRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0);           // bolt
+  ctx.fillStyle = '#d03030'; ctx.fillRect(b.x0, b.y0, b.x1 - b.x0, 12);
+  ctx.fillStyle = n > 0.2 ? '#ffe9a0' : '#9cc4e0'; ctx.fillRect(b.x0 + 20, b.y0 + 22, b.x1 - b.x0 - 40, 12);
+  ctx.fillStyle = '#d03030'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('⛽ BENZIN', (b.x0 + b.x1) / 2, b.y1 - 10);
+  ctx.fillStyle = '#ff8a1f'; ctx.font = 'bold 12px sans-serif';
+  ctx.fillText(`$${FUEL_PRICE}/%`, st.sign.x, st.sign.y);
+  ctx.textAlign = 'left';
+}
+
+function drawMissionMarker() {
+  if (!mission.active) return;
+  const pulse = 1 + 0.15 * Math.sin(clock * 6);
+  ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(mission.tx, mission.ty, 50 * pulse, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,210,58,0.25)';
+  ctx.beginPath(); ctx.arc(mission.tx, mission.ty, 50 * pulse, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('📦', mission.tx, mission.ty + 8); ctx.textAlign = 'left';
+}
+
+// a képernyő szélén nyíl mutat egy képen kívüli célpont felé
+function drawEdgeArrow(wx, wy, color, label, w, h) {
+  const sx = wx - lastCam.x + w / 2, sy = wy - lastCam.y + h / 2;
+  if (sx > 30 && sx < w - 30 && sy > 30 && sy < h - 30) return;
+  const ang = Math.atan2(sy - h / 2, sx - w / 2);
+  const k = Math.min((w / 2 - 50) / Math.abs(Math.cos(ang) || 1e-6), (h / 2 - 50) / Math.abs(Math.sin(ang) || 1e-6));
+  const ax = w / 2 + Math.cos(ang) * k, ay = h / 2 + Math.sin(ang) * k;
+  ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang);
+  ctx.fillStyle = color; ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-10, -12); ctx.lineTo(-10, 12); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = color; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(label, ax - Math.cos(ang) * 30, ay - Math.sin(ang) * 30 + 4); ctx.textAlign = 'left';
 }
 
 function drawSkidMarks(view) {
@@ -1189,7 +1478,7 @@ function drawHud(w, h) {
   const left = isDay ? HALF_CYCLE - time : CYCLE - time;
   const speed = Math.round(Math.hypot(car.vx, car.vy) / 4);
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.fillRect(10, 10, 400, 166);
+  ctx.fillRect(10, 10, 400, 238);
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 16px sans-serif';
   ctx.fillText(`${isDay ? '☀ Nappal' : '☾ Éjszaka'} – ${isDay ? 'éjszakáig' : 'nappalig'}: ${fmt(left / timeScale)}`, 20, 34);
@@ -1207,15 +1496,71 @@ function drawHud(w, h) {
   if (wanted.level) {
     ctx.fillStyle = Math.floor(clock * 4) % 2 ? '#4af' : '#f44';
     ctx.font = 'bold 18px sans-serif';
-    ctx.fillText('★'.repeat(wanted.level) + '☆'.repeat(2 - wanted.level) + ' KÖRÖZÉS', 20, 200);
+    ctx.fillText('★'.repeat(wanted.level) + '☆'.repeat(2 - wanted.level) + ' KÖRÖZÉS', 20, 272);
     ctx.font = '14px sans-serif'; ctx.fillStyle = '#fff';
   }
+  // benzin
+  ctx.fillText('Benzin', 20, 102);
+  ctx.fillStyle = '#333'; ctx.fillRect(80, 91, 150, 13);
+  ctx.fillStyle = car.fuel > 40 ? '#3c3' : car.fuel > 20 ? '#ec3' : (Math.floor(clock * 4) % 2 ? '#e33' : '#711');
+  ctx.fillRect(80, 91, 150 * car.fuel / 100, 13);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(car.refueling ? `⛽ Tankolás… ${car.fuel | 0}%` : `${car.fuel | 0}%`, 245, 102);
+  // pénz és szint
+  const lvl = levelOf(progress.xp), xp0 = xpForLevel(lvl), xp1 = xpForLevel(lvl + 1);
+  ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 18px sans-serif';
+  ctx.fillText(`$${Math.floor(progress.money)}`, 20, 128);
+  ctx.font = '14px sans-serif'; ctx.fillStyle = '#fff';
+  ctx.fillText(`${lvl}. szint`, 150, 127);
+  ctx.fillStyle = '#333'; ctx.fillRect(215, 117, 120, 10);
+  ctx.fillStyle = '#ffd23a'; ctx.fillRect(215, 117, 120 * (progress.xp - xp0) / (xp1 - xp0), 10);
+  // küldetés
+  if (mission.active) {
+    const m = Math.round(Math.hypot(player.x - mission.tx, player.y - mission.ty) / 10);
+    ctx.fillStyle = mission.timeLeft < 10 && Math.floor(clock * 4) % 2 ? '#f66' : '#ffd23a';
+    ctx.fillText(`📦 Szállítás: ${m} m · ${fmt(mission.timeLeft)} · sorozat x${streakMult().toFixed(2)}`, 20, 150);
+  } else {
+    ctx.fillStyle = '#ffd23a';
+    ctx.fillText(`📦 Új szállítás hamarosan… (sorozat: ${mission.streak})`, 20, 150);
+  }
+  ctx.fillStyle = '#fff';
   if (storm.level > 0.3) { ctx.fillStyle = '#ffb040'; ctx.fillText('⚠ Homokvihar!', 300, 80); ctx.fillStyle = '#fff'; }
-  ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 104);
-  ctx.fillText('Space: kézifék · Bal klikk / F: lövés', 20, 124);
-  ctx.fillText(`H: homokvihar · T: gyors idő (${timeScale}x) · Esc: menü`, 20, 144);
+  ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 176);
+  ctx.fillText('Space: kézifék (drift = pénz) · Bal klikk / F: lövés', 20, 196);
+  ctx.fillText(`H: homokvihar · T: gyors idő (${timeScale}x) · Esc: menü / autóbolt`, 20, 216);
   ctx.fillStyle = '#bbb'; ctx.font = '12px sans-serif';
-  ctx.fillText(`Vigyázz a nyálkafoltokkal! Az úton ${SPEED_LIMIT} km/h felett jön a rendőrség.`, 20, 164);
+  ctx.fillText(`Az úton ${SPEED_LIMIT} km/h felett jön a rendőrség · tankolni a ⛽ kutaknál lehet`, 20, 238);
+
+  // drift-kombó számláló
+  if (drift.active && drift.points > 2) {
+    ctx.textAlign = 'center'; ctx.font = 'bold 30px sans-serif';
+    ctx.fillStyle = ['#fff', '#fff', '#ffd23a', '#ff8a1f', '#ff4a4a', '#ff3aff'][drift.mult];
+    ctx.fillText(`DRIFT ${Math.round(drift.points)}  x${drift.mult}`, w / 2, h - 90);
+    ctx.textAlign = 'left';
+  }
+  // felugró üzenetek (pénz, figyelmeztetések)
+  ctx.textAlign = 'center'; ctx.font = 'bold 20px sans-serif';
+  popups.forEach((p, i) => {
+    ctx.globalAlpha = clamp(2.5 - (clock - p.born), 0, 1);
+    ctx.fillStyle = p.color;
+    ctx.fillText(p.text, w / 2, 40 + i * 26 - (clock - p.born) * 8);
+  });
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  // nyilak: küldetés célpontja, kevés benzinnél a legközelebbi kút
+  if (mission.active) drawEdgeArrow(mission.tx, mission.ty, '#ffd23a', `${Math.round(Math.hypot(player.x - mission.tx, player.y - mission.ty) / 10)} m`, w, h);
+  if (player.inCar && car.fuel < 25) {
+    const ns = nearestStation(car.x, car.y);
+    if (ns) {
+      drawEdgeArrow(ns.x, ns.y, '#ff8a1f', `⛽ ${Math.round(ns.d / 10)} m`, w, h);
+      ctx.fillStyle = Math.floor(clock * 3) % 2 ? '#ff8a1f' : '#fff'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(`⛽ Kevés a benzin! Legközelebbi kút: ${Math.round(ns.d / 10)} m`, w / 2, h - 66);
+      ctx.textAlign = 'left';
+    }
+  }
+  if (player.inCar && !car.refueling && car.fuel < 100 && nearPump(car.x, car.y)) {
+    ctx.fillStyle = '#ff8a1f'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Állj meg a tankoláshoz', w / 2, h - 40); ctx.textAlign = 'left';
+  }
 
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
@@ -1258,6 +1603,14 @@ function drawMinimap(w) {
   }
   ctx.fillStyle = '#e33';
   for (const p of npcs) if (p.kind === 'bandit' && !p.dead) { ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 2.5, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = '#ff8a1f';
+  for (const st of stationsIn(player.x - RAD, player.y - RAD, player.x + RAD, player.y + RAD)) {
+    ctx.fillRect(px((st.rect.x0 + st.rect.x1) / 2) - 4, py((st.rect.y0 + st.rect.y1) / 2) - 4, 8, 8);
+  }
+  if (mission.active) {
+    ctx.fillStyle = '#ffd23a';
+    ctx.beginPath(); ctx.arc(clamp(px(mission.tx), x0 + 4, x0 + S - 4), clamp(py(mission.ty), y0 + 4, y0 + S - 4), 5, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.fillStyle = '#d42020'; ctx.fillRect(px(car.x) - 3, py(car.y) - 3, 6, 6);
   ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px(player.x), py(player.y), 3.5, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
@@ -1266,7 +1619,7 @@ function drawMinimap(w) {
 function drawMenu(w, h) {
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillRect(0, 0, w, h);
-  const PW = 560, PH = 420, px = (w - PW) / 2, py = (h - PH) / 2;
+  const PW = 600, PH = 500, px = (w - PW) / 2, py = (h - PH) / 2;
   ctx.fillStyle = 'rgba(30,24,16,0.95)'; ctx.fillRect(px, py, PW, PH);
   ctx.strokeStyle = '#e2c27d'; ctx.lineWidth = 3; ctx.strokeRect(px, py, PW, PH);
   ctx.textAlign = 'center';
@@ -1274,7 +1627,8 @@ function drawMenu(w, h) {
   ctx.fillText('SIVATAGI GTA – MENÜ', w / 2, py + 50);
 
   menu.hits = [];
-  const values = [null, SKINS[menu.skin].name, CAR_MODELS[menu.carModel].name];
+  const cm = CAR_MODELS[menu.carModel];
+  const values = [null, SKINS[menu.skin].name, cm.name + (owns(menu.carModel) ? '' : `  🔒 $${cm.price}`)];
   for (let i = 0; i < MENU_ROWS.length; i++) {
     const ry = py + 90 + i * 62, rx = px + 30, rw = PW - 60, rh = 48;
     const sel = menu.sel === i;
@@ -1290,18 +1644,34 @@ function drawMenu(w, h) {
       ctx.textAlign = 'center'; ctx.fillText('◀  ' + values[i] + '  ▶', rx + rw / 2 + 50, ry + 31);
       menu.hits.push({ row: i, delta: -1, x: rx + 110, y: ry, w: 60, h: rh });
       menu.hits.push({ row: i, delta: 1, x: rx + rw - 60, y: ry, w: 60, h: rh });
+      if (i === 2 && !owns(menu.carModel)) menu.hits.push({ row: i, delta: 0, buy: true, x: rx + 175, y: ry, w: rw - 240, h: rh });
     }
   }
 
+  // pénz, szint, rekordok, vásárlás
+  ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#ffd23a';
+  ctx.fillText(`$${Math.floor(progress.money)} · ${levelOf(progress.xp)}. szint`, w / 2, py + 296);
+  ctx.font = '14px sans-serif'; ctx.fillStyle = '#ccc';
+  ctx.fillText(`Legjobb drift: ${progress.bestDrift} · Leghosszabb sorozat: ${progress.bestStreak} · Szállítások: ${progress.missions}`, w / 2, py + 318);
+  if (!owns(menu.carModel) || menu.note) {
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillStyle = menu.note ? (menu.note.startsWith('Megvetted') ? '#7f7' : '#f66') : progress.money >= cm.price ? '#7f7' : '#f99';
+    ctx.fillText(menu.note || (progress.money >= cm.price ? `Enter vagy kattints a névre: megveszed $${cm.price}-ért`
+      : `Ehhez az autóhoz még $${cm.price - Math.floor(progress.money)} kell – szállíts, driftelj!`), w / 2, py + 342);
+  }
+
   // előnézet
-  const m = CAR_MODELS[menu.carModel], sk = SKINS[menu.skin], prevY = py + 320;
+  const m = cm, sk = SKINS[menu.skin], prevY = py + 400;
   ctx.save(); ctx.translate(px + 150, prevY); ctx.scale(2.2, 2.2);
   drawPerson(0, 0, -Math.PI / 2, clock * 6, sk.shirt, sk.head, true, sk.legs, sk.hat);
   ctx.restore();
-  const preview = { ...car, x: 0, y: 0, angle: 0, wrecked: false, braking: false };
-  ctx.save(); ctx.translate(px + 390, prevY); ctx.scale(1.6, 1.6); drawCar(preview, 0); ctx.restore();
+  const preview = makeCar(0, 0, 0, m.color);
+  applyCarModel(preview, m);
+  ctx.save(); ctx.translate(px + 410, prevY); ctx.scale(1.6, 1.6);
+  if (!owns(menu.carModel)) ctx.globalAlpha = 0.45;
+  drawCar(preview, 0); ctx.globalAlpha = 1; ctx.restore();
   ctx.fillStyle = '#ccc'; ctx.font = '14px sans-serif';
-  ctx.fillText(m.desc + ` · végsebesség ${Math.round(m.maxRoad / 4)} km/h`, px + 390, prevY + 62);
+  ctx.fillText(m.desc + ` · ${Math.round(m.maxRoad / 4)} km/h · fogyasztás x${m.fuelUse}`, px + 410, prevY + 58);
 
   ctx.fillStyle = '#999'; ctx.font = '13px sans-serif';
   ctx.fillText('↑↓: választás · ←→: váltás · Enter: Folytatás · Esc: vissza a játékba · egérrel is kattintható', w / 2, py + PH - 14);
@@ -1335,6 +1705,9 @@ function render() {
     }
   }
   drawRoads(view);
+  const stations = stationsIn(view.x0, view.y0, view.x1, view.y1);
+  for (const st of stations) drawStation(st, n);
+  drawMissionMarker();
   if (slimeEnabled) for (const ch of chunks) for (const s of ch.slime) if (inView(s)) drawSlime(s);
   drawSkidMarks(view);
   for (const p of npcs) if (p.dead && inView(p)) drawCorpse(p.x, p.y, p.angle, p.shirt, p.head);
@@ -1360,7 +1733,8 @@ function render() {
   for (const l of lamps) drawLamp(l, n);
   ctx.restore();
 
-  drawLighting(n, cam, w, h, lamps, cars);
+  const lights = lamps.concat(stations.flatMap(st => st.pumps.map(p => ({ hx: p.x, hy: p.y }))));
+  drawLighting(n, cam, w, h, lights, cars);
   drawStorm(w, h, n);
   drawHud(w, h);
   drawMinimap(w);

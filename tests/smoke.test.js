@@ -27,7 +27,8 @@ eval(src + `
   getChunk, chunkCache, onRoad, onSlime, nearestRoad, spawnNpc, spawnAiCar, damageCar, damagePlayer, nightAmount,
   get time(){return time}, set time(v){time=v}, get timeScale(){return timeScale},
   set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, set police(v){policeEnabled=v}, wanted, clearWanted,
-  SPEED_LIMIT, KMH, START_X, START_Y, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
+  SPEED_LIMIT, KMH, START_X, START_Y, progress, mission, drift, stationFor, allStations, nearPump, earn, levelOf,
+  set missions(v){missionsEnabled=v}, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
@@ -45,6 +46,7 @@ const near = (a, b, eps = 0.01) => Math.abs(a - b) < eps;
 G.spawn = false;
 G.slime = false;
 G.police = false;
+G.missions = false;
 
 step(10);
 check('a játék elindul és fut', typeof rafCb === 'function');
@@ -73,8 +75,10 @@ key('KeyW', true); step(90);
 key('Space', true); key('KeyD', true); step(40);
 check('kézifékes kanyarban féknyom keletkezik', G.skidMarks.length > 10);
 check('kézifékes kanyarban füstöl', G.smoke.length > 5);
+const moneyBeforeDrift = G.progress.money;
 key('Space', false); key('KeyD', false); key('KeyW', false);
 step(150);   // ~2,5 mp
+check('a drift pénzt ér', G.progress.money > moneyBeforeDrift && G.progress.bestDrift > 0);
 check('a füst idővel eloszlik', G.smoke.length === 0);
 check('a féknyom 2,5 mp után még látszik', G.skidMarks.length > 10);
 step(180);   // összesen ~5,5 mp a csúszás vége óta
@@ -157,8 +161,8 @@ check('a gyors autó elüti a gyalogost', victim.dead > 0);
 // --- banditák ---
 G.npcs.length = 0;
 Object.assign(G.player, { x: 8000, y: 9000, inCar: false, health: 100, lastHit: -99 });
-G.spawnNpc('bandit', 8400, 9000);
-step(240);
+G.spawnNpc('bandit', 8200, 9000);   // közelről, hogy a szórás ellenére is találjon
+step(600);
 check('a bandita rálő a játékosra', G.player.health < 100);
 G.npcs.length = 0;
 
@@ -252,6 +256,7 @@ check(`${G.SPEED_LIMIT} km/h alatt nincs körözés`, G.wanted.level === 0 && ma
 key('KeyW', true); step(60); key('KeyW', false);
 check(`${G.SPEED_LIMIT} km/h felett körözni kezdenek`, G.wanted.level === 1);
 key('KeyS', true); step(90); key('KeyS', false);    // megállunk
+G.aiCars.length = 0;                                  // egy frissen érkező rendőrautót figyelünk
 let cop = null;
 for (let i = 0; i < 600 && !cop; i++) { step(1); cop = G.aiCars.find(c => c.police && c.chasing); }
 check('megjelenik az üldöző rendőrautó', !!cop);
@@ -283,6 +288,85 @@ step(60 * 13);
 check('12 mp rendőr nélkül → lerázod őket', G.wanted.level === 0);
 G.police = false;
 
+// --- benzinkutak és tankolás ---
+G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted();
+const st = G.stationFor(5, 5);   // a kezdőhely melletti kereszteződés
+check('a kezdőhely mellett van benzinkút', !!st);
+check('a pályán sok benzinkút van', G.allStations().length >= 20);
+let cactiInStations = 0, pumps = 0;
+for (const s2 of G.allStations().slice(0, 15)) {
+  for (let cx = Math.floor(s2.rect.x0 / G.CHUNK); cx <= Math.floor(s2.rect.x1 / G.CHUNK); cx++)
+    for (let cy = Math.floor(s2.rect.y0 / G.CHUNK); cy <= Math.floor(s2.rect.y1 / G.CHUNK); cy++)
+      for (const o of G.getChunk(cx, cy).obstacles) {
+        const inside = o.x > s2.rect.x0 && o.x < s2.rect.x1 && o.y > s2.rect.y0 && o.y < s2.rect.y1;
+        if (inside && (o.type === 'cactus' || o.type === 'rock')) cactiInStations++;
+        if (inside && o.type === 'pump') pumps++;
+      }
+}
+check('a kutak területén nincs kaktusz vagy szikla', cactiInStations === 0);
+check('a benzinkutak (pumpák) szilárd akadályok', pumps >= 30);
+
+// fogyasztás
+Object.assign(G.player, { x: 20000, y: G.C, inCar: true });
+Object.assign(G.car, { x: 20000, y: G.C, angle: 0, vx: 0, vy: 0, fuel: 50 });
+key('KeyW', true); step(120); key('KeyW', false);
+check('gázadáskor fogy a benzin', G.car.fuel < 50 && G.car.fuel > 45);
+// üres tank
+Object.assign(G.car, { x: 20000, y: G.C, angle: 0, vx: 0, vy: 0, fuel: 0 });
+key('KeyW', true); step(180); key('KeyW', false);
+check('üres tankkal csak vánszorog az autó', Math.hypot(G.car.vx, G.car.vy) <= 61 && G.car.x > 20000);
+// tankolás a kút mellett (két kút között állva)
+const p0 = st.pumps[0], p1 = st.pumps[1];
+Object.assign(G.car, { x: (p0.x + p1.x) / 2, y: p0.y, angle: 0, vx: 0, vy: 0, fuel: 20 });
+Object.assign(G.player, { x: G.car.x, y: G.car.y, inCar: true });
+G.progress.money = 100;
+step(60);
+check('a kútnál megállva tankol', G.car.refueling && G.car.fuel > 40);
+check('a tankolás pénzbe kerül', G.progress.money < 100 && G.progress.money > 60);
+step(200);
+check('a tank megtelik és a tankolás leáll', G.car.fuel === 100 && !G.car.refueling);
+Object.assign(G.car, { x: (p0.x + p1.x) / 2, y: p0.y, vx: 400, vy: 0, fuel: 20 });
+step(1);
+check('menet közben nem tankol', !G.car.refueling);
+Object.assign(G.car, { vx: 0, vy: 0 });
+key('KeyE', true); key('KeyE', false);
+
+// --- szállítási küldetések ---
+G.missions = true;
+G.mission.cooldown = 0;
+step(2);
+check('magától indul szállítási küldetés', G.mission.active && G.mission.timeLeft > 20);
+const md = Math.hypot(G.mission.tx - G.player.x, G.mission.ty - G.player.y);
+check('a célpont messze, járdán van', md > 1000 && G.onRoad(G.mission.tx, G.mission.ty, G.SIDEWALK_W));
+const money0 = G.progress.money;
+Object.assign(G.player, { x: G.mission.tx, y: G.mission.ty, inCar: false });
+step(1);
+check('a célba érve fizet és nő a sorozat', G.progress.money > money0 + 60 && G.mission.streak === 1 && !G.mission.active);
+step(150);
+check('utána jön a következő küldetés', G.mission.active);
+const reward2 = G.mission.reward, money1 = G.progress.money;
+Object.assign(G.player, { x: G.mission.tx, y: G.mission.ty });
+step(1);
+check('a sorozat szorzója nő (x1.25)', G.progress.money - money1 >= Math.round(reward2 * 1.25) && G.mission.streak === 2);
+step(150);
+G.mission.timeLeft = 0.01;
+step(2);
+check('lejárt időnél elvész a sorozat', G.mission.streak === 0 && !G.mission.active);
+G.missions = false;
+
+// --- jutalmak, szintek ---
+G.npcs.length = 0;
+Object.assign(G.player, { x: 10000, y: G.C, angle: 0, inCar: false, health: 100 });
+const bandit = G.spawnNpc('bandit', 10150, G.C);
+const money2 = G.progress.money;
+key('KeyF', true); step(40); key('KeyF', false);
+step(10);
+check('bandita lelövéséért fejpénz jár', bandit.dead > 0 && G.progress.money >= money2 + 50);
+G.npcs.length = 0;
+const lvl0 = G.levelOf(G.progress.xp), m3 = G.progress.money;
+G.earn(5000, 'teszt');
+check('elég XP-vel szintet lépsz, és szintbónuszt kapsz', G.levelOf(G.progress.xp) > lvl0 && G.progress.money > m3 + 5000);
+
 // --- Esc menü: szünet, szkin- és autóváltás ---
 Object.assign(G.player, { x: 10000, y: G.C, inCar: false });
 press('Escape');
@@ -296,16 +380,34 @@ check('a menüben lehet szkint váltani', G.menu.skin === (skin0 + 1) % G.SKINS.
 press('ArrowLeft');
 check('vissza is lehet lapozni a szkint', G.menu.skin === skin0);
 press('ArrowDown'); press('ArrowRight');
-const model = G.CAR_MODELS[G.menu.carModel];
-check('a menüben lehet autót váltani', G.menu.carModel === 1 && G.car.color === model.color && G.car.maxSand === model.maxSand);
-// egérrel: a kirajzolt menü jobb nyilára kattintás
+const model = G.CAR_MODELS[1];
+G.progress.money = 100;
+check('a meg nem vett autó nem használható', G.menu.carModel === 1 && G.car.color !== model.color);
+press('Enter');
+check('pénz nélkül nem lehet megvenni', !G.progress.owned.includes(1) && G.progress.money === 100);
+G.progress.money = model.price + 500;
+press('Enter');
+check('elég pénzzel megvehető és rögtön használható', G.progress.owned.includes(1) && G.car.color === model.color
+  && G.car.maxSand === model.maxSand && G.progress.money === 500);
+// egérrel: jobb nyíl, majd kattintás a névre = vásárlás
+G.progress.money = 1000;
 step(1);
 const arrow = G.menu.hits.find(h => h.row === 2 && h.delta === 1);
 listeners.mousedown({ button: 0, clientX: arrow.x + arrow.w / 2, clientY: arrow.y + arrow.h / 2 });
-check('egérrel is lehet autót váltani', G.menu.carModel === 2 && G.car.color === G.CAR_MODELS[2].color);
+check('egérrel is lehet lapozni az autók között', G.menu.carModel === 2 && G.car.color === model.color);
+step(1);
+const buy = G.menu.hits.find(h => h.buy);
+listeners.mousedown({ button: 0, clientX: buy.x + buy.w / 2, clientY: buy.y + buy.h / 2 });
+check('egérrel is lehet autót venni', G.progress.owned.includes(2) && G.car.color === G.CAR_MODELS[2].color && G.progress.money === 200);
+press('ArrowRight');
+check('a megvett autók között szabadon lehet váltani', G.menu.carModel === 3 && G.car.color === G.CAR_MODELS[2].color);
+press('ArrowLeft'); press('ArrowLeft');
+check('visszaváltás egy megvett autóra', G.menu.carModel === 1 && G.car.color === G.CAR_MODELS[1].color);
+press('ArrowRight'); press('ArrowRight');   // a zárolt rakétaautónál zárjuk be a menüt
 const resume = G.menu.hits.find(h => h.row === 0);
 listeners.mousedown({ button: 0, clientX: resume.x + 5, clientY: resume.y + 5 });
 check('a Folytatás gomb bezárja a menüt', G.menu.open === false);
+check('zárt menü után a ténylegesen használt autó marad kiválasztva', G.menu.carModel === 2);
 step(5);
 check('menü után újra megy a játék', G.clock > clk);
 press('Escape'); press('Enter');
