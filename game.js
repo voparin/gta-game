@@ -1,12 +1,19 @@
 'use strict';
 
 // ===== Beállítások =====
-const WORLD = 10000;             // a sivatag mérete (pixel)
-const START_X = WORLD / 2 - 300, START_Y = WORLD / 2 - 100;   // kezdőhely
+const OLD_WORLD = 10000;
+const WORLD = Math.round(OLD_WORLD * Math.sqrt(30) / 1000) * 1000;  // 30x akkora terület (~55 000 px)
+const CHUNK = 1000;              // a világ ekkora négyzetekből épül fel, menet közben generálva
+const CHUNKS = WORLD / CHUNK;
+const ROAD_W = 160;
+const ROAD_SPACING = 5000;       // utak távolsága (rácsban)
+const ROAD_OFFSET = 2500;
+const LAMP_OFF = ROAD_W / 2 + 22;
+const C = WORLD / 2;             // a pálya közepe (itt egy kereszteződés van)
+const START_X = C - 300, START_Y = C - 250;   // kezdőhely
 const HALF_CYCLE = 30 * 60;      // 30 perc nappal, 30 perc éjszaka (másodperc)
 const CYCLE = HALF_CYCLE * 2;
 const FADE = 120;                // alkonyat / hajnal hossza (másodperc)
-const ROAD_W = 160;
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -22,14 +29,23 @@ resize();
 
 // ===== Bemenet =====
 const keys = {};
+const mouse = { x: 0, y: 0, down: false, active: false };
 let timeScale = 1;
 window.addEventListener('keydown', e => {
   keys[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyE') toggleCar();
   if (e.code === 'KeyT') timeScale = timeScale === 1 ? 60 : 1;
+  if (e.code === 'KeyH') toggleStorm();
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
+window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; });
+window.addEventListener('mousedown', e => {
+  mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+  if (e.button === 0) mouse.down = true;
+});
+window.addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; });
 
 // ===== Segédfüggvények =====
 function rng(seed) {
@@ -42,43 +58,124 @@ function rng(seed) {
 }
 const rand = rng(1234);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+// Utak: rácsban, ROAD_SPACING távolságra egymástól
+const nearestRoad = v =>
+  clamp(Math.round((v - ROAD_OFFSET) / ROAD_SPACING) * ROAD_SPACING + ROAD_OFFSET, ROAD_OFFSET, WORLD - ROAD_OFFSET);
 const onRoad = (x, y, m = 0) =>
-  Math.abs(y - WORLD / 2) < ROAD_W / 2 + m || Math.abs(x - WORLD / 2) < ROAD_W / 2 + m;
-
-// ===== Világ =====
-const obstacles = [];   // {x, y, r, type}
-const lamps = [];       // {x, y, hx, hy}
-const dunes = [];
-
-// Villanyoszlopok mindkét út mentén, mindkét oldalon váltakozva
-for (let i = 150; i < WORLD; i += 320) {
-  if (Math.abs(i - WORLD / 2) < 200) continue;           // kereszteződésben nincs
-  const side = (i / 320) % 2 < 1 ? -1 : 1;
-  const off = ROAD_W / 2 + 22;
-  // vízszintes út
-  lamps.push({ x: i, y: WORLD / 2 + side * off, hx: i, hy: WORLD / 2 + side * (off - 40) });
-  // függőleges út
-  lamps.push({ x: WORLD / 2 + side * off, y: i, hx: WORLD / 2 + side * (off - 40), hy: i });
-}
-for (const l of lamps) obstacles.push({ x: l.x, y: l.y, r: 8, type: 'lamp' });
-
-// Kaktuszok és sziklák (nem az úton)
-function placeRandom(count, type, rMin, rMax) {
-  let placed = 0;
-  while (placed < count) {
-    const x = 60 + rand() * (WORLD - 120), y = 60 + rand() * (WORLD - 120);
-    const r = rMin + rand() * (rMax - rMin);
-    if (onRoad(x, y, r + 40)) continue;
-    if (Math.hypot(x - START_X, y - START_Y) < 250) continue;  // kezdőhely szabadon
-    obstacles.push({ x, y, r, type, rot: rand() * Math.PI * 2, seed: rand() });
-    placed++;
+  Math.abs(y - nearestRoad(y)) < ROAD_W / 2 + m || Math.abs(x - nearestRoad(x)) < ROAD_W / 2 + m;
+function roadsIn(a, b) {
+  const out = [];
+  for (let r = Math.ceil((a - ROAD_OFFSET) / ROAD_SPACING) * ROAD_SPACING + ROAD_OFFSET; r < b; r += ROAD_SPACING) {
+    if (r > 0 && r < WORLD) out.push(r);
   }
+  return out;
 }
-placeRandom(1400, 'cactus', 10, 16);
-placeRandom(560, 'rock', 18, 42);
 
-for (let i = 0; i < 1600; i++) {
-  dunes.push({ x: rand() * WORLD, y: rand() * WORLD, rx: 80 + rand() * 220, ry: 30 + rand() * 80, rot: rand() * Math.PI });
+// ===== Világ (chunkokban, menet közben generálva) =====
+const chunkCache = new Map();
+let slimeEnabled = true;    // teszteléshez kikapcsolható
+
+function chunkSeed(cx, cy) {
+  return (Math.imul(cx + 1, 73856093) ^ Math.imul(cy + 1, 19349663) ^ 0x5bd1e995) | 0;
+}
+
+function generateChunk(cx, cy) {
+  const r = rng(chunkSeed(cx, cy));
+  const x0 = cx * CHUNK, y0 = cy * CHUNK;
+  const ch = { obstacles: [], lamps: [], dunes: [], slime: [] };
+  const inChunk = (x, y) => x >= x0 && x < x0 + CHUNK && y >= y0 && y < y0 + CHUNK;
+
+  // villanyoszlopok az utak mentén, váltakozó oldalon
+  for (const R of roadsIn(y0 - LAMP_OFF - 1, y0 + CHUNK + LAMP_OFF + 1)) {
+    for (let i = Math.max(0, Math.ceil((x0 - 150) / 320)); 150 + i * 320 < x0 + CHUNK; i++) {
+      const x = 150 + i * 320, side = i % 2 ? 1 : -1, y = R + side * LAMP_OFF;
+      if (Math.abs(x - nearestRoad(x)) < 200 || !inChunk(x, y)) continue;   // kereszteződésben nincs
+      ch.lamps.push({ x, y, hx: x, hy: R + side * (LAMP_OFF - 40) });
+    }
+  }
+  for (const R of roadsIn(x0 - LAMP_OFF - 1, x0 + CHUNK + LAMP_OFF + 1)) {
+    for (let i = Math.max(0, Math.ceil((y0 - 150) / 320)); 150 + i * 320 < y0 + CHUNK; i++) {
+      const y = 150 + i * 320, side = i % 2 ? 1 : -1, x = R + side * LAMP_OFF;
+      if (Math.abs(y - nearestRoad(y)) < 200 || !inChunk(x, y)) continue;
+      ch.lamps.push({ x, y, hx: R + side * (LAMP_OFF - 40), hy: y });
+    }
+  }
+  for (const l of ch.lamps) ch.obstacles.push({ x: l.x, y: l.y, r: 8, type: 'lamp' });
+
+  // kaktuszok és sziklák (nem az úton, nem a kezdőhelyen)
+  const place = (count, type, rMin, rMax) => {
+    for (let k = 0; k < count; k++) {
+      const x = x0 + r() * CHUNK, y = y0 + r() * CHUNK, rad = rMin + r() * (rMax - rMin);
+      const rot = r() * Math.PI * 2, seed = r();
+      if (x < 60 || y < 60 || x > WORLD - 60 || y > WORLD - 60) continue;
+      if (onRoad(x, y, rad + 40)) continue;
+      if (Math.hypot(x - START_X, y - START_Y) < 250) continue;
+      ch.obstacles.push({ x, y, r: rad, type, rot, seed });
+    }
+  };
+  place(14, 'cactus', 10, 16);
+  place(6, 'rock', 18, 42);
+
+  for (let i = 0; i < 16; i++) {
+    ch.dunes.push({ x: x0 + r() * CHUNK, y: y0 + r() * CHUNK, rx: 80 + r() * 220, ry: 30 + r() * 80, rot: r() * Math.PI });
+  }
+
+  // nyálkafoltok az utakon
+  const makeSlime = (x, y) => {
+    const s = { x, y, r: 26 + r() * 20, blobs: [] };
+    for (let i = 0; i < 5; i++) s.blobs.push({ dx: (r() - 0.5) * s.r, dy: (r() - 0.5) * s.r, rr: s.r * (0.45 + r() * 0.35) });
+    return s;
+  };
+  for (const R of roadsIn(y0, y0 + CHUNK)) {
+    if (r() < 0.45) {
+      const x = x0 + r() * CHUNK, y = R + (r() - 0.5) * (ROAD_W - 70);
+      if (Math.abs(x - nearestRoad(x)) > ROAD_W) ch.slime.push(makeSlime(x, y));
+    }
+  }
+  for (const R of roadsIn(x0, x0 + CHUNK)) {
+    if (r() < 0.45) {
+      const y = y0 + r() * CHUNK, x = R + (r() - 0.5) * (ROAD_W - 70);
+      if (Math.abs(y - nearestRoad(y)) > ROAD_W) ch.slime.push(makeSlime(x, y));
+    }
+  }
+  return ch;
+}
+
+function getChunk(cx, cy) {
+  const key = cx + ',' + cy;
+  let ch = chunkCache.get(key);
+  if (!ch) {
+    ch = generateChunk(cx, cy);
+    chunkCache.set(key, ch);
+    if (chunkCache.size > 600) chunkCache.delete(chunkCache.keys().next().value);  // a legrégebbit eldobjuk
+  }
+  return ch;
+}
+
+function chunksIn(xa, ya, xb, yb) {
+  const out = [];
+  const c0x = Math.max(0, Math.floor(xa / CHUNK)), c1x = Math.min(CHUNKS - 1, Math.floor(xb / CHUNK));
+  const c0y = Math.max(0, Math.floor(ya / CHUNK)), c1y = Math.min(CHUNKS - 1, Math.floor(yb / CHUNK));
+  for (let cy = c0y; cy <= c1y; cy++) for (let cx = c0x; cx <= c1x; cx++) out.push(getChunk(cx, cy));
+  return out;
+}
+const chunksAround = (x, y, rad) => chunksIn(x - rad, y - rad, x + rad, y + rad);
+
+function obstacleAt(x, y, pad = 0) {
+  for (const ch of chunksAround(x, y, 50 + pad)) {
+    for (const ob of ch.obstacles) if (Math.hypot(x - ob.x, y - ob.y) < ob.r + pad) return true;
+  }
+  return false;
+}
+
+function onSlime(x, y) {
+  for (const ch of chunksAround(x, y, 60)) {
+    for (const s of ch.slime) if (Math.hypot(x - s.x, y - s.y) < s.r + 6) return true;
+  }
+  return false;
 }
 
 // Homok textúra
@@ -97,39 +194,67 @@ sandTile.width = sandTile.height = 256;
 const sandPattern = ctx.createPattern(sandTile, 'repeat');
 
 // ===== Szereplők =====
-const player = { x: START_X, y: START_Y, angle: 0, r: 12, inCar: false, walk: 0 };
-const car = { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, r: 28, len: 72, wid: 36, skid: false };
+const CAR_COLORS = [['#2f6fd0', '#1f4f9a'], ['#e6e6e6', '#b4b4b4'], ['#f2c230', '#c09010'],
+  ['#3a9a4a', '#257035'], ['#2a2a2a', '#151515'], ['#ff8a1f', '#cc6600'], ['#8a3ac0', '#622a8a']];
+const PED_SHIRTS = ['#e05a5a', '#5ab0e0', '#e0c05a', '#70c070', '#c070c0', '#f0f0f0', '#8a6040'];
+const PED_HAIR = ['#3a2615', '#111', '#c8a060', '#7a4a20', '#999'];
+
+function makeCar(x, y, angle, color) {
+  return { x, y, angle, vx: 0, vy: 0, r: 28, len: 72, wid: 36, color, skid: false, spin: 0,
+    onSlime: false, braking: false, lastWheels: null, health: 6, wrecked: false, ai: null };
+}
+
+const player = { x: START_X, y: START_Y, angle: 0, r: 12, inCar: false, walk: 0,
+  health: 100, dead: 0, cooldown: 0, kills: 0, lastHit: -99 };
+const car = makeCar(START_X + 100, START_Y - 50, 0, ['#d42020', '#a31515']);
+const aiCars = [];      // AI által vezetett autók
+const npcs = [];        // gyalogosok ('ped') és banditák ('bandit')
+const bullets = [];     // {x, y, vx, vy, life, from}
+const flashes = [];     // torkolattűz
 const skidMarks = [];   // féknyomok: {x1, y1, x2, y2, born}
 const smoke = [];       // füstrészecskék: {x, y, vx, vy, r, life, max}
 const MAX_SKID = 4000, MAX_SMOKE = 300;
 const SKID_LIFE = 5;    // ennyi másodperc alatt tűnik el egy féknyom
 let clock = 0;          // valós idő másodpercben (a T gomb nem gyorsítja)
-let lastWheels = null;
-let time = 60;   // játékidő másodpercben: nappal indulunk
+let time = 60;          // játékidő másodpercben: nappal indulunk
+let spawnEnabled = true;    // teszteléshez kikapcsolható
+let message = null;     // {text, until}
+let lastCam = { x: player.x, y: player.y };
+
+// Homokvihar
+const storm = { level: 0, target: 0, timer: 120 + rand() * 120, angle: rand() * Math.PI * 2, particles: [] };
+function toggleStorm() {
+  storm.target = storm.target > 0 ? 0 : 1;
+  storm.timer = storm.target ? 35 + rand() * 25 : 120 + rand() * 120;
+  if (storm.target) storm.angle = rand() * Math.PI * 2;
+}
 
 function toggleCar() {
+  if (player.dead) return;
   if (player.inCar) {
     // kiszállás a vezető oldalán
-    const px = car.x + Math.sin(car.angle) * 40;
-    const py = car.y - Math.cos(car.angle) * 40;
-    player.x = px; player.y = py; player.angle = car.angle;
+    player.x = car.x + Math.sin(car.angle) * 40;
+    player.y = car.y - Math.cos(car.angle) * 40;
+    player.angle = car.angle;
     player.inCar = false;
     collide(player);
-  } else if (Math.hypot(player.x - car.x, player.y - car.y) < 75) {
+  } else if (dist(player, car) < 75) {
     player.inCar = true;
   }
 }
 
 function collide(o, bounce) {
-  for (const ob of obstacles) {
-    const dx = o.x - ob.x, dy = o.y - ob.y;
-    const d = Math.hypot(dx, dy), min = o.r + ob.r;
-    if (d < min && d > 0.0001) {
-      const nx = dx / d, ny = dy / d;
-      o.x = ob.x + nx * min; o.y = ob.y + ny * min;
-      if (bounce) {
-        const vn = o.vx * nx + o.vy * ny;
-        if (vn < 0) { o.vx -= 1.4 * vn * nx; o.vy -= 1.4 * vn * ny; o.vx *= 0.6; o.vy *= 0.6; }
+  for (const ch of chunksAround(o.x, o.y, o.r + 50)) {
+    for (const ob of ch.obstacles) {
+      const dx = o.x - ob.x, dy = o.y - ob.y;
+      const d = Math.hypot(dx, dy), min = o.r + ob.r;
+      if (d < min && d > 0.0001) {
+        const nx = dx / d, ny = dy / d;
+        o.x = ob.x + nx * min; o.y = ob.y + ny * min;
+        if (bounce) {
+          const vn = o.vx * nx + o.vy * ny;
+          if (vn < 0) { o.vx -= 1.4 * vn * nx; o.vy -= 1.4 * vn * ny; o.vx *= 0.6; o.vy *= 0.6; }
+        }
       }
     }
   }
@@ -137,7 +262,69 @@ function collide(o, bounce) {
   o.y = clamp(o.y, o.r, WORLD - o.r);
 }
 
+// ===== Spawnolás =====
+function spawnNpc(kind, x, y) {
+  const p = { kind, x, y, r: 11, angle: rand() * Math.PI * 2, speed: 0, walk: 0,
+    health: kind === 'bandit' ? 3 : 1, dead: 0, wanderT: 0, moving: false, flee: 0, fx: 0, fy: 0,
+    cooldown: 1 + rand(),
+    shirt: kind === 'bandit' ? '#1c1c1c' : PED_SHIRTS[(rand() * PED_SHIRTS.length) | 0],
+    head: kind === 'bandit' ? '#b01010' : PED_HAIR[(rand() * PED_HAIR.length) | 0] };
+  npcs.push(p);
+  return p;
+}
+
+// sáv: jobb oldali közlekedés (vízszintes +x → road+40; függőleges +y → road-40)
+const laneFor = ai => (ai.axis === 'h' ? ai.road + ai.dir * 40 : ai.road - ai.dir * 40);
+
+function spawnAiCar(axis, dir, road, along) {
+  const ai = { axis, dir, road, speed: 240 + rand() * 120, lastCross: null };
+  const lane = laneFor(ai);
+  const x = axis === 'h' ? along : lane, y = axis === 'h' ? lane : along;
+  const angle = axis === 'h' ? (dir > 0 ? 0 : Math.PI) : (dir > 0 ? Math.PI / 2 : -Math.PI / 2);
+  const c = makeCar(x, y, angle, CAR_COLORS[(rand() * CAR_COLORS.length) | 0]);
+  c.ai = ai;
+  c.vx = Math.cos(angle) * 200; c.vy = Math.sin(angle) * 200;
+  aiCars.push(c);
+  return c;
+}
+
+function spawnAround(dt) {
+  // a távoliakat eltüntetjük
+  for (let i = npcs.length - 1; i >= 0; i--) {
+    const p = npcs[i];
+    if (dist(p, player) > 2600 || (p.dead && clock - p.dead > 15)) npcs.splice(i, 1);
+  }
+  for (let i = aiCars.length - 1; i >= 0; i--) if (dist(aiCars[i], player) > 3000) aiCars.splice(i, 1);
+  if (!spawnEnabled || player.dead) return;
+
+  const ring = (a, b) => {
+    const ang = rand() * Math.PI * 2, d = a + rand() * (b - a);
+    return { x: clamp(player.x + Math.cos(ang) * d, 100, WORLD - 100), y: clamp(player.y + Math.sin(ang) * d, 100, WORLD - 100) };
+  };
+  const alive = kind => npcs.filter(p => p.kind === kind && !p.dead).length;
+
+  if (alive('ped') < 14) {
+    const pos = ring(700, 1400);
+    if (!obstacleAt(pos.x, pos.y, 15)) spawnNpc('ped', pos.x, pos.y);
+  }
+  if (alive('bandit') < 2 && rand() < dt * 0.2) {
+    const pos = ring(1000, 1400);
+    if (!obstacleAt(pos.x, pos.y, 15)) spawnNpc('bandit', pos.x, pos.y);
+  }
+  if (aiCars.length < 6 && rand() < dt) {
+    const axis = rand() < 0.5 ? 'h' : 'v', dir = rand() < 0.5 ? 1 : -1;
+    const road = nearestRoad(axis === 'h' ? player.y : player.x);
+    const along = clamp((axis === 'h' ? player.x : player.y) + (rand() < 0.5 ? -1 : 1) * (900 + rand() * 700), 400, WORLD - 400);
+    const pos = axis === 'h' ? { x: along, y: road } : { x: road, y: along };
+    const d = dist(pos, player);
+    if (d > 700 && d < 2400 && ![car, ...aiCars].some(c => dist(c, pos) < 250)) spawnAiCar(axis, dir, road, along);
+  }
+}
+
 // ===== Frissítés =====
+function windX() { return Math.cos(storm.angle) * storm.level; }
+function windY() { return Math.sin(storm.angle) * storm.level; }
+
 function updatePlayer(dt) {
   let mx = 0, my = 0;
   if (keys.KeyW || keys.ArrowUp) my -= 1;
@@ -146,36 +333,96 @@ function updatePlayer(dt) {
   if (keys.KeyD || keys.ArrowRight) mx += 1;
   if (mx || my) {
     const len = Math.hypot(mx, my);
-    const sp = keys.ShiftLeft || keys.ShiftRight ? 260 : 140;
+    const sp = (keys.ShiftLeft || keys.ShiftRight ? 260 : 140) * (1 - 0.3 * storm.level);
     player.x += (mx / len) * sp * dt;
     player.y += (my / len) * sp * dt;
     player.angle = Math.atan2(my, mx);
     player.walk += dt * sp / 12;
   }
+  player.x += windX() * 35 * dt; player.y += windY() * 35 * dt;   // a szél sodor
   collide(player);
-  // ne lehessen átsétálni az autón
-  const dx = player.x - car.x, dy = player.y - car.y, d = Math.hypot(dx, dy);
-  if (d < player.r + car.r && d > 0) {
-    player.x = car.x + (dx / d) * (player.r + car.r);
-    player.y = car.y + (dy / d) * (player.r + car.r);
+  // ne lehessen átsétálni az autókon
+  for (const c of [car, ...aiCars]) {
+    const dx = player.x - c.x, dy = player.y - c.y, d = Math.hypot(dx, dy);
+    if (d < player.r + c.r && d > 0) {
+      player.x = c.x + (dx / d) * (player.r + c.r);
+      player.y = c.y + (dy / d) * (player.r + c.r);
+    }
   }
 }
 
-function updateCar(dt) {
-  const drive = player.inCar;
-  const up = drive && (keys.KeyW || keys.ArrowUp);
-  const down = drive && (keys.KeyS || keys.ArrowDown);
-  const steer = drive ? ((keys.KeyD || keys.ArrowRight) ? 1 : 0) - ((keys.KeyA || keys.ArrowLeft) ? 1 : 0) : 0;
-  const handbrake = drive && keys.Space;
-  const sandy = !onRoad(car.x, car.y);
+function playerCarInput() {
+  const drive = player.inCar && !player.dead;
+  return {
+    up: drive && !!(keys.KeyW || keys.ArrowUp),
+    down: drive && !!(keys.KeyS || keys.ArrowDown),
+    steer: drive ? ((keys.KeyD || keys.ArrowRight) ? 1 : 0) - ((keys.KeyA || keys.ArrowLeft) ? 1 : 0) : 0,
+    handbrake: drive && !!keys.Space,
+  };
+}
+
+function aiCarInput(c) {
+  if (c.wrecked) return { up: false, down: false, steer: 0, handbrake: true };
+  const ai = c.ai;
+  const along = ai.axis === 'h' ? c.x : c.y;
+
+  // kereszteződés: egyenesen, jobbra vagy balra
+  const cross = nearestRoad(along);
+  const key = ai.axis + ai.road + ':' + cross;
+  if (Math.abs(along - cross) < 60 && ai.lastCross !== key) {
+    ai.lastCross = key;
+    const roll = rand();
+    if (roll < 0.5) {
+      const right = roll < 0.25;
+      const newAxis = ai.axis === 'h' ? 'v' : 'h';
+      const newDir = ai.axis === 'h' ? (right ? ai.dir : -ai.dir) : (right ? -ai.dir : ai.dir);
+      const oldRoad = ai.road;
+      ai.axis = newAxis; ai.dir = newDir; ai.road = cross;
+      ai.lastCross = newAxis + cross + ':' + oldRoad;
+    }
+  }
+  // a pálya szélén megfordul
+  const al = ai.axis === 'h' ? c.x : c.y;
+  if ((ai.dir > 0 && al > WORLD - 400) || (ai.dir < 0 && al < 400)) ai.dir = -ai.dir;
+
+  const tx = ai.axis === 'h' ? c.x + ai.dir * 160 : laneFor(ai);
+  const ty = ai.axis === 'h' ? laneFor(ai) : c.y + ai.dir * 160;
+  const diff = wrapAngle(Math.atan2(ty - c.y, tx - c.x) - c.angle);
+  const fwd = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
+  const target = Math.abs(diff) > 0.4 ? 150 : ai.speed;
+
+  // ha valaki előtte van, fékez
+  const hx = Math.cos(c.angle), hy = Math.sin(c.angle);
+  const ahead = o => {
+    const dx = o.x - c.x, dy = o.y - c.y, d = Math.hypot(dx, dy);
+    return d > 0 && d < 150 && (dx * hx + dy * hy) / d > 0.8;
+  };
+  const blocked = [car, ...aiCars].some(o => o !== c && ahead(o)) || (!player.inCar && !player.dead && ahead(player));
+
+  return {
+    up: !blocked && fwd < target,
+    down: (blocked && fwd > 20) || fwd > target + 60,
+    steer: clamp(diff * 2.5, -1, 1),
+    handbrake: false,
+  };
+}
+
+function updateCarPhysics(c, input, dt) {
+  const { up, down, steer, handbrake } = input;
+  const sandy = !onRoad(c.x, c.y);
+  const slimy = slimeEnabled && onSlime(c.x, c.y);
+  if (slimy && !c.onSlime) c.spin = (rand() < 0.5 ? -1 : 1) * (2.5 + rand() * 2);   // nyálkán megpördül
+  c.onSlime = slimy;
+  c.spin *= Math.exp(-1.5 * dt);
 
   // először fordul az autó, a sebesség viszont nem fordul vele azonnal → oldalirányú csúszás
-  const fwd0 = car.vx * Math.cos(car.angle) + car.vy * Math.sin(car.angle);
-  car.angle += steer * (handbrake ? 3.4 : 2.6) * dt * clamp(fwd0 / 160, -1, 1);
+  const fwd0 = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
+  c.angle += steer * (handbrake ? 3.4 : 2.6) * dt * clamp(fwd0 / 160, -1, 1)
+    + c.spin * dt * clamp(Math.abs(fwd0) / 200, 0, 1);
 
-  const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
-  let fwd = car.vx * fx + car.vy * fy;
-  let lat = -car.vx * fy + car.vy * fx;
+  const fx = Math.cos(c.angle), fy = Math.sin(c.angle);
+  let fwd = c.vx * fx + c.vy * fy;
+  let lat = -c.vx * fy + c.vy * fx;
 
   if (up) fwd += 420 * dt;
   if (down) fwd -= (fwd > 20 ? 700 : 300) * dt;
@@ -183,39 +430,197 @@ function updateCar(dt) {
   fwd *= Math.exp(-(sandy ? 0.9 : 0.4) * dt);          // homokban lassabb
   if (!up && !down && Math.abs(fwd) < 5) fwd = 0;
   fwd = clamp(fwd, -180, sandy ? 380 : 620);
-  lat *= Math.exp(-(handbrake ? 1.2 : 12) * dt);         // kézifékkel alig tapad → driftel
+  const grip = slimy ? 0.4 : handbrake ? 1.2 : 12;     // kézifékkel / nyálkán alig tapad → csúszik
+  lat *= Math.exp(-grip * dt);
 
-  car.vx = fwd * fx - lat * fy;
-  car.vy = fwd * fy + lat * fx;
-  car.x += car.vx * dt;
-  car.y += car.vy * dt;
-  collide(car, true);
-  if (player.inCar) { player.x = car.x; player.y = car.y; }
+  c.vx = fwd * fx - lat * fy + windX() * 40 * dt;
+  c.vy = fwd * fy + lat * fx + windY() * 40 * dt;
+  c.x += c.vx * dt;
+  c.y += c.vy * dt;
+  c.braking = down || handbrake;
+  collide(c, true);
 
   // csúszás: féknyom és füst a hátsó kerekeknél
-  const speed = Math.hypot(car.vx, car.vy);
-  car.skid = speed > 90 && (Math.abs(lat) > (handbrake ? 40 : 250) || (handbrake && Math.abs(fwd) > 200));
+  const speed = Math.hypot(c.vx, c.vy);
+  c.skid = speed > 90 && (Math.abs(lat) > (handbrake || slimy ? 40 : 250) || (handbrake && Math.abs(fwd) > 200));
   const wheels = [-1, 1].map(side => {
-    const lx = -car.len / 3, ly = side * (car.wid / 2 - 3);
-    return { x: car.x + fx * lx - fy * ly, y: car.y + fy * lx + fx * ly };
+    const lx = -c.len / 3, ly = side * (c.wid / 2 - 3);
+    return { x: c.x + fx * lx - fy * ly, y: c.y + fy * lx + fx * ly };
   });
-  if (car.skid) {
-    if (lastWheels) {
+  if (c.skid) {
+    if (c.lastWheels) {
       for (let i = 0; i < 2; i++) {
-        skidMarks.push({ x1: lastWheels[i].x, y1: lastWheels[i].y, x2: wheels[i].x, y2: wheels[i].y, born: clock });
+        skidMarks.push({ x1: c.lastWheels[i].x, y1: c.lastWheels[i].y, x2: wheels[i].x, y2: wheels[i].y, born: clock });
       }
       if (skidMarks.length > MAX_SKID) skidMarks.splice(0, skidMarks.length - MAX_SKID);
     }
-    for (const w of wheels) {
-      if (rand() < 0.6) smoke.push({
-        x: w.x, y: w.y,
-        vx: -car.vx * 0.1 + (rand() - 0.5) * 40, vy: -car.vy * 0.1 + (rand() - 0.5) * 40,
-        r: 6 + rand() * 6, life: 0, max: 1 + rand() * 0.8,
-      });
-    }
-    if (smoke.length > MAX_SMOKE) smoke.splice(0, smoke.length - MAX_SMOKE);
+    for (const w of wheels) if (rand() < 0.6) addSmoke(w.x, w.y, -c.vx * 0.1, -c.vy * 0.1);
   }
-  lastWheels = car.skid ? wheels : null;
+  c.lastWheels = c.skid ? wheels : null;
+  if (c.wrecked && rand() < dt * 10) addSmoke(c.x, c.y, 0, 0, '#555');   // a roncs füstöl
+}
+
+function addSmoke(x, y, vx, vy, dark) {
+  smoke.push({ x, y, vx: vx + (rand() - 0.5) * 40, vy: vy + (rand() - 0.5) * 40,
+    r: 6 + rand() * 6, life: 0, max: 1 + rand() * 0.8, dark: !!dark });
+  if (smoke.length > MAX_SMOKE) smoke.splice(0, smoke.length - MAX_SMOKE);
+}
+
+function carCollisions() {
+  const all = [car, ...aiCars];
+  for (let i = 0; i < all.length; i++) {
+    for (let j = i + 1; j < all.length; j++) {
+      const a = all[i], b = all[j];
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy), min = a.r + b.r;
+      if (d >= min || d < 0.001) continue;
+      const nx = dx / d, ny = dy / d, push = (min - d) / 2;
+      a.x -= nx * push; a.y -= ny * push; b.x += nx * push; b.y += ny * push;
+      const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+      if (rv < 0) {
+        const imp = -rv * 0.65;
+        a.vx -= imp * nx; a.vy -= imp * ny; b.vx += imp * nx; b.vy += imp * ny;
+        if (-rv > 250) { if (a.ai) damageCar(a); if (b.ai) damageCar(b); }
+      }
+    }
+  }
+  // elütés: gyors autó megöli a gyalogost
+  for (const c of all) {
+    for (const p of npcs) {
+      if (p.dead) continue;
+      const dx = p.x - c.x, dy = p.y - c.y, d = Math.hypot(dx, dy);
+      if (d >= c.r + p.r || d < 0.001) continue;
+      if (Math.hypot(c.vx, c.vy) > 120) killNpc(p, c === car && player.inCar);
+      else { p.x = c.x + dx / d * (c.r + p.r); p.y = c.y + dy / d * (c.r + p.r); }
+    }
+  }
+}
+
+function damageCar(c) {
+  if (c.wrecked) return;
+  c.health -= 1;
+  if (c.health <= 0) { c.wrecked = true; for (let i = 0; i < 12; i++) addSmoke(c.x, c.y, 0, 0, true); }
+}
+
+function killNpc(p, byPlayer) {
+  if (p.dead) return;
+  p.dead = clock;
+  if (byPlayer) player.kills++;
+  alertPeds(p.x, p.y);
+}
+
+function damagePlayer(n) {
+  if (player.dead) return;
+  player.health -= n;
+  player.lastHit = clock;
+  if (player.health <= 0) {
+    player.health = 0;
+    player.dead = 3;
+    if (player.inCar) { player.inCar = false; player.x = car.x; player.y = car.y; }
+    message = { text: 'MEGHALTÁL', until: clock + 3 };
+  }
+}
+
+function respawn() {
+  Object.assign(player, { x: START_X, y: START_Y, angle: 0, inCar: false, health: 100, dead: 0 });
+  Object.assign(car, { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, spin: 0, lastWheels: null });
+  for (let i = npcs.length - 1; i >= 0; i--) if (npcs[i].kind === 'bandit') npcs.splice(i, 1);
+  message = { text: 'Újraéledtél', until: clock + 2 };
+}
+
+// ===== Lövöldözés =====
+function shoot(x, y, ang, from, offset) {
+  const cx = Math.cos(ang), cy = Math.sin(ang);
+  bullets.push({ x: x + cx * offset, y: y + cy * offset, vx: cx * 1100, vy: cy * 1100, life: 0.9, from });
+  flashes.push({ x: x + cx * (offset + 2), y: y + cy * (offset + 2), until: clock + 0.05 });
+  alertPeds(x, y);
+}
+
+function alertPeds(x, y) {
+  for (const p of npcs) {
+    if (p.kind === 'ped' && !p.dead && Math.hypot(p.x - x, p.y - y) < 600) { p.flee = 4; p.fx = x; p.fy = y; }
+  }
+}
+
+function updatePlayerShooting(dt) {
+  player.cooldown -= dt;
+  const byMouse = mouse.down, byKey = !!keys.KeyF;
+  if (player.dead || (!byMouse && !byKey) || player.cooldown > 0) return;
+  const src = player.inCar ? car : player;
+  let ang = player.inCar ? car.angle : player.angle;
+  if (byMouse) {
+    const wx = mouse.x - canvas.width / 2 + lastCam.x, wy = mouse.y - canvas.height / 2 + lastCam.y;
+    ang = Math.atan2(wy - src.y, wx - src.x);
+    if (!player.inCar) player.angle = ang;
+  }
+  shoot(src.x, src.y, ang, 'player', src.r + 8);
+  player.cooldown = 0.14;
+}
+
+function updateBullets(dt) {
+  const STEPS = 3;
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    let hit = false;
+    for (let s = 0; s < STEPS && !hit; s++) {
+      b.x += b.vx * dt / STEPS; b.y += b.vy * dt / STEPS;
+      if (b.x < 0 || b.y < 0 || b.x > WORLD || b.y > WORLD || obstacleAt(b.x, b.y)) { hit = true; break; }
+      if (b.from === 'player') {
+        for (const p of npcs) {
+          if (!p.dead && Math.hypot(p.x - b.x, p.y - b.y) < p.r + 3) {
+            p.health -= 1;
+            if (p.health <= 0) killNpc(p, true); else alertPeds(p.x, p.y);
+            hit = true; break;
+          }
+        }
+        if (!hit) for (const c of aiCars) {
+          if (Math.hypot(c.x - b.x, c.y - b.y) < c.r) { damageCar(c); hit = true; break; }
+        }
+      } else if (!player.dead) {
+        const t = player.inCar ? car : player;
+        if (Math.hypot(t.x - b.x, t.y - b.y) < t.r + 3) { damagePlayer(player.inCar ? 5 : 10); hit = true; }
+      }
+    }
+    b.life -= dt;
+    if (hit || b.life <= 0) bullets.splice(i, 1);
+  }
+  for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].until < clock) flashes.splice(i, 1);
+}
+
+// ===== AI gyalogosok és banditák =====
+function updateNpcs(dt) {
+  for (const p of npcs) {
+    if (p.dead) continue;
+    let speed = 0;
+    if (p.kind === 'ped') {
+      if (p.flee > 0) {
+        p.flee -= dt;
+        p.angle = Math.atan2(p.y - p.fy, p.x - p.fx);
+        speed = 200;
+      } else {
+        p.wanderT -= dt;
+        if (p.wanderT <= 0) { p.angle = rand() * Math.PI * 2; p.wanderT = 2 + rand() * 4; p.moving = rand() < 0.75; }
+        speed = p.moving ? 60 : 0;
+      }
+    } else {
+      const d = dist(p, player);
+      if (!player.dead && d < 900) {
+        p.angle = Math.atan2(player.y - p.y, player.x - p.x);
+        speed = d > 280 ? 110 : 0;
+        p.cooldown -= dt;
+        if (p.cooldown <= 0 && d < 650) {
+          shoot(p.x, p.y, p.angle + (rand() - 0.5) * 0.25, 'enemy', p.r + 8);
+          p.cooldown = 0.9 + rand() * 0.6;
+        }
+      } else if (!player.dead) {
+        p.angle = Math.atan2(player.y - p.y, player.x - p.x);
+        speed = 90;
+      }
+    }
+    p.x += Math.cos(p.angle) * speed * dt + windX() * 30 * dt;
+    p.y += Math.sin(p.angle) * speed * dt + windY() * 30 * dt;
+    p.walk += dt * speed / 12;
+    collide(p);
+  }
 }
 
 function updateSmoke(dt) {
@@ -223,9 +628,34 @@ function updateSmoke(dt) {
     const p = smoke[i];
     p.life += dt;
     if (p.life >= p.max) { smoke.splice(i, 1); continue; }
-    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.x += (p.vx + windX() * 120) * dt; p.y += (p.vy + windY() * 120) * dt;
     p.vx *= Math.exp(-2 * dt); p.vy *= Math.exp(-2 * dt);
     p.r += 22 * dt;                                    // tágul
+  }
+}
+
+function updateSkidMarks() {
+  let old = 0;
+  while (old < skidMarks.length && clock - skidMarks[old].born >= SKID_LIFE) old++;
+  if (old) skidMarks.splice(0, old);
+}
+
+function updateStorm(dt) {
+  storm.timer -= dt;
+  if (storm.timer <= 0) toggleStorm();
+  storm.level += clamp(storm.target - storm.level, -0.25 * dt, 0.25 * dt);   // ~4 mp alatt erősödik / gyengül
+  storm.angle += (rand() - 0.5) * 0.3 * dt;
+  // homokszemcsék a képernyőn
+  const want = Math.floor(320 * storm.level), w = canvas.width, h = canvas.height;
+  while (storm.particles.length < want) {
+    storm.particles.push({ x: rand() * w, y: rand() * h, len: 15 + rand() * 30, spd: 600 + rand() * 600 });
+  }
+  if (storm.particles.length > want) storm.particles.length = want;
+  const ca = Math.cos(storm.angle), sa = Math.sin(storm.angle);
+  for (const p of storm.particles) {
+    p.x += ca * p.spd * dt; p.y += sa * p.spd * dt;
+    if (p.x < -50) p.x += w + 100; else if (p.x > w + 50) p.x -= w + 100;
+    if (p.y < -50) p.y += h + 100; else if (p.y > h + 50) p.y -= h + 100;
   }
 }
 
@@ -236,6 +666,27 @@ function nightAmount(t) {
   if (t >= CYCLE - FADE / 2) return 1 - (t - (CYCLE - FADE / 2)) / FADE;
   if (t < FADE / 2) return 0.5 - t / FADE;
   return 0;
+}
+
+function update(dt) {
+  updateStorm(dt);
+  if (player.dead > 0) {
+    player.dead -= dt;
+    if (player.dead <= 0) respawn();
+  } else if (!player.inCar) {
+    updatePlayer(dt);
+  }
+  updatePlayerShooting(dt);
+  updateCarPhysics(car, playerCarInput(), dt);
+  if (player.inCar) { player.x = car.x; player.y = car.y; }
+  for (const c of aiCars) updateCarPhysics(c, aiCarInput(c), dt);
+  carCollisions();
+  updateNpcs(dt);
+  updateBullets(dt);
+  updateSmoke(dt);
+  updateSkidMarks();
+  spawnAround(dt);
+  if (!player.dead && clock - player.lastHit > 4) player.health = Math.min(100, player.health + 4 * dt);  // gyógyul
 }
 
 // ===== Rajzolás =====
@@ -277,25 +728,32 @@ function drawLamp(l, n) {
   ctx.beginPath(); ctx.arc(l.hx, l.hy, 6, 0, Math.PI * 2); ctx.fill();
 }
 
-function drawRoads(view) {
-  const c = WORLD / 2;
-  ctx.fillStyle = '#4a4a4a';
-  ctx.fillRect(0, c - ROAD_W / 2, WORLD, ROAD_W);
-  ctx.fillRect(c - ROAD_W / 2, 0, ROAD_W, WORLD);
-  ctx.fillStyle = '#d8d8d8';
-  ctx.fillRect(0, c - ROAD_W / 2 + 6, WORLD, 3); ctx.fillRect(0, c + ROAD_W / 2 - 9, WORLD, 3);
-  ctx.fillRect(c - ROAD_W / 2 + 6, 0, 3, WORLD); ctx.fillRect(c + ROAD_W / 2 - 9, 0, 3, WORLD);
-  ctx.fillStyle = '#f2c230';
-  for (let i = Math.floor(view.x0 / 80) * 80; i < view.x1; i += 80)
-    if (Math.abs(i - c) > ROAD_W) ctx.fillRect(i, c - 2, 40, 4);
-  for (let i = Math.floor(view.y0 / 80) * 80; i < view.y1; i += 80)
-    if (Math.abs(i - c) > ROAD_W) ctx.fillRect(c - 2, i, 4, 40);
+function drawSlime(s) {
+  ctx.fillStyle = 'rgba(80,190,50,0.85)';
+  ctx.beginPath();
+  for (const b of s.blobs) { ctx.moveTo(s.x + b.dx + b.rr, s.y + b.dy); ctx.arc(s.x + b.dx, s.y + b.dy, b.rr, 0, Math.PI * 2); }
+  ctx.fill();
+  ctx.fillStyle = 'rgba(190,255,140,0.55)';
+  ctx.beginPath(); ctx.arc(s.x - s.r * 0.2, s.y - s.r * 0.2, s.r * 0.18, 0, Math.PI * 2); ctx.fill();
 }
 
-function updateSkidMarks() {
-  let old = 0;
-  while (old < skidMarks.length && clock - skidMarks[old].born >= SKID_LIFE) old++;
-  if (old) skidMarks.splice(0, old);
+function drawRoads(view) {
+  const xa = Math.max(0, view.x0), xb = Math.min(WORLD, view.x1);
+  const ya = Math.max(0, view.y0), yb = Math.min(WORLD, view.y1);
+  const hRoads = roadsIn(view.y0 - ROAD_W, view.y1 + ROAD_W), vRoads = roadsIn(view.x0 - ROAD_W, view.x1 + ROAD_W);
+  ctx.fillStyle = '#4a4a4a';
+  for (const R of hRoads) ctx.fillRect(xa, R - ROAD_W / 2, xb - xa, ROAD_W);
+  for (const R of vRoads) ctx.fillRect(R - ROAD_W / 2, ya, ROAD_W, yb - ya);
+  ctx.fillStyle = '#d8d8d8';
+  for (const R of hRoads) { ctx.fillRect(xa, R - ROAD_W / 2 + 6, xb - xa, 3); ctx.fillRect(xa, R + ROAD_W / 2 - 9, xb - xa, 3); }
+  for (const R of vRoads) { ctx.fillRect(R - ROAD_W / 2 + 6, ya, 3, yb - ya); ctx.fillRect(R + ROAD_W / 2 - 9, ya, 3, yb - ya); }
+  ctx.fillStyle = '#f2c230';
+  for (const R of hRoads) {
+    for (let i = Math.floor(xa / 80) * 80; i < xb; i += 80) if (Math.abs(i - nearestRoad(i)) > ROAD_W) ctx.fillRect(i, R - 2, 40, 4);
+  }
+  for (const R of vRoads) {
+    for (let i = Math.floor(ya / 80) * 80; i < yb; i += 80) if (Math.abs(i - nearestRoad(i)) > ROAD_W) ctx.fillRect(R - 2, i, 4, 40);
+  }
 }
 
 function drawSkidMarks(view) {
@@ -318,47 +776,56 @@ function drawSkidMarks(view) {
 function drawSmoke() {
   for (const p of smoke) {
     const a = 0.45 * (1 - p.life / p.max);
-    ctx.fillStyle = `rgba(225,222,215,${a})`;
+    ctx.fillStyle = p.dark ? `rgba(70,70,70,${a})` : `rgba(225,222,215,${a})`;
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
   }
 }
 
-function drawCar(n) {
-  ctx.save(); ctx.translate(car.x, car.y); ctx.rotate(car.angle);
-  const L = car.len, W = car.wid;
+function drawCar(c, n) {
+  ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.angle);
+  const L = c.len, W = c.wid;
   ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(-L / 2 + 5, -W / 2 + 5, L, W);
   ctx.fillStyle = '#111';
   for (const [x, y] of [[-L / 3, -W / 2 - 3], [L / 4, -W / 2 - 3], [-L / 3, W / 2 - 3], [L / 4, W / 2 - 3]]) ctx.fillRect(x - 8, y, 16, 6);
-  ctx.fillStyle = '#d42020';
+  ctx.fillStyle = c.wrecked ? '#3a3a3a' : c.color[0];
   ctx.beginPath(); ctx.roundRect(-L / 2, -W / 2, L, W, 8); ctx.fill();
-  ctx.fillStyle = '#a31515'; ctx.fillRect(-L / 2 + 10, -W / 2 + 4, L - 26, W - 8);
-  ctx.fillStyle = '#7fb6d9';
+  ctx.fillStyle = c.wrecked ? '#2a2a2a' : c.color[1]; ctx.fillRect(-L / 2 + 10, -W / 2 + 4, L - 26, W - 8);
+  ctx.fillStyle = c.wrecked ? '#445' : '#7fb6d9';
   ctx.fillRect(L / 2 - 26, -W / 2 + 5, 10, W - 10);    // szélvédő
   ctx.fillRect(-L / 2 + 8, -W / 2 + 6, 6, W - 12);     // hátsó ablak
-  ctx.fillStyle = n > 0.2 ? '#fffbe0' : '#f5f0c8';
+  ctx.fillStyle = c.wrecked ? '#333' : n > 0.2 ? '#fffbe0' : '#f5f0c8';
   ctx.fillRect(L / 2 - 4, -W / 2 + 3, 4, 7); ctx.fillRect(L / 2 - 4, W / 2 - 10, 4, 7);
-  ctx.fillStyle = (player.inCar && (keys.KeyS || keys.ArrowDown || keys.Space)) ? '#ff3030' : '#801010';
+  ctx.fillStyle = c.braking && !c.wrecked ? '#ff3030' : '#801010';
   ctx.fillRect(-L / 2, -W / 2 + 3, 3, 7); ctx.fillRect(-L / 2, W / 2 - 10, 3, 7);
   ctx.restore();
 }
 
-function drawPlayer() {
-  if (player.inCar) return;
-  ctx.save(); ctx.translate(player.x, player.y); ctx.rotate(player.angle);
-  const swing = Math.sin(player.walk) * 6;
+function drawPerson(x, y, angle, walk, shirt, head, gun) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+  const swing = Math.sin(walk) * 6;
   ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(4, 4, 12, 14, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#2b2b4a';                                     // lábak
   ctx.fillRect(swing - 4, -7, 8, 5); ctx.fillRect(-swing - 4, 2, 8, 5);
-  ctx.fillStyle = '#2f6fd0';                                     // póló
+  ctx.fillStyle = shirt;                                         // póló
   ctx.beginPath(); ctx.ellipse(0, 0, 8, 13, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#e0b088';                                     // karok
   ctx.beginPath(); ctx.arc(-swing * 0.6, -13, 3.5, 0, Math.PI * 2); ctx.arc(swing * 0.6, 13, 3.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#3a2615';                                     // fej (haj)
+  if (gun) { ctx.fillStyle = '#222'; ctx.fillRect(2, 11, 14, 4); }  // pisztoly
+  ctx.fillStyle = head;                                          // fej (haj)
   ctx.beginPath(); ctx.arc(1, 0, 7, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 
-function drawLighting(n, cam, w, h) {
+function drawCorpse(x, y, angle, shirt, head) {
+  ctx.fillStyle = 'rgba(120,0,0,0.75)';
+  ctx.beginPath(); ctx.ellipse(x, y, 20, 13, angle, 0, Math.PI * 2); ctx.fill();
+  ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+  ctx.fillStyle = shirt; ctx.beginPath(); ctx.ellipse(0, 0, 13, 8, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = head; ctx.beginPath(); ctx.arc(14, 0, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function drawLighting(n, cam, w, h, lamps, cars) {
   if (n <= 0) return;
   const sx = x => x - cam.x + w / 2, sy = y => y - cam.y + h / 2;
 
@@ -374,21 +841,21 @@ function drawLighting(n, cam, w, h) {
     lctx.fillStyle = g; lctx.beginPath(); lctx.arc(x, y, r, 0, Math.PI * 2); lctx.fill();
   };
 
-  for (const l of lamps) {
-    const x = sx(l.hx), y = sy(l.hy);
-    if (x < -250 || y < -250 || x > w + 250 || y > h + 250) continue;
-    hole(x, y, 220, 1);
-  }
+  for (const l of lamps) hole(sx(l.hx), sy(l.hy), 220, 1);
   // fényszórók
-  const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
-  const cx = sx(car.x + fx * car.len / 2), cy = sy(car.y + fy * car.len / 2);
-  const reach = 380;
-  const g = lctx.createRadialGradient(cx, cy, 0, cx, cy, reach);
-  g.addColorStop(0, 'rgba(0,0,0,0.95)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-  lctx.fillStyle = g;
-  lctx.beginPath(); lctx.moveTo(cx, cy);
-  lctx.arc(cx, cy, reach, car.angle - 0.4, car.angle + 0.4); lctx.closePath(); lctx.fill();
-  hole(sx(car.x), sy(car.y), 70, 0.4);
+  for (const c of cars) {
+    if (c.wrecked) continue;
+    const fx = Math.cos(c.angle), fy = Math.sin(c.angle);
+    const cx = sx(c.x + fx * c.len / 2), cy = sy(c.y + fy * c.len / 2);
+    const reach = 380;
+    const g = lctx.createRadialGradient(cx, cy, 0, cx, cy, reach);
+    g.addColorStop(0, 'rgba(0,0,0,0.95)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    lctx.fillStyle = g;
+    lctx.beginPath(); lctx.moveTo(cx, cy);
+    lctx.arc(cx, cy, reach, c.angle - 0.4, c.angle + 0.4); lctx.closePath(); lctx.fill();
+    hole(sx(c.x), sy(c.y), 70, 0.4);
+  }
+  for (const f of flashes) hole(sx(f.x), sy(f.y), 90, 0.8);
   if (!player.inCar) hole(sx(player.x), sy(player.y), 70, 0.45);
 
   ctx.drawImage(light, 0, 0);
@@ -397,7 +864,6 @@ function drawLighting(n, cam, w, h) {
   ctx.globalCompositeOperation = 'lighter';
   for (const l of lamps) {
     const x = sx(l.hx), y = sy(l.hy);
-    if (x < -250 || y < -250 || x > w + 250 || y > h + 250) continue;
     const gg = ctx.createRadialGradient(x, y, 0, x, y, 200);
     gg.addColorStop(0, `rgba(255,200,120,${0.35 * n})`); gg.addColorStop(1, 'rgba(255,200,120,0)');
     ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(x, y, 200, 0, Math.PI * 2); ctx.fill();
@@ -409,75 +875,145 @@ function drawLighting(n, cam, w, h) {
   if (dusk > 0.01) { ctx.fillStyle = `rgba(255,120,40,${0.18 * dusk})`; ctx.fillRect(0, 0, w, h); }
 }
 
+function drawStorm(w, h, n) {
+  const L = storm.level;
+  if (L < 0.01) return;
+  const k = 1 - 0.75 * n;   // éjszaka sötétebb a homok
+  ctx.fillStyle = `rgba(${200 * k | 0},${160 * k | 0},${95 * k | 0},${0.62 * L})`;
+  ctx.fillRect(0, 0, w, h);
+  const ca = Math.cos(storm.angle), sa = Math.sin(storm.angle);
+  ctx.strokeStyle = `rgba(${245 * k | 0},${220 * k | 0},${170 * k | 0},${0.55 * L})`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (const p of storm.particles) { ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - ca * p.len, p.y - sa * p.len); }
+  ctx.stroke();
+}
+
 function fmt(sec) {
   sec = Math.max(0, Math.ceil(sec));
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 }
 
-function drawHud(w) {
+function drawHud(w, h) {
   const isDay = time < HALF_CYCLE;
   const left = isDay ? HALF_CYCLE - time : CYCLE - time;
   const speed = Math.round(Math.hypot(car.vx, car.vy) / 4);
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.fillRect(10, 10, 330, 104);
+  ctx.fillRect(10, 10, 400, 166);
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 16px sans-serif';
   ctx.fillText(`${isDay ? '☀ Nappal' : '☾ Éjszaka'} – ${isDay ? 'éjszakáig' : 'nappalig'}: ${fmt(left / timeScale)}`, 20, 34);
   ctx.font = '14px sans-serif';
-  ctx.fillText(player.inCar ? `Sebesség: ${speed} km/h` : 'Gyalog', 20, 56);
-  ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 78);
-  ctx.fillText(`Space: kézifék · T: gyorsított idő (${timeScale}x)`, 20, 98);
+  ctx.fillText('Életerő', 20, 58);
+  ctx.fillStyle = '#400'; ctx.fillRect(80, 47, 150, 13);
+  ctx.fillStyle = player.health > 50 ? '#3c3' : player.health > 25 ? '#ec3' : '#e33';
+  ctx.fillRect(80, 47, 150 * player.health / 100, 13);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(`Ölések: ${player.kills}`, 245, 58);
+  ctx.fillText(player.inCar ? `Sebesség: ${speed} km/h` : 'Gyalog', 20, 80);
+  if (storm.level > 0.3) { ctx.fillStyle = '#ffb040'; ctx.fillText('⚠ Homokvihar!', 245, 80); ctx.fillStyle = '#fff'; }
+  ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 104);
+  ctx.fillText('Space: kézifék · Bal klikk / F: lövés', 20, 124);
+  ctx.fillText(`H: homokvihar · T: gyorsított idő (${timeScale}x)`, 20, 144);
+  ctx.fillStyle = '#bbb'; ctx.font = '12px sans-serif';
+  ctx.fillText('Vigyázz a zöld nyálkafoltokkal az úton!', 20, 164);
 
-  if (!player.inCar && Math.hypot(player.x - car.x, player.y - car.y) < 75) {
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  if (!player.inCar && !player.dead && dist(player, car) < 75) {
     ctx.font = 'bold 18px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Nyomd meg az E-t a beszálláshoz', w / 2, canvas.height - 40);
-    ctx.textAlign = 'left';
+    ctx.fillText('Nyomd meg az E-t a beszálláshoz', w / 2, h - 40);
+  }
+  if (message && clock < message.until) {
+    ctx.font = 'bold 48px sans-serif';
+    ctx.fillStyle = message.text === 'MEGHALTÁL' ? '#e33' : '#fff';
+    ctx.fillText(message.text, w / 2, h / 2 - 60);
+  }
+  ctx.textAlign = 'left';
+
+  if (mouse.active && !player.dead) {   // célkereszt
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 9, 0, Math.PI * 2);
+    ctx.moveTo(mouse.x - 14, mouse.y); ctx.lineTo(mouse.x - 4, mouse.y);
+    ctx.moveTo(mouse.x + 4, mouse.y); ctx.lineTo(mouse.x + 14, mouse.y);
+    ctx.stroke();
   }
 }
 
 function drawMinimap(w) {
-  const S = 150, k = S / WORLD, x0 = w - S - 12, y0 = 12;
+  // radar: a játékos körüli 8000 × 8000 px-es terület
+  const S = 170, RAD = 4000, k = S / (2 * RAD), x0 = w - S - 12, y0 = 12;
+  const px = x => x0 + (x - player.x + RAD) * k, py = y => y0 + (y - player.y + RAD) * k;
   ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(x0 - 4, y0 - 4, S + 8, S + 8);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x0, y0, S, S); ctx.clip();
   ctx.fillStyle = '#c9a964'; ctx.fillRect(x0, y0, S, S);
   ctx.fillStyle = '#555';
-  ctx.fillRect(x0, y0 + WORLD / 2 * k - 2, S, 4); ctx.fillRect(x0 + WORLD / 2 * k - 2, y0, 4, S);
-  ctx.fillStyle = '#d42020'; ctx.fillRect(x0 + car.x * k - 3, y0 + car.y * k - 3, 6, 6);
-  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x0 + player.x * k, y0 + player.y * k, 3, 0, Math.PI * 2); ctx.fill();
+  for (const R of roadsIn(player.y - RAD - 100, player.y + RAD + 100)) ctx.fillRect(x0, py(R) - 2, S, 4);
+  for (const R of roadsIn(player.x - RAD - 100, player.x + RAD + 100)) ctx.fillRect(px(R) - 2, y0, 4, S);
+  ctx.strokeStyle = '#a00'; ctx.lineWidth = 2; ctx.strokeRect(px(0), py(0), WORLD * k, WORLD * k);   // pálya széle
+  for (const c of aiCars) { ctx.fillStyle = c.wrecked ? '#333' : c.color[0]; ctx.fillRect(px(c.x) - 2, py(c.y) - 2, 4, 4); }
+  ctx.fillStyle = '#e33';
+  for (const p of npcs) if (p.kind === 'bandit' && !p.dead) { ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 2.5, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = '#d42020'; ctx.fillRect(px(car.x) - 3, py(car.y) - 3, 6, 6);
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px(player.x), py(player.y), 3.5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 }
 
 function render() {
   const w = canvas.width, h = canvas.height;
   const cam = { x: clamp(player.x, w / 2, WORLD - w / 2), y: clamp(player.y, h / 2, WORLD - h / 2) };
+  lastCam = cam;
   const view = { x0: cam.x - w / 2 - 100, x1: cam.x + w / 2 + 100, y0: cam.y - h / 2 - 100, y1: cam.y + h / 2 + 100 };
   const inView = o => o.x > view.x0 && o.x < view.x1 && o.y > view.y0 && o.y < view.y1;
   const n = nightAmount(time);
+  const chunks = chunksIn(view.x0 - 300, view.y0 - 300, view.x1 + 300, view.y1 + 300);
+  const lamps = [];
+  for (const ch of chunks) for (const l of ch.lamps) if (inView(l)) lamps.push(l);
+  const cars = [car, ...aiCars].filter(inView);
 
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
   ctx.save();
   ctx.translate(Math.round(w / 2 - cam.x), Math.round(h / 2 - cam.y));
 
-  ctx.fillStyle = sandPattern; ctx.fillRect(0, 0, WORLD, WORLD);
+  ctx.fillStyle = sandPattern;
+  ctx.fillRect(Math.max(0, view.x0), Math.max(0, view.y0),
+    Math.min(WORLD, view.x1) - Math.max(0, view.x0), Math.min(WORLD, view.y1) - Math.max(0, view.y0));
   ctx.fillStyle = 'rgba(190,150,85,0.25)';
-  for (const d of dunes) {
-    if (d.x + d.rx < view.x0 || d.x - d.rx > view.x1 || d.y + d.rx < view.y0 || d.y - d.rx > view.y1) continue;
-    ctx.beginPath(); ctx.ellipse(d.x, d.y, d.rx, d.ry, d.rot, 0, Math.PI * 2); ctx.fill();
+  for (const ch of chunks) {
+    for (const d of ch.dunes) {
+      if (d.x + d.rx < view.x0 || d.x - d.rx > view.x1 || d.y + d.rx < view.y0 || d.y - d.rx > view.y1) continue;
+      ctx.beginPath(); ctx.ellipse(d.x, d.y, d.rx, d.ry, d.rot, 0, Math.PI * 2); ctx.fill();
+    }
   }
   drawRoads(view);
+  if (slimeEnabled) for (const ch of chunks) for (const s of ch.slime) if (inView(s)) drawSlime(s);
   drawSkidMarks(view);
-  for (const o of obstacles) {
-    if (!inView(o)) continue;
-    if (o.type === 'cactus') drawCactus(o);
-    else if (o.type === 'rock') drawRock(o);
+  for (const p of npcs) if (p.dead && inView(p)) drawCorpse(p.x, p.y, p.angle, p.shirt, p.head);
+  for (const ch of chunks) {
+    for (const o of ch.obstacles) {
+      if (!inView(o)) continue;
+      if (o.type === 'cactus') drawCactus(o);
+      else if (o.type === 'rock') drawRock(o);
+    }
   }
-  drawPlayer();
-  drawCar(n);
+  for (const p of npcs) if (!p.dead && inView(p)) drawPerson(p.x, p.y, p.angle, p.walk, p.shirt, p.head, p.kind === 'bandit');
+  if (player.dead) drawCorpse(player.x, player.y, player.angle, '#2f6fd0', '#3a2615');
+  else if (!player.inCar) drawPerson(player.x, player.y, player.angle, player.walk, '#2f6fd0', '#3a2615', true);
+  for (const c of cars) drawCar(c, n);
+  ctx.strokeStyle = '#ffe680'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (const b of bullets) { ctx.moveTo(b.x - b.vx * 0.02, b.y - b.vy * 0.02); ctx.lineTo(b.x, b.y); }
+  ctx.stroke();
+  ctx.fillStyle = '#fff2a0';
+  for (const f of flashes) { ctx.beginPath(); ctx.arc(f.x, f.y, 7, 0, Math.PI * 2); ctx.fill(); }
   drawSmoke();
-  for (const l of lamps) if (inView(l)) drawLamp(l, n);
+  for (const l of lamps) drawLamp(l, n);
   ctx.restore();
 
-  drawLighting(n, cam, w, h);
-  drawHud(w);
+  drawLighting(n, cam, w, h, lamps, cars);
+  drawStorm(w, h, n);
+  drawHud(w, h);
   drawMinimap(w);
 }
 
@@ -488,10 +1024,7 @@ function frame(now) {
   last = now;
   time = (time + dt * timeScale) % CYCLE;
   clock += dt;
-  if (!player.inCar) updatePlayer(dt);
-  updateCar(dt);
-  updateSmoke(dt);
-  updateSkidMarks();
+  update(dt);
   render();
   requestAnimationFrame(frame);
 }

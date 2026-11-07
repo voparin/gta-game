@@ -14,7 +14,15 @@ Felülnézetes, GTA-szerű böngészős játék. Tiszta HTML + JavaScript (Canva
 | `tests/smoke.test.js` | füstteszt kamu böngészőkörnyezetben (Node, függőség nélkül) |
 | `.github/workflows/deploy.yml` | CI: teszt, majd publikálás GitHub Pages-re |
 
-Fontos állandók a `game.js` elején: `WORLD` (pályaméret), `HALF_CYCLE` (30 perc nappal / 30 perc éjszaka), `FADE` (alkonyat hossza).
+Fontos állandók a `game.js` elején: `WORLD` (pályaméret, a régi 10 000 px-es pálya 30-szoros területe), `CHUNK`, `ROAD_SPACING`, `HALF_CYCLE` (30 perc nappal / 30 perc éjszaka), `FADE` (alkonyat hossza).
+
+Felépítés a `game.js`-en belül:
+- **Világ chunkokban**: a pálya 1000×1000 px-es darabokból áll (`getChunk`), amelyek menet közben, determinisztikusan generálódnak (akadályok, villanyoszlopok, dűnék, nyálkafoltok). Ütközésnél és rajzolásnál mindig csak a közeli chunkokat nézd (`chunksAround`, `chunksIn`) – soha ne járd be az egész világot.
+- **Utak**: rácsban, `ROAD_SPACING` távolságra (`nearestRoad`, `onRoad`, `roadsIn`).
+- **Autók**: egy közös fizika (`updateCarPhysics`) a játékos és az AI autók számára; az AI a `aiCarInput`-ban dönt (sáv követése, kereszteződésben fordulás).
+- **Szereplők**: `npcs` (gyalogos / bandita), `aiCars`, `bullets`; a játékostól messze lévőket a `spawnAround` eltünteti, a közelben újakat hoz létre.
+- **Időjárás**: `storm` (homokvihar), napszak: `nightAmount`.
+- Tesztekben a `spawnEnabled` és `slimeEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el.
 
 ## Szokásos fejlesztési flow
 
