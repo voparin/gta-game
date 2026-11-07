@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.16.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.17.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -39,6 +39,7 @@ function unlockAudio() { if (radio.ac && radio.ac.state === 'suspended') radio.a
 window.addEventListener('keydown', e => {
   unlockAudio();
   if (donate.open) { if (!e.repeat) donateKey(e.code); return; }
+  if (bank.open) { if (!e.repeat) bankKey(e.code); return; }
   if (e.code === 'Escape') { if (!e.repeat) toggleMenu(); return; }
   if (menu.open) { if (!e.repeat) menuKey(e.code); return; }
   keys[e.code] = true;
@@ -47,6 +48,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyT') timeScale = timeScale === 1 ? 60 : 1;
   if (e.code === 'KeyH') toggleStorm();
   if (e.code === 'KeyR' && player.inHouse) startRadio();                            // következő szám
+  if (e.code === 'Space' && player.inHouse && player.inHouse.factory) factoryAction();
   if (e.code === 'Digit1' || e.code === 'Numpad1') buyDrink('beer');
   if (e.code === 'Digit2' || e.code === 'Numpad2') buyDrink('wine');
   if (e.code === 'KeyM' && player.inHouse) { if (radio.playing) stopRadio(); else startRadio(); }
@@ -57,6 +59,7 @@ window.addEventListener('mousedown', e => {
   unlockAudio();
   mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
   if (donate.open) { if (e.button === 0) donateClick(e.clientX, e.clientY); return; }
+  if (bank.open) { if (e.button === 0) bankClick(e.clientX, e.clientY); return; }
   if (menu.open) { if (e.button === 0) menuClick(e.clientX, e.clientY); return; }
   if (e.button === 0) mouse.down = true;
 });
@@ -331,7 +334,10 @@ function housesIn(xa, ya, xb, yb) {
         const p = toXY(a - w / 2, d0), q = toXY(a + w / 2, d0 + d), c = toXY(a, d0 + d / 2);
         out.push({ id: `${axis}:${R}:${a}:${side}`, axis, side, road: R, along: a, w, d, x: c.x, y: c.y,
           x0: Math.min(p.x, q.x), y0: Math.min(p.y, q.y), x1: Math.max(p.x, q.x), y1: Math.max(p.y, q.y),
-          roof: ROOF_COLORS[(h() * ROOF_COLORS.length) | 0], chimney: h(), pub: h() < 0.12 });
+          roof: ROOF_COLORS[(h() * ROOF_COLORS.length) | 0], chimney: h(), pub: h() < 0.12, bankRoll: h(), factoryRoll: h() });
+        const hs = out[out.length - 1];
+        hs.bank = !hs.pub && hs.bankRoll < 0.06;                                 // ~6% bank
+        hs.factory = !hs.pub && !hs.bank && hs.factoryRoll < 0.06;               // ~6% gyár
       }
     }
   };
@@ -354,6 +360,8 @@ function nearestDoor() {
 // bútorok: két elrendezés (tükrözve is), az ajtó előtti sáv mindig szabad
 function furnitureOf(hs) {
   if (hs.pub) return PUB_FURNITURE;
+  if (hs.bank) return BANK_FURNITURE;
+  if (hs.factory) return FACTORY_FURNITURE;
   const r = rng(chunkSeed(Math.round(hs.x), Math.round(hs.y)));
   const mirror = r() < 0.5, alt = r() < 0.5;
   const items = alt ? [
@@ -453,6 +461,103 @@ function updateRadio() {
 // ===== Kocsma: pult, székek, asztalok; a pultnál 1: sör, 2: bor =====
 const BEER_PRICE = 2, WINE_PRICE = 3;
 const DRINKS = { beer: { name: 'sör', price: BEER_PRICE, drunk: 15 }, wine: { name: 'bor', price: WINE_PRICE, drunk: 22 } };
+// ===== Bank (ADR-0028): hitel $100–$2000, 20% díj, egyszerre egy; tartozás alatt a kereset 25%-a törleszt =====
+const LOAN_MIN = 100, LOAN_MAX = 2000, LOAN_STEP = 100, LOAN_FEE = 0.2, AUTO_REPAY = 0.25;
+const BANK_FURNITURE = [
+  { k: 'counter', x: 100, y: 20, w: 360, h: 44 }, { k: 'vault', x: ROOM_W - 90, y: 120, w: 60, h: 90 },
+  { k: 'plant', x: 30, y: 120, w: 34, h: 34 }, { k: 'radio', x: 30, y: 22, w: 38, h: 22 },
+];
+const atBankCounter = () => player.inHouse && player.inHouse.hs.bank && player.inHouse.iy < 20 + 44 + 50 && player.inHouse.ix > 90 && player.inHouse.ix < 470;
+const bank = { open: false, amount: 500, hits: [] };
+function openBank() { Object.assign(bank, { open: true, amount: 500 }); for (const k in keys) keys[k] = false; mouse.down = false; }
+function closeBank() { bank.open = false; }
+function takeLoan() {
+  if ((progress.debt || 0) > 0) { popup('Már van hiteled – előbb törleszd!', '#f66'); return false; }
+  const amt = clamp(bank.amount, LOAN_MIN, LOAN_MAX);
+  progress.money += amt;
+  progress.debt = Math.round(amt * (1 + LOAN_FEE));
+  saveProgress();
+  popup(`🏦 Felvettél $${amt} hitelt – tartozás: $${progress.debt}`, '#7df');
+  closeBank();
+  return true;
+}
+function repayLoan() {
+  const pay = Math.min(Math.floor(progress.money), progress.debt || 0);
+  if (pay <= 0) { popup((progress.debt || 0) > 0 ? 'Nincs pénzed a törlesztéshez!' : 'Nincs tartozásod', '#f66'); return false; }
+  progress.money -= pay; progress.debt -= pay; saveProgress();
+  popup(progress.debt > 0 ? `🏦 Törlesztettél $${pay}-t – maradt: $${progress.debt}` : `🏦 Kifizetted a hiteled ($${pay})!`, '#7f7');
+  closeBank();
+  return true;
+}
+function bankKey(code) {
+  if (code === 'Escape') closeBank();
+  else if (code === 'ArrowRight' || code === 'KeyD' || code === 'ArrowUp' || code === 'KeyW') bank.amount = clamp(bank.amount + LOAN_STEP, LOAN_MIN, LOAN_MAX);
+  else if (code === 'ArrowLeft' || code === 'KeyA' || code === 'ArrowDown' || code === 'KeyS') bank.amount = clamp(bank.amount - LOAN_STEP, LOAN_MIN, LOAN_MAX);
+  else if (code === 'Digit1' || code === 'Numpad1' || code === 'Enter') takeLoan();
+  else if (code === 'Digit2' || code === 'Numpad2') repayLoan();
+}
+function bankClick(x, y) {
+  for (const h of bank.hits) {
+    if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
+      if (h.loan) takeLoan(); else if (h.repay) repayLoan(); else if (h.cancel) closeBank();
+      else bank.amount = clamp(bank.amount + h.delta, LOAN_MIN, LOAN_MAX);
+      return;
+    }
+  }
+}
+
+// ===== Gyár: futószalag sós zacskókkal; Space: felvesz / dobozba tesz =====
+const FACTORY_WAGE = 500, WAGE_PERIOD = 60;   // fizetés: $500 percenként – ha abban a percben dolgoztál (legalább 1 zacskót bepakoltál)
+const BOX_SIZE = 10, BAG_EVERY = 2.2, BELT_SPEED = 45;
+const BELT = { x0: 60, x1: 500, y: 60, h: 40 };
+const FACTORY_FURNITURE = [
+  { k: 'belt', x: BELT.x0, y: BELT.y, w: BELT.x1 - BELT.x0, h: BELT.h },
+  { k: 'box', x: 50, y: 230, w: 60, h: 60 }, { k: 'box', x: 150, y: 230, w: 60, h: 60 }, { k: 'box', x: ROOM_W - 110, y: 230, w: 60, h: 60 },
+  { k: 'radio', x: 30, y: 22, w: 38, h: 22 },
+];
+function newFactory() { return { bags: [], carrying: false, nextBag: 0.5, boxes: [0, 0, 0], packed: 0, lost: 0, shift: 0, minutePacked: 0 }; }
+function updateFactory(dt) {
+  const F = player.inHouse.factory;
+  F.shift += dt;                                       // percenként fizetés
+  if (F.shift >= WAGE_PERIOD) {
+    F.shift -= WAGE_PERIOD;
+    if (F.minutePacked > 0) earn(FACTORY_WAGE, 'gyári fizetés 💵');
+    else popup('Ebben a percben nem dolgoztál – nincs fizetés', '#f66');
+    F.minutePacked = 0;
+  }
+  F.nextBag -= dt;
+  if (F.nextBag <= 0) { F.bags.push({ x: BELT.x0 + 10, color: ['#f2c230', '#e05a5a', '#5ab0e0'][F.bags.length % 3] }); F.nextBag = BAG_EVERY; }
+  for (const b of F.bags) b.x += BELT_SPEED * dt;
+  const lost = F.bags.filter(b => b.x > BELT.x1 - 6).length;
+  if (lost) { F.lost += lost; F.bags = F.bags.filter(b => b.x <= BELT.x1 - 6); popup(`Leesett ${lost} zacskó a szalag végén!`, '#f66'); }
+}
+const factoryBoxes = () => FACTORY_FURNITURE.filter(f => f.k === 'box');
+function nearBag() {
+  const H = player.inHouse;
+  return H && H.factory && H.factory.bags.find(b => Math.hypot(b.x - H.ix, BELT.y + BELT.h / 2 - H.iy) < 50);
+}
+function nearBox() {
+  const H = player.inHouse;
+  if (!H || !H.factory) return -1;
+  return factoryBoxes().findIndex(f => Math.hypot(Math.max(f.x, Math.min(H.ix, f.x + f.w)) - H.ix, Math.max(f.y, Math.min(H.iy, f.y + f.h)) - H.iy) < 30);
+}
+function factoryAction() {
+  const H = player.inHouse;
+  if (!H || !H.factory || !controllable()) return false;
+  const F = H.factory;
+  if (!F.carrying) {
+    const b = nearBag();
+    if (!b) return false;
+    F.bags.splice(F.bags.indexOf(b), 1); F.carrying = true;
+    return true;
+  }
+  const bi = nearBox();
+  if (bi < 0) return false;
+  F.carrying = false; F.boxes[bi]++; F.packed++; F.minutePacked++;
+  if (F.boxes[bi] >= BOX_SIZE) { F.boxes[bi] = 0; popup('📦 Tele a doboz – jön az üres!', '#ffd23a'); }
+  return true;
+}
+
 const PUB_FURNITURE = [
   { k: 'bar', x: 120, y: 20, w: 320, h: 40 },
   ...[150, 210, 270, 330, 390].map(x => ({ k: 'stool', x: x - 10, y: 76, w: 20, h: 20 })),
@@ -487,9 +592,9 @@ function wakeUp() {
 const drunkK = () => clamp(((player.drunk || 0) - 25) / 75, 0, 1);   // 0: józan … 1: nagyon részeg
 
 function enterHouse(hs) {
-  player.inHouse = { hs, ix: ROOM_W / 2, iy: ROOM_H - 50, furniture: furnitureOf(hs) };
+  player.inHouse = { hs, ix: ROOM_W / 2, iy: ROOM_H - 50, furniture: furnitureOf(hs), factory: hs.factory ? newFactory() : null };
   Object.assign(player, doorOf(hs));
-  popup(hs.pub ? '🍺 Bementél a kocsmába – a pultnál ihatsz' : '🏠 Bementél a házba – itt nem talál meg a rendőrség', '#7df');
+  popup(hs.pub ? '🍺 Bementél a kocsmába – a pultnál ihatsz' : hs.bank ? '🏦 Bementél a bankba – a pultnál E' : hs.factory ? '🏭 Bementél a gyárba – pakold a zacskókat (Space)' : '🏠 Bementél a házba – itt nem talál meg a rendőrség', '#7df');
   startRadio();
 }
 function exitHouse() {
@@ -647,7 +752,7 @@ function sanitizeProgress(p) {
     money: num(src.money), xp: num(src.xp), owned,
     activeCar: owned.includes(src.activeCar) ? src.activeCar : 0,
     bestDrift: num(src.bestDrift), bestStreak: num(src.bestStreak), missions: num(src.missions), raceWins: num(src.raceWins),
-    donated: num(src.donated),
+    donated: num(src.donated), debt: num(src.debt),
     ownedSkins: [...SKINS.map((k, i) => i).filter(i => !skinPrice(i)),
       ...(Array.isArray(src.ownedSkins) ? src.ownedSkins.filter(i => Number.isInteger(i) && i >= 0 && i < SKINS.length) : [])]
       .filter((v, i, a) => a.indexOf(v) === i),
@@ -803,6 +908,12 @@ function nearestBoardableBus() {
 function interactionPrompt() {
   if (player.dead || player.arrested || player.passedOut > 0) return null;
   if (player.riding) return { text: '🚌 Buszon utazol – E: leszállás (amikor megáll)', color: '#f28c1e' };
+  if (atBankCounter()) return { text: `🏦 E: bank – hitel ($${LOAN_MIN}–$${LOAN_MAX}) és törlesztés`, color: '#7df' };
+  if (player.inHouse && player.inHouse.factory) {
+    const F = player.inHouse.factory;
+    if (F.carrying) return { text: nearBox() >= 0 ? '📦 Space: berakás a dobozba' : '🥨 Viszel egy zacskót – vidd egy dobozhoz', color: '#ffd23a' };
+    if (nearBag()) return { text: '🥨 Space: zacskó felvétele a szalagról', color: '#ffd23a' };
+  }
   if (atBar()) return { text: `🍺 1: sör ($${BEER_PRICE}) · 🍷 2: bor ($${WINE_PRICE})`, color: '#ffd23a' };
   if (player.inHouse) return { text: atInnerDoor() ? '🚪 E: kimenés' : 'Menj az ajtóhoz (lent) a kimenéshez', color: '#7df' };
   if (player.inCar) return null;
@@ -828,7 +939,7 @@ function toggleCar() {
     return;
   }
   const bus = !player.inCar && dist(player, car) >= 75 ? nearestBoardableBus() : null;
-  if (player.inHouse) { if (atInnerDoor()) exitHouse(); return; }
+  if (player.inHouse) { if (atInnerDoor()) exitHouse(); else if (atBankCounter()) openBank(); return; }
   const door = !bus && !player.inCar && dist(player, car) >= 75 ? nearestDoor() : null;
   if (door) { enterHouse(door); return; }
   const lot = !bus && !player.inCar && dist(player, car) >= 75 ? nearestRentable() : null;
@@ -1684,6 +1795,11 @@ function earn(amount, label) {
   progress.money += amount;
   progress.xp += amount;
   popup(`+$${amount} ${label}`, '#7f7');
+  if ((progress.debt || 0) > 0) {                       // tartozás alatt a kereset 25%-a a hitelt törleszti
+    const part = Math.min(progress.debt, Math.max(1, Math.round(amount * AUTO_REPAY)));
+    progress.money -= part; progress.debt -= part;
+    popup(`🏦 -$${part} hiteltörlesztés (maradt: $${progress.debt})`, '#7df');
+  }
   const after = levelOf(progress.xp);
   if (after > before) {
     let bonus = 0;
@@ -1899,6 +2015,7 @@ function update(dt) {
     if (player.passedOut <= 0) wakeUp();
   } else if (player.inHouse) {
     updateInterior(dt);
+    if (player.inHouse && player.inHouse.factory) updateFactory(dt);
   } else if (player.riding) {                        // utas: a busszal együtt mozog
     const b = player.riding;
     if (!aiCars.includes(b) || b.wrecked) { player.riding = null; collide(player); }
@@ -2091,6 +2208,12 @@ function drawHouse(hs, n) {
   ctx.beginPath();                                                                     // tetőgerinc
   if (h) { ctx.moveTo(x0, (y0 + y1) / 2); ctx.lineTo(x1, (y0 + y1) / 2); } else { ctx.moveTo((x0 + x1) / 2, y0); ctx.lineTo((x0 + x1) / 2, y1); }
   ctx.stroke();
+  if (hs.bank || hs.factory) {                                                         // bank / gyár: tető és cégtábla
+    ctx.fillStyle = hs.bank ? 'rgba(60,80,120,0.9)' : 'rgba(110,110,115,0.92)'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.fillStyle = '#1a1a22'; ctx.fillRect(hs.x - 42, hs.y - 11, 84, 22);
+    ctx.fillStyle = hs.bank ? '#9fd8ff' : '#ffd23a'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(hs.bank ? '🏦 BANK' : '🏭 GYÁR', hs.x, hs.y + 5); ctx.textAlign = 'left';
+  }
   if (hs.pub) {                                                                        // kocsma: zöld tető, cégtábla
     ctx.fillStyle = 'rgba(30,90,40,0.85)'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
     ctx.fillStyle = '#2b1a0e'; ctx.fillRect(hs.x - 42, hs.y - 11, 84, 22);
@@ -2173,6 +2296,14 @@ function drawInterior(w, h) {
       ctx.fillStyle = '#5a3418'; ctx.fillRect(f.x, f.y + f.h - 10, f.w, 10);
       for (let x = f.x + 20; x < f.x + f.w - 10; x += 40) { ctx.fillStyle = '#d8b04a'; ctx.fillRect(x, f.y + 8, 6, 14); ctx.fillStyle = '#c0203a'; ctx.fillRect(x + 14, f.y + 10, 5, 12); }
     }
+    if (f.k === 'counter') { ctx.fillStyle = '#2f4a6a'; ctx.fillRect(f.x, f.y + f.h - 10, f.w, 10); ctx.fillStyle = '#9fd8ff'; for (let x = f.x + 30; x < f.x + f.w; x += 90) ctx.fillRect(x, f.y + 6, 40, 18); }
+    if (f.k === 'vault') { ctx.fillStyle = '#777'; ctx.beginPath(); ctx.arc(f.x + f.w / 2, f.y + f.h / 2, 22, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ddd'; ctx.fillRect(f.x + f.w / 2 - 2, f.y + f.h / 2 - 16, 4, 32); }
+    if (f.k === 'belt') { ctx.fillStyle = '#333'; ctx.fillRect(f.x, f.y, f.w, f.h); ctx.fillStyle = '#555'; for (let x = f.x + ((clock * BELT_SPEED) % 20); x < f.x + f.w; x += 20) ctx.fillRect(x, f.y, 3, f.h); }
+    if (f.k === 'box') {
+      const i = factoryBoxes().indexOf(f), cnt = H.factory ? H.factory.boxes[i] : 0;
+      ctx.fillStyle = '#c8a06a'; ctx.fillRect(f.x + 4, f.y + 4, f.w - 8, f.h - 8);
+      ctx.fillStyle = '#5a3a1a'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(`${cnt}/${BOX_SIZE}`, f.x + f.w / 2, f.y + f.h / 2 + 5); ctx.textAlign = 'left';
+    }
     if (f.k === 'stool') { ctx.fillStyle = '#3a2a1a'; ctx.beginPath(); ctx.arc(f.x + f.w / 2, f.y + f.h / 2, f.w / 2, 0, Math.PI * 2); ctx.fill(); }
     if (f.k === 'radio') {                                                              // rádió: hangszóró, antenna
       ctx.fillStyle = '#3a2a1a'; ctx.fillRect(f.x, f.y, f.w, f.h);
@@ -2188,11 +2319,13 @@ function drawInterior(w, h) {
   }
   ctx.strokeStyle = '#e8dcc6'; ctx.lineWidth = ROOM_WALL; ctx.strokeRect(ROOM_WALL / 2, ROOM_WALL / 2, ROOM_W - ROOM_WALL, ROOM_H - ROOM_WALL);   // falak
   ctx.fillStyle = '#6b4a2e'; ctx.fillRect(ROOM_W / 2 - 34, ROOM_H - ROOM_WALL, 68, ROOM_WALL);                                  // ajtó
+  if (H.factory) for (const b of H.factory.bags) { ctx.fillStyle = b.color; ctx.fillRect(b.x - 8, BELT.y + 8, 16, 24); ctx.fillStyle = '#fff'; ctx.fillRect(b.x - 5, BELT.y + 16, 10, 4); }
   const sk = SKINS[activeSkin];
   drawPerson(H.ix, H.iy, player.angle, player.walk, sk.shirt, sk.head, false, sk.legs, sk.hat, sk.pattern);
+  if (H.factory && H.factory.carrying) { ctx.fillStyle = '#f2c230'; ctx.fillRect(H.ix + 8, H.iy - 18, 14, 20); }
   ctx.restore();
   ctx.fillStyle = '#7df'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(H.hs.pub ? `🍺 Kocsmában vagy – a pultnál ihatsz: sör $${BEER_PRICE}, bor $${WINE_PRICE}` : '🏠 Bent vagy a házban – itt nem talál meg a rendőrség, és gyorsabban gyógyulsz', w / 2, oy - 14);
+  ctx.fillText(H.hs.bank ? '🏦 Bankban vagy – a pultnál E: hitel vagy törlesztés' : H.hs.factory ? `🏭 Gyár – fizetés $${FACTORY_WAGE}/perc · következő: ${Math.ceil(WAGE_PERIOD - H.factory.shift)} mp · ebben a percben bepakolva: ${H.factory.minutePacked}` : H.hs.pub ? `🍺 Kocsmában vagy – a pultnál ihatsz: sör $${BEER_PRICE}, bor $${WINE_PRICE}` : '🏠 Bent vagy a házban – itt nem talál meg a rendőrség, és gyorsabban gyógyulsz', w / 2, oy - 14);
   ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 16px sans-serif';
   if (radio.playing && radio.ac && radio.ac.state === 'suspended') ctx.fillText('🔇 A böngésző lenémította a hangot – kattints vagy nyomj meg egy gombot', w / 2, oy + 24);
   ctx.fillText(radio.playing && radio.song ? `📻 Most szól: ${radio.song.name} (${radio.song.scaleName}, ${radio.song.bpm} BPM) · R: következő szám · M: rádió ki`
@@ -2517,12 +2650,22 @@ function drawHud(w, h) {
   ctx.fillText(car.refueling ? `⛽ Tankolás… ${car.fuel | 0}%` : `${car.fuel | 0}%`, 245, 102);
   // pénz és szint
   const lvl = levelOf(progress.xp), xp0 = xpForLevel(lvl), xp1 = xpForLevel(lvl + 1);
+  // a feliratok egymás után, a tényleges szélességük szerint (nagy összegnél / hitelnél se fedjék egymást)
+  const textW = (t, fallback) => { const m = ctx.measureText(t); return m && m.width ? m.width : fallback; };
+  const moneyTxt = `$${Math.floor(progress.money)}`;
   ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 18px sans-serif';
-  ctx.fillText(`$${Math.floor(progress.money)}`, 20, 128);
+  ctx.fillText(moneyTxt, 20, 128);
+  let hx = 20 + textW(moneyTxt, moneyTxt.length * 11) + 10;
+  if (progress.debt > 0) {
+    const debtTxt = `hitel: -$${progress.debt}`;
+    ctx.fillStyle = '#7df'; ctx.font = 'bold 11px sans-serif'; ctx.fillText(debtTxt, hx, 127);
+    hx += textW(debtTxt, debtTxt.length * 6.5) + 10;
+  }
+  const lvlX = Math.max(150, hx), barX = lvlX + 65, barW = Math.max(40, 395 - barX);
   ctx.font = '14px sans-serif'; ctx.fillStyle = '#fff';
-  ctx.fillText(`${lvl}. szint`, 150, 127);
-  ctx.fillStyle = '#333'; ctx.fillRect(215, 117, 120, 10);
-  ctx.fillStyle = '#ffd23a'; ctx.fillRect(215, 117, 120 * (progress.xp - xp0) / (xp1 - xp0), 10);
+  ctx.fillText(`${lvl}. szint`, lvlX, 127);
+  ctx.fillStyle = '#333'; ctx.fillRect(barX, 117, barW, 10);
+  ctx.fillStyle = '#ffd23a'; ctx.fillRect(barX, 117, barW * (progress.xp - xp0) / (xp1 - xp0), 10);
   // küldetés
   if (mission.active) {
     const m = Math.round(Math.hypot(player.x - mission.tx, player.y - mission.ty) / 10);
@@ -2650,6 +2793,32 @@ function drawHomeless(p) {
   ctx.fillStyle = '#333'; ctx.font = 'bold 7px sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('SEGÍTS', p.x - fy * 22, p.y + fx * 22 + 2.5);
   if (clock < (p.thanksUntil || 0)) { ctx.fillStyle = '#7f7'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('Köszönöm! ❤', p.x, p.y - 26); }
+  ctx.textAlign = 'left';
+}
+
+function drawBank(w, h) {
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, w, h);
+  const PW = 500, PH = 270, px = (w - PW) / 2, py = (h - PH) / 2, debt = progress.debt || 0;
+  ctx.fillStyle = 'rgba(16,24,36,0.96)'; ctx.fillRect(px, py, PW, PH);
+  ctx.strokeStyle = '#7df'; ctx.lineWidth = 3; ctx.strokeRect(px, py, PW, PH);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#7df'; ctx.font = 'bold 26px sans-serif'; ctx.fillText('🏦 Bank', w / 2, py + 40);
+  ctx.fillStyle = '#ccc'; ctx.font = '14px sans-serif';
+  ctx.fillText(`Egyenleg: $${Math.floor(progress.money)} · Tartozás: $${debt} · díj: ${Math.round(LOAN_FEE * 100)}%`, w / 2, py + 66);
+  ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 40px sans-serif'; ctx.fillText(`$${bank.amount}`, w / 2, py + 122);
+  ctx.fillStyle = '#ccc'; ctx.font = '13px sans-serif'; ctx.fillText(`visszafizetendő: $${Math.round(bank.amount * (1 + LOAN_FEE))}`, w / 2, py + 144);
+  bank.hits = [];
+  const btn = (label, x, y, bw, hit, color = '#e2c27d') => {
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(x, y, bw, 36);
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.strokeRect(x, y, bw, 36);
+    ctx.fillStyle = color; ctx.font = 'bold 17px sans-serif'; ctx.fillText(label, x + bw / 2, y + 24);
+    bank.hits.push({ x, y, w: bw, h: 36, ...hit });
+  };
+  btn(`−$${LOAN_STEP}`, px + 40, py + 92, 80, { delta: -LOAN_STEP }); btn(`+$${LOAN_STEP}`, px + PW - 120, py + 92, 80, { delta: LOAN_STEP });
+  btn('1: Hitel felvétele', px + 30, py + 170, 210, { loan: true }, debt > 0 ? '#777' : '#7f7');
+  btn('2: Törlesztés', px + 260, py + 170, 210, { repay: true }, debt > 0 ? '#7df' : '#777');
+  ctx.fillStyle = '#999'; ctx.font = '12px sans-serif';
+  ctx.fillText(`Egyszerre egy hitel · tartozás alatt minden kereset ${Math.round(AUTO_REPAY * 100)}%-a törleszt · Esc: bezárás`, w / 2, py + PH - 16);
   ctx.textAlign = 'left';
 }
 
@@ -2822,6 +2991,7 @@ function render() {
   drawMinimap(w);
   if (menu.open) drawMenu(w, h);
   if (donate.open) drawDonate(w, h);
+  if (bank.open) drawBank(w, h);
 }
 
 // ===== Fő ciklus =====
@@ -2829,7 +2999,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (!menu.open && !donate.open) {   // menüben és adományozás közben megáll a játék
+  if (!menu.open && !donate.open && !bank.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
     time = (time + dt * timeScale) % CYCLE;
     clock += dt;
     update(dt);

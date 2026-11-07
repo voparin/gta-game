@@ -38,7 +38,7 @@ eval(src + `
   set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, set police(v){policeEnabled=v}, wanted, clearWanted,
   SPEED_LIMIT, KMH, START_X, START_Y, progress, mission, drift, stationFor, nearPump, earn, levelOf,
   set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
-  set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, stationCache, STATION_CACHE_MAX, raiseWanted,
+  set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, bank, LOAN_MIN, LOAN_MAX, LOAN_FEE, FACTORY_WAGE, WAGE_PERIOD, BOX_SIZE, BELT, stationCache, STATION_CACHE_MAX, raiseWanted,
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
@@ -1223,6 +1223,82 @@ G.npcs.length = 0; G.aiCars.length = 0;
   check('széles képernyőn messzebbről indul (nem a szemed előtt jelenik meg), és a megállóba ér', leadW > 1500 && arrivedW);
   G.canvas.width = w0;
   G.spawn = false; G.aiCars.length = 0;
+}
+
+// --- bankok: hitel és törlesztés ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null;
+  const all = G.housesIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000);
+  const banks = all.filter(h => h.bank), factories = all.filter(h => h.factory);
+  check('vannak bankok és gyárak, ritkán', banks.length > 5 && factories.length > 5 && banks.length < all.length * 0.12 && factories.length < all.length * 0.12);
+  check('egy ház csak egyféle lehet (kocsma / bank / gyár)', all.every(h => [h.pub, h.bank, h.factory].filter(Boolean).length <= 1));
+  const bk = banks[0];
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  Object.assign(G.player, { inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0, drunk: 0, passedOut: 0 });
+  G.progress.money = 100; G.progress.debt = 0;
+  Object.assign(G.player, G.doorOf(bk)); press('KeyE');
+  check('a bankba be lehet menni', G.player.inHouse && G.player.inHouse.hs.bank);
+  G.player.inHouse.ix = 280; G.player.inHouse.iy = 100;
+  check('a pultnál kiírja a bankot', /bank.*hitel/.test(G.interactionPrompt().text));
+  press('KeyE');
+  check('E-re megnyílik a bank', G.bank.open);
+  const clk = G.clock; step(30);
+  check('banki ügyintézés közben áll a játék', G.clock === clk);
+  for (let i = 0; i < 30; i++) press('ArrowLeft');
+  check(`a hitel legalább $${G.LOAN_MIN}`, G.bank.amount === G.LOAN_MIN);
+  for (let i = 0; i < 40; i++) press('ArrowRight');
+  check(`a hitel legfeljebb $${G.LOAN_MAX}`, G.bank.amount === G.LOAN_MAX);
+  for (let i = 0; i < 15; i++) press('ArrowLeft');      // $500
+  press('Digit1');
+  check('felvehető a hitel: megkapod a pénzt, és 20%-kal többel tartozol', G.progress.money === 600 && G.progress.debt === 600 && !G.bank.open);
+  press('KeyE'); press('Digit1');
+  check('egyszerre csak egy hitel lehet', G.progress.money === 600 && G.progress.debt === 600);
+  press('Escape');
+  G.earn(100, 'teszt');
+  check('tartozás alatt a kereset 25%-a automatikusan törleszt', G.progress.debt === 575 && G.progress.money >= 675 && G.progress.money < 700);
+  G.progress.money = 200;
+  press('KeyE'); press('Digit2');
+  check('részletben is lehet törleszteni', G.progress.debt === 375 && G.progress.money === 0);
+  G.progress.money = 1000;
+  press('KeyE'); press('Digit2');
+  check('teljesen ki lehet fizetni a hitelt', G.progress.debt === 0 && G.progress.money === 625);
+  check('a tartozás a mentésben is megmarad', G.sanitizeProgress({ money: 0, debt: 333 }).debt === 333 && G.sanitizeProgress({ money: 0, debt: -5 }).debt === 0);
+  G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
+
+  // --- gyárak: sós zacskók a dobozokba ---
+  const fc = factories[0];
+  Object.assign(G.player, G.doorOf(fc)); press('KeyE');
+  check('a gyárba be lehet menni, van futószalag és doboz', G.player.inHouse && G.player.inHouse.factory && G.player.inHouse.furniture.some(f => f.k === 'belt') && G.player.inHouse.furniture.filter(f => f.k === 'box').length === 3);
+  const F = G.player.inHouse.factory, H = G.player.inHouse;
+  step(60);
+  check('a futószalagon jönnek a sós zacskók', F.bags.length > 0 && F.bags[0].x > G.BELT.x0 + 30);
+  press('Space');
+  check('távolról nem lehet zacskót felvenni', !F.carrying);
+  const box = H.furniture.filter(f => f.k === 'box')[0];
+  const grab = () => { const b = F.bags[0]; H.ix = b.x; H.iy = G.BELT.y + G.BELT.h + 14; press('Space'); return F.carrying; };
+  const drop = () => { H.ix = box.x + box.w / 2; H.iy = box.y - 14; press('Space'); };
+  check('a szalag mellett Space-re felveszed a zacskót', grab());
+  while (!F.bags.length) step(10);
+  const nb = F.bags.length; H.ix = F.bags[0].x; H.iy = G.BELT.y + G.BELT.h + 14;
+  press('Space');
+  check('nem lehet egyszerre két zacskót vinni', F.carrying && F.bags.length === nb);
+  drop();
+  check('a zacskó bekerül a dobozba', !F.carrying && F.boxes[0] === 1 && F.minutePacked === 1);
+  for (let i = 1; i < G.BOX_SIZE; i++) { while (!F.bags.length) step(10); grab(); drop(); }
+  check(`${G.BOX_SIZE} zacskóval tele a doboz, jön az üres`, F.boxes[0] === 0 && F.packed === G.BOX_SIZE);
+  // fizetés: $500 percenként, ha abban a percben dolgoztál
+  F.shift = G.WAGE_PERIOD - 0.5; const mw = G.progress.money;
+  step(40);
+  check(`dolgozva percenként $${G.FACTORY_WAGE} fizetés jár`, G.FACTORY_WAGE === 500 && G.progress.money >= mw + 500 && F.minutePacked === 0);
+  F.shift = G.WAGE_PERIOD - 0.5; const mi = G.progress.money;
+  step(40);
+  check('ha abban a percben nem dolgoztál, nincs fizetés', G.progress.money === mi);
+  const lost0 = F.lost; H.ix = 280; H.iy = 300;
+  step(60 * 15);
+  check('a le nem szedett zacskók a szalag végén leesnek', F.lost > lost0);
+  H.ix = G.ROOM_W / 2; H.iy = G.ROOM_H - 30; press('KeyE');
+  press('Space');
+  check('a gyáron kívül a Space nem pakol', !G.player.inHouse);
 }
 
 // --- zöld busz: csak a játékosé ---

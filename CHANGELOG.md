@@ -5,6 +5,11 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.17.0 – 2026-11-07
+- Bankok (a házak ~6%-a): a pultnál E – hitel $100–$2000 (20% díj, egyszerre egy), törlesztés; amíg tartozol, minden kereset 25%-a automatikusan törleszt (ADR-0028)
+- Gyárak (a házak ~6%-a): futószalagon jönnek a sós zacskók, Space: felveszed, Space: berakod egy dobozba; fizetés $500 percenként, ha abban a percben dolgoztál
+- Kódátnézés után javítva (kiadás előtt): nagy pénzösszegnél / hitelnél a HUD feliratai egymásra csúsztak
+
 ## 0.16.0 – 2026-11-07
 - Buszmenetrend: percenként jön egy busz a hozzád legközelebbi megállóba; a megállóban látszik, hány mp múlva jön a következő (ADR-0027)
 - Kódátnézés után javítva (kiadás előtt): a busz nem indul foglalt helyről (ilyenkor egy másik közeli megállóba jön); széles képernyőn messzebbről indul, hogy ne a szemed előtt jelenjen meg

@@ -70,3 +70,11 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 ## Kocsmák
 - A házak egy része **kocsma** (zöld tető, „KOCSMA” tábla). A pultnál **1: sör ($2)**, **2: bor ($3)**.
 - Ha sokat iszol, imbolyogsz, és himbálózik a kép. **Ittasan ne vezess:** már egy ital után is üldöz a rendőrség, amíg ki nem józanodsz. Túl sok italtól elájulsz, és a kocsma előtt térsz magadhoz.
+
+## Bankok
+- A házak egy része **bank** (kék tető, „BANK” tábla). A pultnál **E**: **hitel** $100–$2000 (20% díjjal, egyszerre egy) vagy **törlesztés**.
+- Amíg tartozol, minden keresetedből 25% automatikusan törleszti a hitelt. A tartozás a HUD-on, a pénzed mellett látszik.
+
+## Gyárak
+- A házak egy része **gyár** (szürke tető, „GYÁR” tábla). Bent futószalagon jönnek a sós zacskók: **Space**: felveszed, **Space** egy doboz mellett: berakod.
+- **Fizetés: $500 percenként** – ha abban a percben legalább egy zacskót bepakoltál. A le nem szedett zacskók a szalag végén leesnek.
