@@ -1,7 +1,8 @@
 'use strict';
 
 // ===== Beállítások =====
-const WORLD = 4000;              // a sivatag mérete (pixel)
+const WORLD = 10000;             // a sivatag mérete (pixel)
+const START_X = WORLD / 2 - 300, START_Y = WORLD / 2 - 100;   // kezdőhely
 const HALF_CYCLE = 30 * 60;      // 30 perc nappal, 30 perc éjszaka (másodperc)
 const CYCLE = HALF_CYCLE * 2;
 const FADE = 120;                // alkonyat / hajnal hossza (másodperc)
@@ -68,15 +69,15 @@ function placeRandom(count, type, rMin, rMax) {
     const x = 60 + rand() * (WORLD - 120), y = 60 + rand() * (WORLD - 120);
     const r = rMin + rand() * (rMax - rMin);
     if (onRoad(x, y, r + 40)) continue;
-    if (Math.hypot(x - 1700, y - 1850) < 250) continue;  // kezdőhely szabadon
+    if (Math.hypot(x - START_X, y - START_Y) < 250) continue;  // kezdőhely szabadon
     obstacles.push({ x, y, r, type, rot: rand() * Math.PI * 2, seed: rand() });
     placed++;
   }
 }
-placeRandom(220, 'cactus', 10, 16);
-placeRandom(90, 'rock', 18, 42);
+placeRandom(1400, 'cactus', 10, 16);
+placeRandom(560, 'rock', 18, 42);
 
-for (let i = 0; i < 260; i++) {
+for (let i = 0; i < 1600; i++) {
   dunes.push({ x: rand() * WORLD, y: rand() * WORLD, rx: 80 + rand() * 220, ry: 30 + rand() * 80, rot: rand() * Math.PI });
 }
 
@@ -96,8 +97,12 @@ sandTile.width = sandTile.height = 256;
 const sandPattern = ctx.createPattern(sandTile, 'repeat');
 
 // ===== Szereplők =====
-const player = { x: 1700, y: 1900, angle: 0, r: 12, inCar: false, walk: 0 };
-const car = { x: 1800, y: 1850, angle: 0, vx: 0, vy: 0, r: 28, len: 72, wid: 36 };
+const player = { x: START_X, y: START_Y, angle: 0, r: 12, inCar: false, walk: 0 };
+const car = { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, r: 28, len: 72, wid: 36, skid: false };
+const skidMarks = [];   // féknyomok: {x1, y1, x2, y2}
+const smoke = [];       // füstrészecskék: {x, y, vx, vy, r, life, max}
+const MAX_SKID = 4000, MAX_SMOKE = 300;
+let lastWheels = null;
 let time = 60;   // játékidő másodpercben: nappal indulunk
 
 function toggleCar() {
@@ -155,10 +160,6 @@ function updatePlayer(dt) {
 }
 
 function updateCar(dt) {
-  const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
-  let fwd = car.vx * fx + car.vy * fy;
-  let lat = -car.vx * fy + car.vy * fx;
-
   const drive = player.inCar;
   const up = drive && (keys.KeyW || keys.ArrowUp);
   const down = drive && (keys.KeyS || keys.ArrowDown);
@@ -166,23 +167,64 @@ function updateCar(dt) {
   const handbrake = drive && keys.Space;
   const sandy = !onRoad(car.x, car.y);
 
+  // először fordul az autó, a sebesség viszont nem fordul vele azonnal → oldalirányú csúszás
+  const fwd0 = car.vx * Math.cos(car.angle) + car.vy * Math.sin(car.angle);
+  car.angle += steer * (handbrake ? 3.4 : 2.6) * dt * clamp(fwd0 / 160, -1, 1);
+
+  const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
+  let fwd = car.vx * fx + car.vy * fy;
+  let lat = -car.vx * fy + car.vy * fx;
+
   if (up) fwd += 420 * dt;
   if (down) fwd -= (fwd > 20 ? 700 : 300) * dt;
   if (handbrake) fwd *= Math.exp(-1.5 * dt);
   fwd *= Math.exp(-(sandy ? 0.9 : 0.4) * dt);          // homokban lassabb
   if (!up && !down && Math.abs(fwd) < 5) fwd = 0;
   fwd = clamp(fwd, -180, sandy ? 380 : 620);
+  lat *= Math.exp(-(handbrake ? 1.2 : 12) * dt);         // kézifékkel alig tapad → driftel
 
-  car.angle += steer * 2.6 * dt * clamp(fwd / 160, -1, 1);
-  lat *= Math.exp(-(handbrake ? 1.2 : 7) * dt);          // kézifékkel driftel
-
-  const nx = Math.cos(car.angle), ny = Math.sin(car.angle);
-  car.vx = fwd * nx - lat * ny;
-  car.vy = fwd * ny + lat * nx;
+  car.vx = fwd * fx - lat * fy;
+  car.vy = fwd * fy + lat * fx;
   car.x += car.vx * dt;
   car.y += car.vy * dt;
   collide(car, true);
   if (player.inCar) { player.x = car.x; player.y = car.y; }
+
+  // csúszás: féknyom és füst a hátsó kerekeknél
+  const speed = Math.hypot(car.vx, car.vy);
+  car.skid = speed > 90 && (Math.abs(lat) > (handbrake ? 40 : 250) || (handbrake && Math.abs(fwd) > 200));
+  const wheels = [-1, 1].map(side => {
+    const lx = -car.len / 3, ly = side * (car.wid / 2 - 3);
+    return { x: car.x + fx * lx - fy * ly, y: car.y + fy * lx + fx * ly };
+  });
+  if (car.skid) {
+    if (lastWheels) {
+      for (let i = 0; i < 2; i++) {
+        skidMarks.push({ x1: lastWheels[i].x, y1: lastWheels[i].y, x2: wheels[i].x, y2: wheels[i].y });
+      }
+      if (skidMarks.length > MAX_SKID) skidMarks.splice(0, skidMarks.length - MAX_SKID);
+    }
+    for (const w of wheels) {
+      if (rand() < 0.6) smoke.push({
+        x: w.x, y: w.y,
+        vx: -car.vx * 0.1 + (rand() - 0.5) * 40, vy: -car.vy * 0.1 + (rand() - 0.5) * 40,
+        r: 6 + rand() * 6, life: 0, max: 1 + rand() * 0.8,
+      });
+    }
+    if (smoke.length > MAX_SMOKE) smoke.splice(0, smoke.length - MAX_SMOKE);
+  }
+  lastWheels = car.skid ? wheels : null;
+}
+
+function updateSmoke(dt) {
+  for (let i = smoke.length - 1; i >= 0; i--) {
+    const p = smoke[i];
+    p.life += dt;
+    if (p.life >= p.max) { smoke.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= Math.exp(-2 * dt); p.vy *= Math.exp(-2 * dt);
+    p.r += 22 * dt;                                    // tágul
+  }
 }
 
 // Éjszaka mértéke: 0 = nappal, 1 = teljes éjszaka
@@ -246,6 +288,26 @@ function drawRoads(view) {
     if (Math.abs(i - c) > ROAD_W) ctx.fillRect(i, c - 2, 40, 4);
   for (let i = Math.floor(view.y0 / 80) * 80; i < view.y1; i += 80)
     if (Math.abs(i - c) > ROAD_W) ctx.fillRect(c - 2, i, 4, 40);
+}
+
+function drawSkidMarks(view) {
+  ctx.strokeStyle = 'rgba(25,20,15,0.35)';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (const m of skidMarks) {
+    if (m.x2 < view.x0 || m.x2 > view.x1 || m.y2 < view.y0 || m.y2 > view.y1) continue;
+    ctx.moveTo(m.x1, m.y1); ctx.lineTo(m.x2, m.y2);
+  }
+  ctx.stroke();
+}
+
+function drawSmoke() {
+  for (const p of smoke) {
+    const a = 0.45 * (1 - p.life / p.max);
+    ctx.fillStyle = `rgba(225,222,215,${a})`;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
+  }
 }
 
 function drawCar(n) {
@@ -389,6 +451,7 @@ function render() {
     ctx.beginPath(); ctx.ellipse(d.x, d.y, d.rx, d.ry, d.rot, 0, Math.PI * 2); ctx.fill();
   }
   drawRoads(view);
+  drawSkidMarks(view);
   for (const o of obstacles) {
     if (!inView(o)) continue;
     if (o.type === 'cactus') drawCactus(o);
@@ -396,6 +459,7 @@ function render() {
   }
   drawPlayer();
   drawCar(n);
+  drawSmoke();
   for (const l of lamps) if (inView(l)) drawLamp(l, n);
   ctx.restore();
 
@@ -412,6 +476,7 @@ function frame(now) {
   time = (time + dt * timeScale) % CYCLE;
   if (!player.inCar) updatePlayer(dt);
   updateCar(dt);
+  updateSmoke(dt);
   render();
   requestAnimationFrame(frame);
 }
