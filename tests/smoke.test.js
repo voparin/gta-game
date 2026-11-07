@@ -17,6 +17,15 @@ const mkCanvas = () => ({ width: 0, height: 0, getContext: () => ctxStub });
 const listeners = {};
 let rafCb = null, now = 0;
 global.window = { innerWidth: 1280, innerHeight: 720, addEventListener: (e, f) => (listeners[e] = f) };
+// kamu hangrendszer: megszámolja, hány hangot ütemez a rádió
+const audio = { tones: 0, ctx: null, gains: [] };
+const param = () => ({ value: 0, setValueAtTime(v) { this.value = v; }, exponentialRampToValueAtTime() {} });
+global.window.AudioContext = class {
+  constructor() { this.currentTime = 0; this.state = 'running'; this.destination = {}; audio.ctx = this; }
+  createGain() { const g = { gain: param(), connect() {}, disconnect() { this.off = true; } }; audio.gains.push(g); return g; }
+  createOscillator() { audio.tones++; return { type: '', frequency: param(), connect() {}, start() {}, stop() {} }; }
+  resume() {}
+};
 global.document = { getElementById: mkCanvas, createElement: mkCanvas };
 global.performance = { now: () => now };
 global.requestAnimationFrame = f => (rafCb = f);
@@ -32,7 +41,7 @@ eval(src + `
   set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, stationCache, STATION_CACHE_MAX, raiseWanted,
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
-  get activeSkin(){return activeSkin}, buySkin, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
+  get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
@@ -968,6 +977,60 @@ G.npcs.length = 0; G.aiCars.length = 0;
   G.selectCar(0); G.selectCar(ni);
   check('autóváltással nem lehet újratölteni a nitrót', G.car.nitro === 0);
   G.selectCar(0); G.progress.owned = owned0;
+}
+
+// --- rádió minden házban ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null;
+  const many = G.housesIn(G.C - 20000, G.C - 20000, G.C + 20000, G.C + 20000);
+  check('minden házban van rádió', many.length > 100 && many.every(h => G.furnitureOf(h).some(f => f.k === 'radio')));
+  const a = G.makeSong(123), b = G.makeSong(123), c = G.makeSong(456);
+  check('ugyanabból a seedből ugyanaz a szám, másikból más', JSON.stringify(a) === JSON.stringify(b) && JSON.stringify(a) !== JSON.stringify(c));
+  const songs = [...Array(30)].map((_, i) => G.makeSong(i * 7919 + 1));
+  check('a számok véletlenszerűek: különböző címek, tempók, hangnemek', new Set(songs.map(x => x.name)).size > 15
+    && new Set(songs.map(x => x.bpm)).size > 10 && new Set(songs.map(x => x.scaleName)).size === 4);
+  check('a dallam hangjai a szám skálájában vannak, a tempó 90–150 BPM', songs.every(x => x.bpm >= 90 && x.bpm < 150
+    && x.melody.every(m => m === null || G.SCALES[x.scaleName].includes(((m - x.root) % 12 + 12) % 12))));
+  press('KeyR');
+  check('házon kívül nem szól a rádió', !G.radio.playing);
+  const hsR = G.housesIn(G.C + 46000, G.C - 400, G.C + 48000, G.C)[0];
+  Object.assign(G.player, { inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0 });
+  Object.assign(G.player, G.doorOf(hsR));
+  press('KeyE');
+  check('a házba lépve szól egy véletlen szám', G.player.inHouse && G.radio.playing && !!G.radio.song && G.radio.song.name.split(' ').length === 3);
+  // 3 mp alatt a leglassabb tempónál (90 BPM, nyolcadok) is ≥ 9 lépés jön, 4 lépésenként legalább 3 dobütéssel
+  const t0 = audio.tones;
+  for (let i = 0; i < 180; i++) { audio.ctx.currentTime += 1 / 60; step(1); }
+  check('a rádió hangokat játszik', audio.tones >= t0 + 6);
+  const song1 = G.radio.song;
+  press('KeyR');
+  check('R: következő (másik) szám', G.radio.playing && G.radio.song !== song1 && G.radio.song.seed !== song1.seed);
+  press('KeyM');
+  const t1 = audio.tones;
+  for (let i = 0; i < 60; i++) { audio.ctx.currentTime += 1 / 60; step(1); }
+  check('M: kikapcsolja a rádiót, nem szól tovább', !G.radio.playing && audio.tones === t1);
+  press('KeyM');
+  check('M újra: bekapcsolja', G.radio.playing);
+  // kódátnézés után: leállításkor az előző szám már beütemezett hangjai is elnémulnak, R-nél nem szól két szám egyszerre
+  const g1 = G.radio.songOut;
+  press('KeyR');
+  check('R-nél az előző szám azonnal elhallgat (nem szól egymásra két szám)', g1.gain.value === 0 && g1.off && G.radio.songOut !== g1 && G.radio.songOut.gain.value === 1);
+  // háttérben töltött idő után nem pótolja be egyszerre a kimaradt hangokat
+  audio.ctx.currentTime += 600;
+  const t3 = audio.tones; step(1);
+  check('hosszú szünet után nincs hangrobbanás', audio.tones - t3 < 10);
+  // szünetben (Esc menü) nem ütemez új hangot
+  press('Escape');
+  const t4 = audio.tones;
+  for (let i = 0; i < 120; i++) { audio.ctx.currentTime += 1 / 60; step(1); }
+  check('Esc menüben (szünetben) nem szól tovább a rádió', audio.tones === t4);
+  press('Escape');
+  G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30;
+  press('KeyE');
+  const t2 = audio.tones;
+  for (let i = 0; i < 60; i++) { audio.ctx.currentTime += 1 / 60; step(1); }
+  check('kilépéskor elhallgat a rádió', !G.player.inHouse && !G.radio.playing && audio.tones === t2);
+  check('kilépéskor a már beütemezett hangok is elnémulnak', audio.gains.filter(g => g.off).every(g => g.gain.value === 0) && G.radio.songOut === null);
 }
 
 // --- Pókhős szkin ($900) ---

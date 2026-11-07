@@ -62,6 +62,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 ## Házak
 - A ház ajtajánál **E**: bemész. Bent nem talál meg a rendőrség (12 mp után leráztad őket), és gyorsabban gyógyulsz. Kimenni az ajtónál **E**-vel lehet.
 - Vigyázz: ha a tornádó elviszi a házat, téged is elvisz.
+- Minden házban van **rádió**: bemenéskor egy véletlen, a játék által generált szám szól. **R**: következő szám, **M**: rádió ki/be.
 
 ## Szkinek
 - Az Esc menüben választhatsz szkint. A **Pókhős** (piros-kék, hálómintás) **$900**-ba kerül; a többi ingyenes.

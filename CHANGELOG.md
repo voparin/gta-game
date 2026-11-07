@@ -5,6 +5,10 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.14.0 – 2026-11-07
+- Rádió minden házban: bemenéskor egy véletlen, menet közben generált szám szól (saját címmel); R: következő szám, M: ki/be; kilépéskor elhallgat (ADR-0026)
+- Kódátnézés után javítva (kiadás előtt): háttérből visszatérve hangrobbanás; kikapcsolás után még szóló hangok, R-nél két szám egymásra; a rádió szünetben is szólt
+
 ## 0.13.0 – 2026-11-07
 - Új autó: Nitró Villám ($2500) – 140 km/h, nitróval (Shift / N) 200 km/h; a nitró kb. 4 mp-ig tart, használat nélkül visszatöltődik
 - A végsebesség fölötti autó (pl. nitró után, homokba érve) fokozatosan lassul vissza, nem hirtelen

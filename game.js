@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.13.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.14.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -43,6 +43,8 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyE') toggleCar();
   if (e.code === 'KeyT') timeScale = timeScale === 1 ? 60 : 1;
   if (e.code === 'KeyH') toggleStorm();
+  if (e.code === 'KeyR' && player.inHouse) startRadio();                            // következő szám
+  if (e.code === 'KeyM' && player.inHouse) { if (radio.playing) stopRadio(); else startRadio(); }
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; });
@@ -347,24 +349,109 @@ function furnitureOf(hs) {
   const items = alt ? [
     { k: 'bed', x: 24, y: 24, w: 130, h: 86 }, { k: 'wardrobe', x: 170, y: 20, w: 120, h: 36 },
     { k: 'table', x: 330, y: 150, w: 110, h: 70 }, { k: 'kitchen', x: ROOM_W - 44, y: 40, w: 24, h: 200 },
-    { k: 'plant', x: 30, y: ROOM_H - 70, w: 34, h: 34 },
+    { k: 'plant', x: 30, y: ROOM_H - 70, w: 34, h: 34 }, { k: 'radio', x: 300, y: 22, w: 38, h: 22 },
   ] : [
     { k: 'sofa', x: 30, y: 150, w: 54, h: 140 }, { k: 'tv', x: 220, y: 20, w: 110, h: 16 },
     { k: 'table', x: 220, y: 140, w: 120, h: 70 }, { k: 'bed', x: ROOM_W - 160, y: 24, w: 136, h: 90 },
     { k: 'kitchen', x: ROOM_W - 44, y: 160, w: 24, h: 130 }, { k: 'plant', x: ROOM_W - 70, y: ROOM_H - 70, w: 34, h: 34 },
+    { k: 'radio', x: 110, y: 22, w: 38, h: 22 },
   ];
   return items.map(o => ({ ...o, x: mirror ? ROOM_W - o.x - o.w : o.x }));
 }
+// ===== Rádió (ADR-0026): Web Audio-val, menet közben generált véletlen számok – nincs hangfájl =====
+const radio = { playing: false, song: null, step: 0, nextTime: 0, ac: null, out: null, songOut: null };   // songOut: az aktuális szám saját hangereje
+const SONG_STEPS = 32;
+const SCALES = { 'dúr': [0, 2, 4, 5, 7, 9, 11], 'moll': [0, 2, 3, 5, 7, 8, 10], 'pentaton': [0, 2, 4, 7, 9], 'blues': [0, 3, 5, 6, 7, 10] };
+const SONG_WORDS = [['Sivatagi', 'Éjféli', 'Poros', 'Forró', 'Kék', 'Homokos', 'Magányos', 'Száguldó', 'Zöld', 'Narancs'],
+  ['Kaktusz', 'Országút', 'Tornádó', 'Busz', 'Naplemente', 'Benzinkút', 'Délibáb', 'Sas', 'Csillag', 'Homokvihar'],
+  ['Blues', 'Boogie', 'Ballada', 'Disco', 'Rock', 'Swing', 'Techno']];
+
+// egy szám a seedből: hangnem, skála, tempó, hangszín, 32 lépéses dallam (szünetekkel) és basszus
+function makeSong(seed) {
+  const r = rng(seed), pick = a => a[(r() * a.length) | 0];
+  const scaleName = pick(Object.keys(SCALES)), scale = SCALES[scaleName];
+  const root = 48 + ((r() * 12) | 0), bpm = 90 + ((r() * 60) | 0), wave = pick(['square', 'triangle', 'sawtooth', 'sine']);
+  const melody = [];
+  let idx = (r() * scale.length) | 0;
+  for (let i = 0; i < SONG_STEPS; i++) {
+    idx = clamp(idx + Math.round((r() - 0.5) * 4), 0, scale.length * 2 - 1);      // véletlen séta a skálán (két oktáv)
+    melody.push(r() < 0.2 ? null : root + 12 + scale[idx % scale.length] + 12 * Math.floor(idx / scale.length));
+  }
+  const bass = [0, 1, 2, 3].map(() => root - 12 + pick([0, scale[2 % scale.length], 7, scale[scale.length - 2]]));
+  return { seed, name: `${pick(SONG_WORDS[0])} ${pick(SONG_WORDS[1])} ${pick(SONG_WORDS[2])}`, scaleName, root, bpm, wave, melody, bass };
+}
+
+function audioOut() {
+  if (!radio.ac) {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) { radio.ac = new AC(); radio.out = radio.ac.createGain(); radio.out.gain.value = 0.12; radio.out.connect(radio.ac.destination); }
+    } catch (e) { radio.ac = null; }                       // nincs hang (pl. teszt) – a rádió állapota attól még működik
+  }
+  return radio.ac;
+}
+
+function startRadio(seed = (Math.random() * 1e9) | 0) {
+  stopRadio();                                         // az előző szám már beütemezett hangjai se szóljanak bele
+  radio.song = makeSong(seed); radio.step = 0; radio.playing = true;
+  const ac = audioOut();
+  if (ac) {
+    if (ac.state === 'suspended') ac.resume();
+    radio.songOut = ac.createGain(); radio.songOut.gain.setValueAtTime(1, ac.currentTime); radio.songOut.connect(radio.out);
+    radio.nextTime = ac.currentTime + 0.05;
+  }
+  popup(`📻 Most szól: ${radio.song.name}`, '#ffd23a');
+}
+
+// leállítás: a szám saját hangerejét azonnal nullára veszi, így a már beütemezett hangok (pl. hosszú basszus) is elhallgatnak
+function stopRadio() {
+  radio.playing = false;
+  if (radio.songOut && radio.ac) { radio.songOut.gain.setValueAtTime(0, radio.ac.currentTime); radio.songOut.disconnect(); }
+  radio.songOut = null;
+}
+
+const midiHz = m => 440 * Math.pow(2, (m - 69) / 12);
+function playTone(freq, t, dur, type, vol) {
+  const ac = radio.ac, o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(radio.songOut); o.start(t); o.stop(t + dur + 0.02);
+}
+function playDrum(t, kick) {
+  const ac = radio.ac, o = ac.createOscillator(), g = ac.createGain();
+  o.type = kick ? 'sine' : 'square';
+  o.frequency.setValueAtTime(kick ? 140 : 6000, t); o.frequency.exponentialRampToValueAtTime(kick ? 40 : 3000, t + (kick ? 0.15 : 0.04));
+  g.gain.setValueAtTime(kick ? 0.9 : 0.08, t); g.gain.exponentialRampToValueAtTime(0.001, t + (kick ? 0.18 : 0.05));
+  o.connect(g); g.connect(radio.songOut); o.start(t); o.stop(t + 0.2);
+}
+
+// előre ütemezi a következő ~0,25 mp hangjait (nyolcadonként egy lépés)
+function updateRadio() {
+  const ac = radio.ac;
+  if (!radio.playing || !ac || !radio.songOut) return;
+  const S = radio.song, stepLen = 60 / S.bpm / 2;
+  if (radio.nextTime < ac.currentTime) radio.nextTime = ac.currentTime + 0.05;   // háttérben töltött idő után ne pótolja be a kimaradt hangokat
+  while (radio.nextTime < ac.currentTime + 0.25) {
+    const t = radio.nextTime, i = radio.step;
+    if (S.melody[i] !== null) playTone(midiHz(S.melody[i]), t, stepLen * 0.9, S.wave, 0.35);
+    if (i % 8 === 0) playTone(midiHz(S.bass[(i / 8) | 0]), t, stepLen * 7.5, 'triangle', 0.5);
+    if (i % 4 === 0) playDrum(t, true); else if (i % 2 === 1) playDrum(t, false);
+    radio.nextTime += stepLen; radio.step = (i + 1) % SONG_STEPS;
+  }
+}
+
 function enterHouse(hs) {
   player.inHouse = { hs, ix: ROOM_W / 2, iy: ROOM_H - 50, furniture: furnitureOf(hs) };
   Object.assign(player, doorOf(hs));
   popup('🏠 Bementél a házba – itt nem talál meg a rendőrség', '#7df');
+  startRadio();
 }
 function exitHouse() {
   Object.assign(player, doorOf(player.inHouse.hs));
   const hs = player.inHouse.hs;
   player.angle = hs.axis === 'h' ? Math.atan2(hs.road - player.y, 0) : Math.atan2(0, hs.road - player.x);   // az út felé
   player.inHouse = null;
+  stopRadio();
 }
 const atInnerDoor = () => player.inHouse && player.inHouse.iy > ROOM_H - ROOM_WALL - 40 && Math.abs(player.inHouse.ix - ROOM_W / 2) < 45;
 
@@ -389,7 +476,7 @@ function updateInterior(dt) {
 const destroyedHouses = new Map();   // id → ház (a romok rajzolásához)
 function destroyHouse(hs) {
   destroyedHouses.set(hs.id, hs);
-  if (player.inHouse && player.inHouse.hs.id === hs.id) { player.inHouse = null; tornadoKillsPlayer(); }   // a házzal együtt elvisz
+  if (player.inHouse && player.inHouse.hs.id === hs.id) { player.inHouse = null; stopRadio(); tornadoKillsPlayer(); }   // a házzal együtt elvisz
   const ch = chunkCache.get(Math.floor(hs.x / CHUNK) + ',' + Math.floor(hs.y / CHUNK));   // a már legenerált chunkból is kivesszük
   if (ch) ch.obstacles = ch.obstacles.filter(o => !(o.type === 'house' && o.x === hs.x && o.y === hs.y));
 }
@@ -1143,6 +1230,7 @@ function damagePlayer(n) {
 
 function respawn() {
   Object.assign(player, { x: START_X, y: START_Y, angle: 0, inCar: false, riding: null, inHouse: null, health: 100, dead: 0, arrested: 0 });
+  stopRadio();
   clearWanted();
   for (let i = aiCars.length - 1; i >= 0; i--) if (aiCars[i].police) aiCars.splice(i, 1);
   Object.assign(car, { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, spin: 0, lastWheels: null, fuel: Math.max(car.fuel, 40) });
@@ -1985,6 +2073,16 @@ function drawInterior(w, h) {
     if (f.k === 'bed') { ctx.fillStyle = '#fff'; ctx.fillRect(f.x + 6, f.y + 6, f.w * 0.25, f.h - 12); ctx.fillStyle = '#4a7ab0'; ctx.fillRect(f.x + f.w * 0.35, f.y + 4, f.w * 0.6, f.h - 8); }
     if (f.k === 'kitchen') { ctx.fillStyle = '#8a9096'; ctx.fillRect(f.x + 4, f.y + 20, f.w - 8, 26); }
     if (f.k === 'tv') { ctx.fillStyle = '#2a5a8a'; ctx.fillRect(f.x + 4, f.y + 3, f.w - 8, f.h - 6); }
+    if (f.k === 'radio') {                                                              // rádió: hangszóró, antenna
+      ctx.fillStyle = '#3a2a1a'; ctx.fillRect(f.x, f.y, f.w, f.h);
+      ctx.fillStyle = '#c9a45a'; ctx.beginPath(); ctx.arc(f.x + 10, f.y + f.h / 2, 6, 0, Math.PI * 2); ctx.arc(f.x + f.w - 10, f.y + f.h / 2, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#999'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(f.x + f.w - 4, f.y); ctx.lineTo(f.x + f.w + 8, f.y - 14); ctx.stroke();
+      if (radio.playing) {
+        ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+        for (let k = 0; k < 3; k++) { const t = (clock * 0.8 + k / 3) % 1; ctx.globalAlpha = 1 - t; ctx.fillText(k % 2 ? '♫' : '♪', f.x + f.w / 2 + Math.sin(t * 6 + k) * 10, f.y + f.h + 14 + t * 40); }
+        ctx.globalAlpha = 1; ctx.textAlign = 'left';
+      }
+    }
     if (f.k === 'plant') { ctx.fillStyle = '#5ab05a'; ctx.beginPath(); ctx.arc(f.x + f.w / 2, f.y + f.h / 2, f.w / 2, 0, Math.PI * 2); ctx.fill(); }
   }
   ctx.strokeStyle = '#e8dcc6'; ctx.lineWidth = ROOM_WALL; ctx.strokeRect(ROOM_WALL / 2, ROOM_WALL / 2, ROOM_W - ROOM_WALL, ROOM_H - ROOM_WALL);   // falak
@@ -1994,6 +2092,9 @@ function drawInterior(w, h) {
   ctx.restore();
   ctx.fillStyle = '#7df'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
   ctx.fillText('🏠 Bent vagy a házban – itt nem talál meg a rendőrség, és gyorsabban gyógyulsz', w / 2, oy - 14);
+  ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 16px sans-serif';
+  ctx.fillText(radio.playing && radio.song ? `📻 Most szól: ${radio.song.name} (${radio.song.scaleName}, ${radio.song.bpm} BPM) · R: következő szám · M: rádió ki`
+    : '📻 A rádió ki van kapcsolva · M: bekapcsolás', w / 2, Math.min(h - 62, oy + ROOM_H * L.sc + 22));
   ctx.textAlign = 'left';
 }
 
@@ -2620,7 +2721,8 @@ function frame(now) {
     time = (time + dt * timeScale) % CYCLE;
     clock += dt;
     update(dt);
-  }
+    updateRadio();                  // szünetben (menü, adományozás) nem ütemez új hangot
+  } else if (radio.playing && radio.ac) radio.nextTime = radio.ac.currentTime + 0.05;
   render();
   requestAnimationFrame(frame);
 }
