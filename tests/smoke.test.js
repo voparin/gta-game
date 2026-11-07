@@ -42,7 +42,7 @@ eval(src + `
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
-  shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
+  school, makeQuestion, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
 const key = (code, down) => listeners[down ? 'keydown' : 'keyup']({ code, repeat: false });
@@ -944,7 +944,7 @@ G.npcs.length = 0; G.aiCars.length = 0;
 // --- kódátnézés (v0.13.0): a mentés sorszám szerint tárol ---
 {
   const carOrder = ['Piros sportkocsi', 'Fekete terepjáró', 'Sárga taxi', 'Kék rakétaautó', 'Zöld pickup', 'Zöld busz', 'Nitró Villám'];
-  const skinOrder = ['Klasszikus', 'Cowboy', 'Sivatagi katona', 'Rózsaszín párduc', 'Ninja', 'Turista', 'Pókhős'];
+  const skinOrder = ['Klasszikus', 'Cowboy', 'Sivatagi katona', 'Rózsaszín párduc', 'Ninja', 'Turista', 'Pókhős', 'Peppa malac'];
   check('a meglévő autók sorrendje nem változott (új autó csak a végére kerülhet)', carOrder.every((n, i) => G.CAR_MODELS[i] && G.CAR_MODELS[i].name === n));
   check('a meglévő szkinek sorrendje nem változott (új szkin csak a végére kerülhet)', skinOrder.every((n, i) => G.SKINS[i] && G.SKINS[i].name === n));
   const old = G.sanitizeProgress({ money: 0, owned: [0, 5], activeCar: 5 });   // egy v0.12-es mentés, a busszal
@@ -1086,6 +1086,12 @@ G.npcs.length = 0; G.aiCars.length = 0;
   key('KeyW', true); step(20); key('KeyW', false);
   check('józanon (lassan) nem üldöz', G.wanted.level === 0);
   Object.assign(G.player, { drunk: 0, inCar: false }); G.clearWanted(); step(60);
+}
+
+// --- Peppa malac szkin (ingyenes) ---
+{
+  const pi = G.SKINS.findIndex(k => k.name === 'Peppa malac');
+  check('van Peppa malac szkin: rózsaszín, piros ruhás, malac-fejjel, ingyenes', pi >= 0 && G.SKINS[pi].pattern === 'pig' && G.SKINS[pi].shirt === '#e8383d' && !G.SKINS[pi].price && G.ownsSkin(pi));
 }
 
 // --- Pókhős szkin ($900) ---
@@ -1462,8 +1468,14 @@ G.npcs.length = 0; G.aiCars.length = 0;
   check('a térképen kívül kattintva nem lesz jelölés', G.progress.pins.length === 0);
   for (let i = 0; i < G.PIN_MAX + 3; i++) listeners.mousedown({ button: 0, clientX: L.x0 + 30 + i * 30, clientY: L.y0 + 40 });
   check(`legfeljebb ${G.PIN_MAX} jelölés lehet`, G.progress.pins.length === G.PIN_MAX);
-  check('a taxi-listában csak a 3 legközelebbi jelölés van (nem lóg ki a képernyőről)', G.taxiDestinations().filter(d => d.label.includes('jelölt pont')).length === 3
-    && G.taxiDestinations().length <= 10);
+  check('a taxi-listában csak a 3 legközelebbi jelölés van', G.taxiDestinations().filter(d => d.label.includes('jelölt pont')).length === 3);
+  {   // a taxi menü minden célja kifér egy 600 px magas képernyőre is
+    const ih = global.window.innerHeight; global.window.innerHeight = 600; listeners.resize && listeners.resize();
+    Object.assign(G.taxiMenu, { open: true, items: G.taxiDestinations(), sel: 0 }); step(1);
+    const hs = G.taxiMenu.hits, last = hs[hs.length - 1];
+    check('a taxi menü sok célnál is kifér a képernyőre (600 px)', hs.length === G.taxiMenu.items.length && hs[0].y >= 0 && last.y + last.h <= 600);
+    G.taxiMenu.open = false; global.window.innerHeight = ih; listeners.resize && listeners.resize(); step(1);
+  }
   G.progress.pins.push({ x: G.player.x + 1e6, y: G.player.y });   // a térképen kívül (pl. egy taxiút után)
   G.progress.pins.splice(0, 1);
   press('Delete');
@@ -1558,6 +1570,60 @@ G.npcs.length = 0; G.aiCars.length = 0;
   check('a taxi a legközelebbi boltba is elvisz', G.taxiDestinations().some(d => d.label.includes('bolt')));
   G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
   G.player.health = 100;
+}
+
+// --- iskola: a táblánál E – matekóra ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null;
+  const all = G.housesIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000);
+  const schools = all.filter(h => h.school);
+  check('vannak iskolák, ritkán', schools.length > 3 && schools.length < all.length * 0.1);
+  check('egy ház csak egyféle lehet (kocsma / bank / gyár / bolt / iskola)', all.every(h => [h.pub, h.bank, h.factory, h.shop, h.school].filter(Boolean).length <= 1));
+  // tiszta függvény: minden feladatnak 3 különböző válasza van, köztük pontosan egy helyes, és a helyes valóban jó
+  let seed = 1; const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const qs = Array.from({ length: 300 }, () => G.makeQuestion(r));
+  const solve = t => { const [a, op, b] = t.replace(' = ?', '').split(' '); return op === '+' ? +a + +b : op === '−' ? a - b : a * b; };
+  check('a feladatok helyes válasza tényleg helyes', qs.every(q => solve(q.text) === q.ans));
+  check('minden feladatnak 3 különböző, nemnegatív válasza van, köztük a helyes', qs.every(q => q.opts.length === 3 && new Set(q.opts).size === 3 && q.opts.includes(q.ans) && q.opts.every(o => o >= 0)));
+  check('állandó véletlennel is érvényes a feladat (pl. 0 eredmény)', [0, 0.5, 0.999].every(v => { const q = G.makeQuestion(() => v); return q.opts.length === 3 && new Set(q.opts).size === 3 && q.opts.includes(q.ans) && q.ans >= 0; }));
+  check('a helyes válasz nem mindig ugyanott van', new Set(qs.map(q => q.opts.indexOf(q.ans))).size === 3);
+  const sc = schools[0];
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  Object.assign(G.player, { inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0, drunk: 0, passedOut: 0, health: 100 });
+  G.progress.money = 0; G.progress.debt = 0;
+  Object.assign(G.player, G.doorOf(sc)); press('KeyE');
+  check('az iskolába be lehet menni, van tábla és padok', G.player.inHouse && G.player.inHouse.hs.school && G.player.inHouse.furniture.some(f => f.k === 'board') && G.player.inHouse.furniture.filter(f => f.k === 'desk').length === 8);
+  for (let i = 0; i < 30; i++) { key('KeyW', true); step(10); key('KeyW', false); if (G.atBlackboard()) break; }
+  check('a táblához oda lehet sétálni (a padok nem zárják el)', G.atBlackboard());
+  check('a táblánál kiírja az órát', /matekóra/.test(G.interactionPrompt().text));
+  press('KeyE');
+  check('E-re kezdődik az óra', G.school.open && G.school.n === 0 && !!G.school.q);
+  const clk = G.clock; step(30);
+  check('óra közben áll a játék', G.clock === clk);
+  const right = () => G.school.q.opts.indexOf(G.school.q.ans), wrong = () => [0, 1, 2].find(i => i !== right());
+  press('Digit' + (right() + 1));
+  check(`jó válaszért $${G.ANSWER_PAY} jár`, G.progress.money === G.ANSWER_PAY && G.school.n === 1);
+  press('Digit' + (wrong() + 1));
+  check('rossz válaszért nem jár pénz, de jön a következő feladat', G.progress.money === G.ANSWER_PAY && G.school.n === 2 && G.school.feedback && !G.school.feedback.ok);
+  press('Digit' + (right() + 1)); press('Digit' + (right() + 1));
+  step(1);
+  listeners.mousedown({ button: 0, clientX: G.school.hits[right()].x + 5, clientY: G.school.hits[right()].y + 5 });
+  check('kattintással is lehet válaszolni; 5 feladat után vége az órának', !G.school.open && G.progress.money === 4 * G.ANSWER_PAY);
+  press('KeyE');
+  check('óra után szünet van: nem kezdhető rögtön új óra', !G.school.open && /Szünet/.test(G.interactionPrompt().text));
+  G.school.nextAt = 0;                                  // a szünet letelt
+  press('KeyE');
+  for (let i = 0; i < G.LESSON_LEN; i++) press('Digit' + (right() + 1));
+  check(`hibátlan óráért +$${G.LESSON_BONUS} bónusz`, !G.school.open && G.progress.money === 4 * G.ANSWER_PAY + G.LESSON_LEN * G.ANSWER_PAY + G.LESSON_BONUS);
+  G.school.nextAt = 0; press('KeyE'); press('Escape');
+  check('Esc: az óra abbahagyható', !G.school.open);
+  press('KeyE');
+  check('abbahagyás után is szünet jön (nem lehet újrakezdéssel pénzt gyűjteni)', !G.school.open);
+  check('a térképen az iskolák is látszanak', G.poisIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000).some(p => p.type === 'school'));
+  check('a taxi a legközelebbi iskolába is elvisz', G.taxiDestinations().some(d => d.label.includes('iskola')));
+  G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
+  check('az iskolából ki lehet jönni', !G.player.inHouse);
+  G.progress.money = 0;
 }
 
 // --- telepítés: a böngésző ne a régi, tárolt game.js-t futtassa ---

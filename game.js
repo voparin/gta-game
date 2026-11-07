@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.21.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.22.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -41,6 +41,7 @@ window.addEventListener('keydown', e => {
   if (donate.open) { if (!e.repeat) donateKey(e.code); return; }
   if (bank.open) { if (!e.repeat) bankKey(e.code); return; }
   if (shop.open) { if (!e.repeat) shopKey(e.code); return; }
+  if (school.open) { if (!e.repeat) schoolKey(e.code); return; }
   if (taxiMenu.open) { if (!e.repeat) taxiMenuKey(e.code); return; }
   if (mapView.open) { if (!e.repeat) mapKey(e.code); return; }
   if (e.code === 'Escape') { if (!e.repeat) toggleMenu(); return; }
@@ -67,6 +68,7 @@ window.addEventListener('mousedown', e => {
   if (donate.open) { if (e.button === 0) donateClick(e.clientX, e.clientY); return; }
   if (bank.open) { if (e.button === 0) bankClick(e.clientX, e.clientY); return; }
   if (shop.open) { if (e.button === 0) shopClick(e.clientX, e.clientY); return; }
+  if (school.open) { if (e.button === 0) schoolClick(e.clientX, e.clientY); return; }
   if (taxiMenu.open) { if (e.button === 0) taxiMenuClick(e.clientX, e.clientY); return; }
   if (mapView.open) { if (e.button === 0) mapClick(e.clientX, e.clientY); return; }
   if (menu.open) { if (e.button === 0) menuClick(e.clientX, e.clientY); return; }
@@ -317,11 +319,12 @@ function housesIn(xa, ya, xb, yb) {
         const p = toXY(a - w / 2, d0), q = toXY(a + w / 2, d0 + d), c = toXY(a, d0 + d / 2);
         out.push({ id: `${axis}:${R}:${a}:${side}`, axis, side, road: R, along: a, w, d, x: c.x, y: c.y,
           x0: Math.min(p.x, q.x), y0: Math.min(p.y, q.y), x1: Math.max(p.x, q.x), y1: Math.max(p.y, q.y),
-          roof: ROOF_COLORS[(h() * ROOF_COLORS.length) | 0], chimney: h(), pub: h() < 0.12, bankRoll: h(), factoryRoll: h(), shopRoll: h() });
+          roof: ROOF_COLORS[(h() * ROOF_COLORS.length) | 0], chimney: h(), pub: h() < 0.12, bankRoll: h(), factoryRoll: h(), shopRoll: h(), schoolRoll: h() });
         const hs = out[out.length - 1];
         hs.bank = !hs.pub && hs.bankRoll < 0.06;                                 // ~6% bank
         hs.factory = !hs.pub && !hs.bank && hs.factoryRoll < 0.06;               // ~6% gyár
         hs.shop = !hs.pub && !hs.bank && !hs.factory && hs.shopRoll < 0.08;      // ~8% bolt
+        hs.school = !hs.pub && !hs.bank && !hs.factory && !hs.shop && hs.schoolRoll < 0.05;   // ~5% iskola
       }
     }
   };
@@ -347,6 +350,7 @@ function furnitureOf(hs) {
   if (hs.bank) return BANK_FURNITURE;
   if (hs.factory) return FACTORY_FURNITURE;
   if (hs.shop) return SHOP_FURNITURE;
+  if (hs.school) return SCHOOL_FURNITURE;
   const r = rng(chunkSeed(Math.round(hs.x), Math.round(hs.y)));
   const mirror = r() < 0.5, alt = r() < 0.5;
   const items = alt ? [
@@ -446,6 +450,57 @@ function updateRadio() {
 // ===== Kocsma: pult, székek, asztalok; a pultnál 1: sör, 2: bor =====
 const BEER_PRICE = 2, WINE_PRICE = 3;
 const DRINKS = { beer: { name: 'sör', price: BEER_PRICE, drunk: 15 }, wine: { name: 'bor', price: WINE_PRICE, drunk: 22 } };
+// ===== Iskola: a táblánál E – matekóra, 5 feladat, jó válaszonként pénz, hibátlan óráért bónusz =====
+const SCHOOL_FURNITURE = [
+  { k: 'board', x: 140, y: 16, w: 280, h: 18 }, { k: 'tdesk', x: 240, y: 56, w: 80, h: 34 },
+  ...[70, 160, 350, 440].flatMap(x => [160, 230].map(y => ({ k: 'desk', x, y, w: 50, h: 30 }))),
+  { k: 'plant', x: 30, y: 30, w: 34, h: 34 }, { k: 'radio', x: ROOM_W - 70, y: 22, w: 38, h: 22 },
+];
+const LESSON_LEN = 5, ANSWER_PAY = 5, LESSON_BONUS = 25, LESSON_BREAK = 60;   // óra után 60 mp szünet (ne lehessen végtelenül pénzt gyűjteni)
+const atBlackboard = () => player.inHouse && player.inHouse.hs.school && player.inHouse.iy < 140 && player.inHouse.ix > 120 && player.inHouse.ix < 440;
+// tiszta függvény: egy feladat a véletlenszám-forrásból (r() 0..1) – tesztelhető
+function makeQuestion(r) {
+  const op = ['+', '−', '×'][(r() * 3) | 0];
+  let a = 2 + ((r() * 18) | 0), b = 2 + ((r() * 9) | 0);
+  if (op === '−' && b > a) [a, b] = [b, a];
+  const ans = op === '+' ? a + b : op === '−' ? a - b : a * b;
+  const wrong = new Set();
+  for (const d of [1, -1, 2, -2, 10, -10, 3]) { if (wrong.size < 2 && ans + d >= 0 && r() < 0.7) wrong.add(ans + d); }
+  for (const d of [1, -1, 2]) if (wrong.size < 2 && ans + d >= 0) wrong.add(ans + d);
+  const opts = [ans, ...wrong];
+  for (let i = opts.length - 1; i > 0; i--) { const j = (r() * (i + 1)) | 0; [opts[i], opts[j]] = [opts[j], opts[i]]; }   // keverés
+  return { text: `${a} ${op} ${b} = ?`, ans, opts };
+}
+const school = { open: false, q: null, n: 0, correct: 0, feedback: null, nextAt: 0 };
+const breakLeft = () => Math.max(0, Math.ceil(school.nextAt - clock));
+function openSchool() {
+  if (breakLeft() > 0) { popup(`🔔 Szünet van – a következő óra ${breakLeft()} mp múlva`, '#ffd23a'); return false; }
+  Object.assign(school, { open: true, n: 0, correct: 0, feedback: null, q: makeQuestion(Math.random) });
+  for (const k in keys) keys[k] = false; mouse.down = false;
+}
+function closeSchool() { if (school.open) school.nextAt = clock + LESSON_BREAK; school.open = false; }   // abbahagyás után is szünet
+function answerQuestion(i, next = Math.random) {
+  if (!school.open || !school.q || !school.q.opts[i] && school.q.opts[i] !== 0) return false;
+  const ok = school.q.opts[i] === school.q.ans;
+  if (ok) { school.correct++; earn(ANSWER_PAY, 'jó válasz ✏️'); } else popup(`✗ Nem jó – a helyes válasz: ${school.q.ans}`, '#f66');
+  school.feedback = { ok, ans: school.q.ans };
+  school.n++;
+  if (school.n >= LESSON_LEN) {                         // vége az órának
+    if (school.correct === LESSON_LEN) earn(LESSON_BONUS, 'hibátlan óra – ötös! 🏅');
+    else popup(`🏫 Vége az órának: ${school.correct}/${LESSON_LEN} jó válasz`, '#ffd23a');
+    closeSchool();
+  } else school.q = makeQuestion(next);
+  return ok;
+}
+function schoolKey(code) {
+  if (code === 'Escape') closeSchool();
+  const m = /^(?:Digit|Numpad)([1-3])$/.exec(code);
+  if (m) answerQuestion(+m[1] - 1);
+}
+function schoolClick(x, y) {
+  for (const h of school.hits || []) if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) { answerQuestion(h.i); return; }
+}
+
 // ===== Bolt: a pultnál E – csoki, szendvics, elsősegély, kávé, benzinkanna, bomba, sorsjegy =====
 const SHOP_FURNITURE = [
   { k: 'shopcounter', x: 100, y: 20, w: 360, h: 44 },
@@ -641,7 +696,7 @@ const drunkK = () => clamp(((player.drunk || 0) - 25) / 75, 0, 1);   // 0: józa
 function enterHouse(hs) {
   player.inHouse = { hs, ix: ROOM_W / 2, iy: ROOM_H - 50, furniture: furnitureOf(hs), factory: hs.factory ? newFactory() : null };
   Object.assign(player, doorOf(hs));
-  popup(hs.pub ? '🍺 Bementél a kocsmába – a pultnál ihatsz' : hs.bank ? '🏦 Bementél a bankba – a pultnál E' : hs.factory ? '🏭 Bementél a gyárba – pakold a zacskókat (Space)' : hs.shop ? '🛒 Bementél a boltba – a pultnál E' : '🏠 Bementél a házba – itt nem talál meg a rendőrség', '#7df');
+  popup(hs.pub ? '🍺 Bementél a kocsmába – a pultnál ihatsz' : hs.bank ? '🏦 Bementél a bankba – a pultnál E' : hs.factory ? '🏭 Bementél a gyárba – pakold a zacskókat (Space)' : hs.shop ? '🛒 Bementél a boltba – a pultnál E' : hs.school ? '🏫 Bementél az iskolába – a táblánál E: óra' : '🏠 Bementél a házba – itt nem talál meg a rendőrség', '#7df');
   startRadio();
 }
 function exitHouse() {
@@ -762,6 +817,7 @@ const SKINS = [
   { name: 'Ninja', shirt: '#151515', head: '#151515', legs: '#151515', hat: '#c01010' },
   { name: 'Turista', shirt: '#ffd23a', head: '#c8a060', legs: '#e0e0e0', hat: '#f5f5f5' },
   { name: 'Pókhős', shirt: '#c8102e', head: '#c8102e', legs: '#1f3fa0', pattern: 'web', price: 900 },   // piros-kék, hálómintás
+  { name: 'Peppa malac', shirt: '#e8383d', head: '#f7a8c0', legs: '#f7a8c0', pattern: 'pig' },          // rózsaszín malac piros ruhában
 ];
 const skinPrice = i => SKINS[i].price || 0;
 const CAR_MODELS = [
@@ -960,6 +1016,8 @@ function nearestBoardableBus() {
 function interactionPrompt() {
   if (player.dead || player.arrested || player.passedOut > 0) return null;
   if (player.riding) return { text: '🚌 Buszon utazol – E: leszállás (amikor megáll)', color: '#f28c1e' };
+  if (atBlackboard() && breakLeft() > 0) return { text: `🔔 Szünet – a következő óra ${breakLeft()} mp múlva`, color: '#ffd23a' };
+  if (atBlackboard()) return { text: `🏫 E: matekóra (${LESSON_LEN} feladat, jó válaszonként $${ANSWER_PAY}, hibátlanért +$${LESSON_BONUS})`, color: '#ffd23a' };
   if (atShopCounter()) return { text: '🛒 E: vásárlás (csoki, szendvics, elsősegély, kávé, benzin, bomba, sorsjegy)', color: '#7f7' };
   if (atBankCounter()) return { text: `🏦 E: bank – hitel ($${LOAN_MIN}–$${LOAN_MAX}) és törlesztés`, color: '#7df' };
   if (player.inHouse && player.inHouse.factory) {
@@ -994,7 +1052,7 @@ function toggleCar() {
   }
   if (!player.inCar && dist(player, car) >= 75 && taxiReady()) { openTaxiMenu(); return; }
   const bus = !player.inCar && dist(player, car) >= 75 ? nearestBoardableBus() : null;
-  if (player.inHouse) { if (atInnerDoor()) exitHouse(); else if (atBankCounter()) openBank(); else if (atShopCounter()) openShop(); return; }
+  if (player.inHouse) { if (atInnerDoor()) exitHouse(); else if (atBankCounter()) openBank(); else if (atShopCounter()) openShop(); else if (atBlackboard()) openSchool(); return; }
   const door = !bus && !player.inCar && dist(player, car) >= 75 ? nearestDoor() : null;
   if (door) { enterHouse(door); return; }
   const lot = !bus && !player.inCar && dist(player, car) >= 75 ? nearestRentable() : null;
@@ -1477,15 +1535,16 @@ const POI_TYPES = {
   bank: { icon: '🏦', name: 'Bankok', color: '#7df' },
   pub: { icon: '🍺', name: 'Kocsmák', color: '#7f7' },
   shop: { icon: '🛒', name: 'Boltok', color: '#c9f' },
+  school: { icon: '🏫', name: 'Iskolák', color: '#ffd23a' },
   pin: { icon: '📍', name: 'Saját jelölések', color: '#f6c' },
 };
-const mapView = { open: false, pois: [], cats: { station: true, factory: true, bank: true, pub: true, shop: true, pin: true }, hits: [], layout: null };
+const mapView = { open: false, pois: [], cats: { station: true, factory: true, bank: true, pub: true, shop: true, school: true, pin: true }, hits: [], layout: null };
 
 // nevezetes helyek egy négyzetben (benzinkút, gyár, bank, kocsma)
 function poisIn(xa, ya, xb, yb) {
   const out = stationsIn(xa, ya, xb, yb).map(st => ({ type: 'station', x: (st.canopy.x0 + st.canopy.x1) / 2, y: (st.canopy.y0 + st.canopy.y1) / 2 }));
   for (const hs of housesIn(xa, ya, xb, yb)) {
-    const type = hs.bank ? 'bank' : hs.factory ? 'factory' : hs.pub ? 'pub' : hs.shop ? 'shop' : null;
+    const type = hs.bank ? 'bank' : hs.factory ? 'factory' : hs.pub ? 'pub' : hs.shop ? 'shop' : hs.school ? 'school' : null;
     if (type) out.push({ type, x: hs.x, y: hs.y });
   }
   return out;
@@ -1525,7 +1584,7 @@ function mapKey(code) {
   if ((code === 'Delete' || code === 'Backspace') && progress.pins.length) {   // a térképen kívülre esett jelölések is törölhetők
     progress.pins = []; saveProgress(); popup('📍 Minden jelölés törölve', '#f6c');
   }
-  const cat = { Digit1: 'station', Digit2: 'factory', Digit3: 'bank', Digit4: 'pub', Digit5: 'shop', Digit6: 'pin' }[code];
+  const cat = { Digit1: 'station', Digit2: 'factory', Digit3: 'bank', Digit4: 'pub', Digit5: 'shop', Digit6: 'school', Digit7: 'pin' }[code];
   if (cat) toggleMapCat(cat);
 }
 
@@ -1592,7 +1651,7 @@ function taxiDestinations() {
   const out = [{ label: '🏠 Kezdőhely', x: START_X, y: START_Y }];
   out.push({ label: '🚗 Az autód', x: car.x + 60, y: car.y });
   const ns = nearestStation(player.x, player.y); if (ns) out.push({ label: '⛽ Legközelebbi benzinkút', x: ns.st.sign.x, y: ns.st.sign.y });
-  for (const [label, pred] of [['🏦 Legközelebbi bank', h => h.bank], ['🍺 Legközelebbi kocsma', h => h.pub], ['🏭 Legközelebbi gyár', h => h.factory], ['🛒 Legközelebbi bolt', h => h.shop]]) {
+  for (const [label, pred] of [['🏦 Legközelebbi bank', h => h.bank], ['🍺 Legközelebbi kocsma', h => h.pub], ['🏭 Legközelebbi gyár', h => h.factory], ['🛒 Legközelebbi bolt', h => h.shop], ['🏫 Legközelebbi iskola', h => h.school]]) {
     const hs = nearestHouseOf(pred); if (hs) { const d = doorOf(hs); out.push({ label, x: d.x, y: d.y }); }
   }
   if (race.state === 'idle' && race.offer) out.push({ label: '🏁 Verseny rajt', x: race.offer.x, y: race.offer.y });
@@ -2516,6 +2575,12 @@ function drawHouse(hs, n) {
     ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText('🍺 KOCSMA', hs.x, hs.y + 5); ctx.textAlign = 'left';
   }
+  if (hs.school) {                                                                     // iskola: sárga tető, cégtábla
+    ctx.fillStyle = 'rgba(200,160,40,0.9)'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.fillStyle = '#2a2010'; ctx.fillRect(hs.x - 48, hs.y - 11, 96, 22);
+    ctx.fillStyle = '#ffe680'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('🏫 ISKOLA', hs.x, hs.y + 5); ctx.textAlign = 'left';
+  }
   if (hs.shop) {                                                                       // bolt: lila tető, cégtábla
     ctx.fillStyle = 'rgba(110,60,140,0.88)'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
     ctx.fillStyle = '#1e1028'; ctx.fillRect(hs.x - 42, hs.y - 11, 84, 22);
@@ -2587,7 +2652,7 @@ function drawInterior(w, h) {
   for (let y = 18; y < ROOM_H; y += 18) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(ROOM_W, y); ctx.stroke(); }
   ctx.fillStyle = 'rgba(150,40,40,0.55)'; ctx.fillRect(ROOM_W / 2 - 110, ROOM_H / 2 - 60, 220, 130);   // szőnyeg
   for (const f of H.furniture) {
-    const c = { bed: '#e8e2d6', wardrobe: '#6b4a2e', table: '#8a5a32', kitchen: '#cfd3d6', sofa: '#3e6a8a', tv: '#151515', plant: '#3a8a3a' }[f.k];
+    const c = { bed: '#e8e2d6', wardrobe: '#6b4a2e', table: '#8a5a32', kitchen: '#cfd3d6', sofa: '#3e6a8a', tv: '#151515', plant: '#3a8a3a', board: '#1f3a2a', tdesk: '#6b4a2e', desk: '#b08a5a' }[f.k];
     ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(f.x + 4, f.y + 4, f.w, f.h);
     ctx.fillStyle = c; ctx.fillRect(f.x, f.y, f.w, f.h);
     ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.strokeRect(f.x, f.y, f.w, f.h);
@@ -2599,6 +2664,8 @@ function drawInterior(w, h) {
       for (let x = f.x + 20; x < f.x + f.w - 10; x += 40) { ctx.fillStyle = '#d8b04a'; ctx.fillRect(x, f.y + 8, 6, 14); ctx.fillStyle = '#c0203a'; ctx.fillRect(x + 14, f.y + 10, 5, 12); }
     }
     if (f.k === 'counter') { ctx.fillStyle = '#2f4a6a'; ctx.fillRect(f.x, f.y + f.h - 10, f.w, 10); ctx.fillStyle = '#9fd8ff'; for (let x = f.x + 30; x < f.x + f.w; x += 90) ctx.fillRect(x, f.y + 6, 40, 18); }
+    if (f.k === 'board') { ctx.fillStyle = '#eee'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('2 + 2 = 4   ·   3 × 3 = 9', f.x + f.w / 2, f.y + 13); ctx.textAlign = 'left'; }
+    if (f.k === 'desk') { ctx.fillStyle = '#555'; ctx.fillRect(f.x + f.w / 2 - 8, f.y + f.h + 4, 16, 12); }   // szék
     if (f.k === 'shopcounter') { ctx.fillStyle = '#5a3a6a'; ctx.fillRect(f.x, f.y, f.w, f.h); ctx.fillStyle = '#ddd'; ctx.fillRect(f.x + f.w - 70, f.y + 8, 40, 26); }   // pult kasszával
     if (f.k === 'shelf') {                                                              // polc színes árukkal
       ctx.fillStyle = '#7a6a5a'; ctx.fillRect(f.x, f.y, f.w, f.h);
@@ -2633,7 +2700,7 @@ function drawInterior(w, h) {
   if (H.factory && H.factory.carrying) { ctx.fillStyle = '#f2c230'; ctx.fillRect(H.ix + 8, H.iy - 18, 14, 20); }
   ctx.restore();
   ctx.fillStyle = '#7df'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(H.hs.shop ? '🛒 Boltban vagy – a pultnál E: vásárlás' : H.hs.bank ? '🏦 Bankban vagy – a pultnál E: hitel vagy törlesztés' : H.hs.factory ? `🏭 Gyár – fizetés $${FACTORY_WAGE}/perc · következő: ${Math.ceil(WAGE_PERIOD - H.factory.shift)} mp · ebben a percben bepakolva: ${H.factory.minutePacked}` : H.hs.pub ? `🍺 Kocsmában vagy – a pultnál ihatsz: sör $${BEER_PRICE}, bor $${WINE_PRICE}` : '🏠 Bent vagy a házban – itt nem talál meg a rendőrség, és gyorsabban gyógyulsz', w / 2, oy - 14);
+  ctx.fillText(H.hs.school ? '🏫 Iskolában vagy – a táblánál E: matekóra' : H.hs.shop ? '🛒 Boltban vagy – a pultnál E: vásárlás' : H.hs.bank ? '🏦 Bankban vagy – a pultnál E: hitel vagy törlesztés' : H.hs.factory ? `🏭 Gyár – fizetés $${FACTORY_WAGE}/perc · következő: ${Math.ceil(WAGE_PERIOD - H.factory.shift)} mp · ebben a percben bepakolva: ${H.factory.minutePacked}` : H.hs.pub ? `🍺 Kocsmában vagy – a pultnál ihatsz: sör $${BEER_PRICE}, bor $${WINE_PRICE}` : '🏠 Bent vagy a házban – itt nem talál meg a rendőrség, és gyorsabban gyógyulsz', w / 2, oy - 14);
   ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 16px sans-serif';
   if (radio.playing && radio.ac && radio.ac.state === 'suspended') ctx.fillText('🔇 A böngésző lenémította a hangot – kattints vagy nyomj meg egy gombot', w / 2, oy + 24);
   ctx.fillText(radio.playing && radio.song ? `📻 Most szól: ${radio.song.name} (${radio.song.scaleName}, ${radio.song.bpm} BPM) · R: következő szám · M: rádió ki`
@@ -2809,7 +2876,7 @@ function drawPerson(x, y, angle, walk, shirt, head, gun, legs = '#2b2b4a', hat =
     ctx.beginPath(); ctx.ellipse(0, 0, 4, 6.5, 0, 0, Math.PI * 2); ctx.ellipse(0, 0, 6.5, 10.5, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = '#1f3fa0'; ctx.fillRect(-3, -13, 6, 4); ctx.fillRect(-3, 9, 6, 4);   // kék oldalcsík
   }
-  ctx.fillStyle = pattern === 'web' ? shirt : '#e0b088';         // karok (a ruhásnak kesztyűs keze van)
+  ctx.fillStyle = pattern === 'web' ? shirt : pattern === 'pig' ? head : '#e0b088';   // karok (a ruhásnak kesztyűs keze, a malacnak rózsaszín)
   ctx.beginPath(); ctx.arc(-swing * 0.6, -13, 3.5, 0, Math.PI * 2); ctx.arc(swing * 0.6, 13, 3.5, 0, Math.PI * 2); ctx.fill();
   if (gun) { ctx.fillStyle = '#222'; ctx.fillRect(2, 11, 14, 4); }  // pisztoly
   ctx.fillStyle = head;                                          // fej (haj)
@@ -2819,6 +2886,14 @@ function drawPerson(x, y, angle, walk, shirt, head, gun, legs = '#2b2b4a', hat =
     for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(1, 0); ctx.lineTo(1 + Math.cos(a) * 7, Math.sin(a) * 7); ctx.stroke(); }
     ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.lineWidth = 0.8;
     for (const sy of [-2.6, 2.6]) { ctx.beginPath(); ctx.ellipse(5, sy, 2.4, 1.6, sy > 0 ? 0.5 : -0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+  }
+  if (pattern === 'pig') {                                       // malac: fülek hátul, nagy ormány előre, orrlyukak, pirospozsgás arc
+    ctx.fillStyle = head; ctx.strokeStyle = 'rgba(150,40,80,0.6)'; ctx.lineWidth = 0.8;
+    for (const sy of [-4.5, 4.5]) { ctx.beginPath(); ctx.ellipse(-4, sy, 3.2, 2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    ctx.beginPath(); ctx.ellipse(9, 0, 3.6, 4.2, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#b04070'; ctx.beginPath(); ctx.arc(10, -1.6, 0.9, 0, Math.PI * 2); ctx.arc(10, 1.6, 0.9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff6f8f'; ctx.beginPath(); ctx.arc(2, -5, 1.6, 0, Math.PI * 2); ctx.arc(2, 5, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(4.5, -2.2, 0.9, 0, Math.PI * 2); ctx.arc(4.5, 2.2, 0.9, 0, Math.PI * 2); ctx.fill();
   }
   if (hat) {                                                     // kalap
     ctx.fillStyle = hat;
@@ -3157,22 +3232,44 @@ function drawBigMap(w, h) {
 
 function drawTaxiMenu(w, h) {
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, w, h);
-  const n = taxiMenu.items.length, PW = 440, PH = 110 + n * 40, px = (w - PW) / 2, py = (h - PH) / 2;
+  const n = taxiMenu.items.length, RH = clamp(Math.floor((h - 130) / n), 26, 40), PW = 440, PH = 110 + n * RH, px = (w - PW) / 2, py = Math.max(4, (h - PH) / 2);
   ctx.fillStyle = 'rgba(30,26,10,0.96)'; ctx.fillRect(px, py, PW, PH);
   ctx.strokeStyle = '#f2c230'; ctx.lineWidth = 3; ctx.strokeRect(px, py, PW, PH);
   ctx.textAlign = 'center'; ctx.fillStyle = '#f2c230'; ctx.font = 'bold 24px sans-serif';
   ctx.fillText(`🚕 Hova vigyelek? ($${TAXI_FARE})`, w / 2, py + 38);
   taxiMenu.hits = [];
   taxiMenu.items.forEach((it, i) => {
-    const y = py + 56 + i * 40, sel = i === taxiMenu.sel;
-    ctx.fillStyle = sel ? 'rgba(242,194,48,0.25)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(px + 20, y, PW - 40, 32);
-    if (sel) { ctx.strokeStyle = '#f2c230'; ctx.lineWidth = 2; ctx.strokeRect(px + 20, y, PW - 40, 32); }
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(it.label, px + 34, y + 22);
-    ctx.textAlign = 'right'; ctx.fillStyle = '#ccc'; ctx.font = '14px sans-serif'; ctx.fillText(`${it.km} km`, px + PW - 34, y + 22);
-    taxiMenu.hits.push({ i, x: px + 20, y, w: PW - 40, h: 32 });
+    const y = py + 56 + i * RH, sel = i === taxiMenu.sel, bh = RH - 8, ty = y + bh / 2 + 6;
+    ctx.fillStyle = sel ? 'rgba(242,194,48,0.25)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(px + 20, y, PW - 40, bh);
+    if (sel) { ctx.strokeStyle = '#f2c230'; ctx.lineWidth = 2; ctx.strokeRect(px + 20, y, PW - 40, bh); }
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left'; ctx.fillText(it.label, px + 34, ty);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#ccc'; ctx.font = '14px sans-serif'; ctx.fillText(`${it.km} km`, px + PW - 34, ty);
+    taxiMenu.hits.push({ i, x: px + 20, y, w: PW - 40, h: bh });
   });
   ctx.textAlign = 'center'; ctx.fillStyle = '#999'; ctx.font = '12px sans-serif';
   ctx.fillText('↑↓: választás · Enter: indulás · Esc: mégse', w / 2, py + PH - 14); ctx.textAlign = 'left';
+}
+
+function drawSchool(w, h) {
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, w, h);
+  const PW = 480, PH = 300, px = (w - PW) / 2, py = Math.max(4, (h - PH) / 2), q = school.q;
+  ctx.fillStyle = '#1f3a2a'; ctx.fillRect(px, py, PW, PH);                     // tábla
+  ctx.strokeStyle = '#8a5a32'; ctx.lineWidth = 8; ctx.strokeRect(px, py, PW, PH);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#ffe680'; ctx.font = 'bold 22px sans-serif';
+  ctx.fillText(`🏫 Matekóra – ${school.n + 1}. feladat / ${LESSON_LEN}`, w / 2, py + 40);
+  ctx.fillStyle = '#ccc'; ctx.font = '14px sans-serif'; ctx.fillText(`jó válaszok: ${school.correct}`, w / 2, py + 64);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 44px sans-serif'; ctx.fillText(q.text, w / 2, py + 130);
+  school.hits = [];
+  q.opts.forEach((o, i) => {
+    const bw = 120, x = w / 2 - 1.5 * bw - 20 + i * (bw + 20), y = py + 170;
+    ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(x, y, bw, 50);
+    ctx.strokeStyle = '#eee'; ctx.lineWidth = 2; ctx.strokeRect(x, y, bw, 50);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 22px sans-serif'; ctx.fillText(`${i + 1}: ${o}`, x + bw / 2, y + 33);
+    school.hits.push({ i, x, y, w: bw, h: 50 });
+  });
+  if (school.feedback) { ctx.fillStyle = school.feedback.ok ? '#7f7' : '#f66'; ctx.font = 'bold 15px sans-serif'; ctx.fillText(school.feedback.ok ? '✓ Jó válasz!' : `✗ Az előző helyesen: ${school.feedback.ans}`, w / 2, py + 248); }
+  ctx.fillStyle = '#aaa'; ctx.font = '12px sans-serif';
+  ctx.fillText(`1–3 vagy kattintás: válasz · jó válasz $${ANSWER_PAY}, hibátlan óra +$${LESSON_BONUS} · Esc: kilépés`, w / 2, py + PH - 16); ctx.textAlign = 'left';
 }
 
 function drawShop(w, h) {
@@ -3398,6 +3495,7 @@ function render() {
   if (donate.open) drawDonate(w, h);
   if (bank.open) drawBank(w, h);
   if (shop.open) drawShop(w, h);
+  if (school.open) drawSchool(w, h);
   if (taxiMenu.open) drawTaxiMenu(w, h);
   if (mapView.open) drawBigMap(w, h);
   if (taxiTrip) {                                    // utazás: elsötétül, felirat
@@ -3412,7 +3510,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (!menu.open && !donate.open && !bank.open && !shop.open && !taxiMenu.open && !mapView.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
+  if (!menu.open && !donate.open && !bank.open && !shop.open && !school.open && !taxiMenu.open && !mapView.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
     time = (time + dt * timeScale) % CYCLE;
     clock += dt;
     update(dt);

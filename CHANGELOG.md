@@ -5,6 +5,11 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.22.0 – 2026-11-07
+- Iskolák (a házak ~5%-a, sárga tető, „ISKOLA” tábla): be lehet menni, a táblánál E – matekóra: 5 feladat (összeadás, kivonás, szorzás), 3 válaszból kell választani; jó válaszonként $5, hibátlan óráért +$25; óra után 60 mp szünet
+- Új szkin: Peppa malac (ingyenes) – rózsaszín malac piros ruhában, ormánnyal és fülekkel
+- Az iskolák a térképen (🏫, 6-os gomb) és a taxi úti céljai között is ott vannak; a taxi menü sok célnál is kifér a képernyőre
+
 ## 0.21.0 – 2026-11-07
 - Boltok (a házak ~8%-a, lila tető, „BOLT” tábla): a pultnál E – csoki ($2, +20 élet), szendvics ($5, +50 élet), elsősegélycsomag ($15, teljes élet), kávé ($3, kijózanít), benzinkanna ($30, +50% benzin), bomba ($50), sorsjegy ($5, 20% eséllyel $20)
 - Amire nincs szükséged (pl. teljes élettel étel, tele tankkal benzin), azt nem adja el – nem fizetsz feleslegesen

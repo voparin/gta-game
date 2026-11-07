@@ -68,7 +68,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Minden házban van **rádió**: bemenéskor egy véletlen, a játék által generált szám szól. **R**: következő szám, **M**: rádió ki/be.
 
 ## Szkinek
-- Az Esc menüben választhatsz szkint. A **Pókhős** (piros-kék, hálómintás) **$900**-ba kerül; a többi ingyenes.
+- Az Esc menüben választhatsz szkint. A **Pókhős** (piros-kék, hálómintás) **$900**-ba kerül; a többi – köztük a **Peppa malac** – ingyenes.
 
 ## Kocsmák
 - A házak egy része **kocsma** (zöld tető, „KOCSMA” tábla). A pultnál **1: sör ($2)**, **2: bor ($3)**.
@@ -97,15 +97,19 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 
 - Amire nincs szükséged (pl. teljes élettel étel), azt nem adja el.
 
+## Iskolák
+- A házak egy része **iskola** (sárga tető, „ISKOLA” tábla) – be lehet menni. A táblánál **E**: **matekóra**, 5 feladat (összeadás, kivonás, szorzás).
+- **1–3** gombbal vagy kattintással válaszolsz. Jó válaszonként **$5**, hibátlan óráért **+$25** jár. Óra után **60 mp szünet** van.
+
 ## Bomba
 - **B**: lerakod (autóból hátra ejted), **3 mp** múlva felrobban: a közeli autókból roncs lesz, a házak ledőlnek, az emberek meghalnak – és téged is megsebez, ha túl közel vagy. Robbantásért ★★ körözés jár.
 - Legfeljebb 5 bombád lehet, percenként kapsz egy újat (a HUD-on: 💣 3/5).
 
 ## Taxi
-- **X**: hívsz egy taxit, pár másodperc alatt odajön. Mellette **E**: választhatsz úti célt (kezdőhely, az autód, a legközelebbi benzinkút / bank / kocsma / gyár / bolt, verseny rajt, saját 📍 jelölés) – **$5**-ért bárhova elvisz.
+- **X**: hívsz egy taxit, pár másodperc alatt odajön. Mellette **E**: választhatsz úti célt (kezdőhely, az autód, a legközelebbi benzinkút / bank / kocsma / gyár / bolt / iskola, verseny rajt, saját 📍 jelölés) – **$5**-ért bárhova elvisz.
 - Ha beülsz az autódba, vagy a taxi 45 mp alatt nem ér oda, lemond. A tönkrement taxi nem visz. A szállítási célpontra nem visz el (a szállítást vezetned kell).
 
 ## Térkép
-- **K**: megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák, 🛒 boltok. Az **1–6** gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
+- **K**: megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák, 🛒 boltok, 🏫 iskolák. Az **1–7** gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
 - **Kattints a térképre:** saját pontot jelölsz 📍 (legfeljebb 10, megmaradnak). Egy jelölésre kattintva törlöd, a **Delete** gomb mindet törli.
 - A jelölések a radaron és a világban is látszanak, a képernyő szélén nyíl mutat a legközelebbire, és a **taxi** is elvisz oda (a 3 legközelebbihez).
