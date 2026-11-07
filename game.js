@@ -291,7 +291,7 @@ const CAR_MODELS = [
 const DEFAULT_MODEL = { accel: 420, maxRoad: 620, maxSand: 380, sandDrag: 0.9, fuelUse: 1 };
 const FUEL_PRICE = 1;            // $ / 1% benzin
 const POLICE_MODEL = { name: 'Rendőrautó', color: ['#f4f4f4', '#1d2a4a'], len: 76, wid: 36, accel: 520, maxRoad: 680, maxSand: 450, sandDrag: 0.4 };
-const SPEED_LIMIT = 60;          // km/h – aki ennél gyorsabban megy az úton, azt üldözi a rendőrség
+const SPEED_LIMIT = 145;         // km/h – aki ennél gyorsabban megy az úton, azt üldözi a rendőrség
 const KMH = 4;                   // 1 km/h = 4 px/s (a HUD is így számol)
 
 function loadChoice(key, max) {
@@ -1242,12 +1242,12 @@ function drawRoads(view) {
   for (const R of vRoads) {
     for (let i = Math.floor(ya / 80) * 80; i < yb; i += 80) if (Math.abs(i - nearestRoad(i)) > EDGE + 10) ctx.fillRect(R - 2, i, 4, 40);
   }
-  // „60” sebességkorlát-táblák a jobb oldali járdán
+  // sebességkorlát-táblák a jobb oldali járdán
   const sign = (x, y) => {
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#d01010'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 9.5, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = '#111'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(String(SPEED_LIMIT), x, y + 3.5); ctx.textAlign = 'left';
+    ctx.fillStyle = '#111'; ctx.font = `bold ${SPEED_LIMIT > 99 ? 8 : 10}px sans-serif`; ctx.textAlign = 'center';
+    ctx.fillText(String(SPEED_LIMIT), x, y + 3); ctx.textAlign = 'left';
   };
   for (const R of hRoads) for (let i = Math.floor(xa / 1000) * 1000 + 500; i < xb; i += 1000) { sign(i, R + ROAD_W / 2 + 36); sign(i + 60, R - ROAD_W / 2 - 36); }
   for (const R of vRoads) for (let i = Math.floor(ya / 1000) * 1000 + 500; i < yb; i += 1000) { sign(R - ROAD_W / 2 - 36, i); sign(R + ROAD_W / 2 + 36, i + 60); }
