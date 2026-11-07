@@ -22,7 +22,8 @@ Felépítés a `game.js`-en belül:
 - **Autók**: egy közös fizika (`updateCarPhysics`) a játékos és az AI autók számára; az AI a `aiCarInput`-ban dönt (sáv követése, kereszteződésben fordulás).
 - **Szereplők**: `npcs` (gyalogos / bandita), `aiCars`, `bullets`; a játékostól messze lévőket a `spawnAround` eltünteti, a közelben újakat hoz létre.
 - **Időjárás**: `storm` (homokvihar), napszak: `nightAmount`.
-- Tesztekben a `spawnEnabled` és `slimeEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el.
+- **Rendőrség**: `wanted` (körözési szint), `updateWanted` (gyorshajtás `SPEED_LIMIT` felett, lerázás, letartóztatás), `policeInput` (üldözés). A rendőrautók az `aiCars`-ban vannak `police`/`chasing` jelzővel. Tesztben a `policeEnabled` kikapcsolható.
+- Tesztekben a `spawnEnabled`, `slimeEnabled` és `policeEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el.
 
 ## Szokásos fejlesztési flow
 

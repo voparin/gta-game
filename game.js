@@ -222,6 +222,9 @@ const CAR_MODELS = [
   { name: 'Zöld pickup', color: ['#3a9a4a', '#257035'], len: 84, wid: 40, accel: 330, maxRoad: 520, maxSand: 420, sandDrag: 0.5, desc: 'strapabíró' },
 ];
 const DEFAULT_MODEL = { accel: 420, maxRoad: 620, maxSand: 380, sandDrag: 0.9 };
+const POLICE_MODEL = { name: 'Rendőrautó', color: ['#f4f4f4', '#1d2a4a'], len: 76, wid: 36, accel: 520, maxRoad: 680, maxSand: 450, sandDrag: 0.4 };
+const SPEED_LIMIT = 60;          // km/h – aki ennél gyorsabban megy az úton, azt üldözi a rendőrség
+const KMH = 4;                   // 1 km/h = 4 px/s (a HUD is így számol)
 
 function loadChoice(key, max) {
   try { const v = parseInt(window.localStorage.getItem(key), 10); return v >= 0 && v < max ? v : 0; } catch (e) { return 0; }
@@ -242,7 +245,7 @@ function applyCarModel(c, m) {
 }
 
 const player = { x: START_X, y: START_Y, angle: 0, r: 12, inCar: false, walk: 0,
-  health: 100, dead: 0, cooldown: 0, kills: 0, lastHit: -99 };
+  health: 100, dead: 0, arrested: 0, cooldown: 0, kills: 0, lastHit: -99 };
 const car = makeCar(START_X + 100, START_Y - 50, 0, ['#d42020', '#a31515']);
 applyCarModel(car, CAR_MODELS[menu.carModel]);
 const aiCars = [];      // AI által vezetett autók
@@ -256,7 +259,12 @@ const SKID_LIFE = 5;    // ennyi másodperc alatt tűnik el egy féknyom
 let clock = 0;          // valós idő másodpercben (a T gomb nem gyorsítja)
 let time = 60;          // játékidő másodpercben: nappal indulunk
 let spawnEnabled = true;    // teszteléshez kikapcsolható
-let message = null;     // {text, until}
+let message = null;     // {text, until, color}
+let policeEnabled = true;   // teszteléshez kikapcsolható
+// körözés: 0 = nincs, 1 = gyorshajtás, 2 = rendőrre lőtt
+const wanted = { level: 0, lostTimer: 0, bustTimer: 0 };
+const POLICE_COUNT = [0, 2, 3];
+const controllable = () => !player.dead && !player.arrested;
 let lastCam = { x: player.x, y: player.y };
 
 // Homokvihar
@@ -306,7 +314,7 @@ function menuClick(x, y) {
 }
 
 function toggleCar() {
-  if (player.dead) return;
+  if (!controllable()) return;
   if (player.inCar) {
     // kiszállás a vezető oldalán
     player.x = car.x + Math.sin(car.angle) * 40;
@@ -388,7 +396,7 @@ function spawnAround(dt) {
     const p = npcs[i];
     if (dist(p, player) > 2600 || (p.dead && clock - p.dead > 15)) npcs.splice(i, 1);
   }
-  for (let i = aiCars.length - 1; i >= 0; i--) if (dist(aiCars[i], player) > 3000) aiCars.splice(i, 1);
+  for (let i = aiCars.length - 1; i >= 0; i--) if (dist(aiCars[i], player) > (aiCars[i].chasing ? 4500 : 3000)) aiCars.splice(i, 1);
   if (!spawnEnabled || player.dead) return;
 
   const ring = (a, b) => {
@@ -410,7 +418,7 @@ function spawnAround(dt) {
     const pos = ring(1000, 1400);
     if (!obstacleAt(pos.x, pos.y, 15)) spawnNpc('bandit', pos.x, pos.y);
   }
-  if (aiCars.length < 6 && rand() < dt) {
+  if (aiCars.filter(c => !c.police).length < 6 && rand() < dt) {
     const axis = rand() < 0.5 ? 'h' : 'v', dir = rand() < 0.5 ? 1 : -1;
     const road = nearestRoad(axis === 'h' ? player.y : player.x);
     const along = clamp((axis === 'h' ? player.x : player.y) + (rand() < 0.5 ? -1 : 1) * (900 + rand() * 700), 400, WORLD - 400);
@@ -451,7 +459,7 @@ function updatePlayer(dt) {
 }
 
 function playerCarInput() {
-  const drive = player.inCar && !player.dead;
+  const drive = player.inCar && controllable();
   return {
     up: drive && !!(keys.KeyW || keys.ArrowUp),
     down: drive && !!(keys.KeyS || keys.ArrowDown),
@@ -579,7 +587,7 @@ function carCollisions() {
       if (rv < 0) {
         const imp = -rv * 0.65;
         a.vx -= imp * nx; a.vy -= imp * ny; b.vx += imp * nx; b.vy += imp * ny;
-        if (-rv > 250) { if (a.ai) damageCar(a); if (b.ai) damageCar(b); }
+        if (-rv > 250) { if (a !== car) damageCar(a); if (b !== car) damageCar(b); }
       }
     }
   }
@@ -621,10 +629,100 @@ function damagePlayer(n) {
 }
 
 function respawn() {
-  Object.assign(player, { x: START_X, y: START_Y, angle: 0, inCar: false, health: 100, dead: 0 });
+  Object.assign(player, { x: START_X, y: START_Y, angle: 0, inCar: false, health: 100, dead: 0, arrested: 0 });
+  clearWanted();
+  for (let i = aiCars.length - 1; i >= 0; i--) if (aiCars[i].police) aiCars.splice(i, 1);
   Object.assign(car, { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, spin: 0, lastWheels: null });
   for (let i = npcs.length - 1; i >= 0; i--) if (npcs[i].kind === 'bandit') npcs.splice(i, 1);
   message = { text: 'Újraéledtél', until: clock + 2 };
+}
+
+// ===== Rendőrség =====
+function raiseWanted(level) {
+  if (level <= wanted.level) return;
+  wanted.level = level;
+  wanted.lostTimer = 0;
+  message = { text: level === 1 ? 'GYORSHAJTÁS! ÜLDÖZ A RENDŐRSÉG!' : 'RENDŐRRE LŐTTÉL! ★★', until: clock + 2.5, color: '#4af' };
+}
+
+function clearWanted() {
+  wanted.level = 0; wanted.lostTimer = 0; wanted.bustTimer = 0;
+  for (const c of aiCars) {
+    if (!c.chasing) continue;
+    c.chasing = false;                       // visszaáll forgalomba
+    const rx = nearestRoad(c.x), ry = nearestRoad(c.y);
+    c.ai = Math.abs(c.y - ry) < Math.abs(c.x - rx)
+      ? { axis: 'h', dir: Math.cos(c.angle) >= 0 ? 1 : -1, road: ry, speed: 280, lastCross: null }
+      : { axis: 'v', dir: Math.sin(c.angle) >= 0 ? 1 : -1, road: rx, speed: 280, lastCross: null };
+  }
+}
+
+function spawnPolice() {
+  const axis = rand() < 0.5 ? 'h' : 'v', dir = rand() < 0.5 ? 1 : -1;
+  const road = nearestRoad(axis === 'h' ? player.y : player.x);
+  const along = clamp((axis === 'h' ? player.x : player.y) - dir * (900 + rand() * 500), 400, WORLD - 400);
+  const pos = axis === 'h' ? { x: along, y: road + dir * 40 } : { x: road - dir * 40, y: along };
+  if (dist(pos, player) < 700 || dist(pos, player) > 2400) return null;
+  const angle = axis === 'h' ? (dir > 0 ? 0 : Math.PI) : (dir > 0 ? Math.PI / 2 : -Math.PI / 2);
+  const c = makeCar(pos.x, pos.y, angle, POLICE_MODEL.color);
+  applyCarModel(c, POLICE_MODEL);
+  Object.assign(c, { police: true, chasing: true, health: 10, stuckT: 0, reverseT: 0 });
+  c.vx = Math.cos(angle) * 300; c.vy = Math.sin(angle) * 300;
+  aiCars.push(c);
+  return c;
+}
+
+// üldözés: a játékos felé hajt, éles kanyarban kézifékkel driftel, ha elakad, tolat
+function policeInput(c, dt) {
+  if (c.wrecked) return { up: false, down: false, steer: 0, handbrake: true };
+  const t = player.inCar ? car : player;
+  const tvx = player.inCar ? car.vx : 0, tvy = player.inCar ? car.vy : 0;
+  const tx = t.x + tvx * 0.4, ty = t.y + tvy * 0.4;
+  const d = dist(c, t);
+  const diff = wrapAngle(Math.atan2(ty - c.y, tx - c.x) - c.angle);
+  const fwd = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
+  if (c.reverseT > 0) {
+    c.reverseT -= dt;
+    return { up: false, down: true, steer: -clamp(diff * 2, -1, 1), handbrake: false };
+  }
+  if (Math.abs(fwd) < 20 && d > 160) { c.stuckT += dt; if (c.stuckT > 1.5) { c.stuckT = 0; c.reverseT = 1; } }
+  else c.stuckT = 0;
+  const want = d < 160 ? Math.max(0, Math.hypot(tvx, tvy) - 30) : 700;
+  return {
+    up: fwd < want,
+    down: fwd > want + 40,
+    steer: clamp(diff * 3, -1, 1),
+    handbrake: Math.abs(diff) > 1.2 && fwd > 250,
+  };
+}
+
+function updateWanted(dt) {
+  // gyorshajtás az úton (és járdán)
+  const kmh = Math.hypot(car.vx, car.vy) / KMH;
+  if (player.inCar && controllable() && onRoad(car.x, car.y, SIDEWALK_W) && kmh > SPEED_LIMIT) raiseWanted(1);
+  if (!wanted.level) return;
+
+  const cops = aiCars.filter(c => c.chasing && !c.wrecked);
+  if (policeEnabled && cops.length < POLICE_COUNT[wanted.level] && rand() < dt * 0.8) spawnPolice();
+
+  // lerázás: ha 12 mp-ig egy rendőr sincs 1500 px-en belül
+  const t = player.inCar ? car : player;
+  if (cops.some(c => dist(c, t) < 1500)) wanted.lostTimer = 0;
+  else wanted.lostTimer += dt;
+  if (wanted.lostTimer > 12) {
+    clearWanted();
+    message = { text: 'Leráztad a rendőröket!', until: clock + 2.5, color: '#7f7' };
+    return;
+  }
+  // letartóztatás: ha állsz és egy rendőr melletted van
+  const slow = Math.hypot(player.inCar ? car.vx : 0, player.inCar ? car.vy : 0) < 40;
+  if (controllable() && slow && cops.some(c => dist(c, t) < (player.inCar ? 110 : 90))) wanted.bustTimer += dt;
+  else wanted.bustTimer = 0;
+  if (wanted.bustTimer > 1.5) {
+    player.arrested = 3;
+    if (player.inCar) { player.inCar = false; player.x = car.x + 40; player.y = car.y; }
+    message = { text: 'LETARTÓZTATTAK!', until: clock + 3, color: '#4af' };
+  }
 }
 
 // ===== Lövöldözés =====
@@ -644,7 +742,7 @@ function alertPeds(x, y) {
 function updatePlayerShooting(dt) {
   player.cooldown -= dt;
   const byMouse = mouse.down, byKey = !!keys.KeyF;
-  if (player.dead || (!byMouse && !byKey) || player.cooldown > 0) return;
+  if (!controllable() || (!byMouse && !byKey) || player.cooldown > 0) return;
   const src = player.inCar ? car : player;
   let ang = player.inCar ? car.angle : player.angle;
   if (byMouse) {
@@ -673,7 +771,11 @@ function updateBullets(dt) {
           }
         }
         if (!hit) for (const c of aiCars) {
-          if (Math.hypot(c.x - b.x, c.y - b.y) < c.r) { damageCar(c); hit = true; break; }
+          if (Math.hypot(c.x - b.x, c.y - b.y) < c.r) {
+            damageCar(c); hit = true;
+            if (c.police) raiseWanted(2);   // rendőrre lőni súlyos
+            break;
+          }
         }
       } else if (!player.dead) {
         const t = player.inCar ? car : player;
@@ -798,13 +900,17 @@ function update(dt) {
   if (player.dead > 0) {
     player.dead -= dt;
     if (player.dead <= 0) respawn();
+  } else if (player.arrested > 0) {
+    player.arrested -= dt;
+    if (player.arrested <= 0) respawn();
   } else if (!player.inCar) {
     updatePlayer(dt);
   }
   updatePlayerShooting(dt);
   updateCarPhysics(car, playerCarInput(), dt);
   if (player.inCar) { player.x = car.x; player.y = car.y; }
-  for (const c of aiCars) updateCarPhysics(c, aiCarInput(c), dt);
+  for (const c of aiCars) updateCarPhysics(c, c.chasing ? policeInput(c, dt) : aiCarInput(c), dt);
+  updateWanted(dt);
   carCollisions();
   updateNpcs(dt);
   updateBullets(dt);
@@ -894,6 +1000,15 @@ function drawRoads(view) {
   for (const R of vRoads) {
     for (let i = Math.floor(ya / 80) * 80; i < yb; i += 80) if (Math.abs(i - nearestRoad(i)) > EDGE + 10) ctx.fillRect(R - 2, i, 4, 40);
   }
+  // „60” sebességkorlát-táblák a jobb oldali járdán
+  const sign = (x, y) => {
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#d01010'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, 9.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#111'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(String(SPEED_LIMIT), x, y + 3.5); ctx.textAlign = 'left';
+  };
+  for (const R of hRoads) for (let i = Math.floor(xa / 1000) * 1000 + 500; i < xb; i += 1000) { sign(i, R + ROAD_W / 2 + 36); sign(i + 60, R - ROAD_W / 2 - 36); }
+  for (const R of vRoads) for (let i = Math.floor(ya / 1000) * 1000 + 500; i < yb; i += 1000) { sign(R - ROAD_W / 2 - 36, i); sign(R + ROAD_W / 2 + 36, i + 60); }
   // zebrák a kereszteződésekben, ahol a járda átvezet az úttesten
   ctx.fillStyle = '#f0f0f0';
   for (const H of hRoads) {
@@ -949,6 +1064,13 @@ function drawCar(c, n) {
   ctx.fillRect(L / 2 - 4, -W / 2 + 3, 4, 7); ctx.fillRect(L / 2 - 4, W / 2 - 10, 4, 7);
   ctx.fillStyle = c.braking && !c.wrecked ? '#ff3030' : '#801010';
   ctx.fillRect(-L / 2, -W / 2 + 3, 3, 7); ctx.fillRect(-L / 2, W / 2 - 10, 3, 7);
+  if (c.police) {                                    // fényhíd: üldözéskor villog
+    const on = c.chasing && !c.wrecked, blink = Math.floor(clock * 6) % 2;
+    ctx.fillStyle = on && blink ? '#ff2020' : '#701010'; ctx.fillRect(-6, -W / 2 + 4, 8, W / 2 - 4);
+    ctx.fillStyle = on && !blink ? '#2060ff' : '#102070'; ctx.fillRect(-6, 0, 8, W / 2 - 4);
+    ctx.fillStyle = '#1d2a4a'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('POLICE', -L / 4 - 4, 3); ctx.textAlign = 'left';
+  }
   ctx.restore();
 }
 
@@ -1026,6 +1148,16 @@ function drawLighting(n, cam, w, h, lamps, cars) {
     gg.addColorStop(0, `rgba(255,200,120,${0.35 * n})`); gg.addColorStop(1, 'rgba(255,200,120,0)');
     ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(x, y, 200, 0, Math.PI * 2); ctx.fill();
   }
+  // villogó szirénafény a rendőrautók körül
+  const blink = Math.floor(clock * 6) % 2;
+  for (const c of cars) {
+    if (!c.police || !c.chasing || c.wrecked) continue;
+    const x = sx(c.x), y = sy(c.y);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, 160);
+    const col = blink ? '255,40,40' : '40,90,255';
+    g.addColorStop(0, `rgba(${col},${0.5 * n})`); g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 160, 0, Math.PI * 2); ctx.fill();
+  }
   ctx.globalCompositeOperation = 'source-over';
 
   // alkonyati / hajnali narancs árnyalat
@@ -1068,13 +1200,22 @@ function drawHud(w, h) {
   ctx.fillRect(80, 47, 150 * player.health / 100, 13);
   ctx.fillStyle = '#fff';
   ctx.fillText(`Ölések: ${player.kills}`, 245, 58);
-  ctx.fillText(player.inCar ? `Sebesség: ${speed} km/h` : 'Gyalog', 20, 80);
-  if (storm.level > 0.3) { ctx.fillStyle = '#ffb040'; ctx.fillText('⚠ Homokvihar!', 245, 80); ctx.fillStyle = '#fff'; }
+  const speeding = player.inCar && onRoad(car.x, car.y, SIDEWALK_W) && speed > SPEED_LIMIT;
+  ctx.fillStyle = speeding ? '#f55' : '#fff';
+  ctx.fillText(player.inCar ? `Sebesség: ${speed} km/h (korlát: ${SPEED_LIMIT})` : 'Gyalog', 20, 80);
+  ctx.fillStyle = '#fff';
+  if (wanted.level) {
+    ctx.fillStyle = Math.floor(clock * 4) % 2 ? '#4af' : '#f44';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText('★'.repeat(wanted.level) + '☆'.repeat(2 - wanted.level) + ' KÖRÖZÉS', 20, 200);
+    ctx.font = '14px sans-serif'; ctx.fillStyle = '#fff';
+  }
+  if (storm.level > 0.3) { ctx.fillStyle = '#ffb040'; ctx.fillText('⚠ Homokvihar!', 300, 80); ctx.fillStyle = '#fff'; }
   ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 104);
   ctx.fillText('Space: kézifék · Bal klikk / F: lövés', 20, 124);
   ctx.fillText(`H: homokvihar · T: gyors idő (${timeScale}x) · Esc: menü`, 20, 144);
   ctx.fillStyle = '#bbb'; ctx.font = '12px sans-serif';
-  ctx.fillText('Vigyázz a zöld nyálkafoltokkal az úton!', 20, 164);
+  ctx.fillText(`Vigyázz a nyálkafoltokkal! Az úton ${SPEED_LIMIT} km/h felett jön a rendőrség.`, 20, 164);
 
   ctx.fillStyle = '#fff';
   ctx.textAlign = 'center';
@@ -1084,7 +1225,7 @@ function drawHud(w, h) {
   }
   if (message && clock < message.until) {
     ctx.font = 'bold 48px sans-serif';
-    ctx.fillStyle = message.text === 'MEGHALTÁL' ? '#e33' : '#fff';
+    ctx.fillStyle = message.color || (message.text === 'MEGHALTÁL' ? '#e33' : '#fff');
     ctx.fillText(message.text, w / 2, h / 2 - 60);
   }
   ctx.textAlign = 'left';
@@ -1110,7 +1251,11 @@ function drawMinimap(w) {
   for (const R of roadsIn(player.y - RAD - 100, player.y + RAD + 100)) ctx.fillRect(x0, py(R) - 2, S, 4);
   for (const R of roadsIn(player.x - RAD - 100, player.x + RAD + 100)) ctx.fillRect(px(R) - 2, y0, 4, S);
   ctx.strokeStyle = '#a00'; ctx.lineWidth = 2; ctx.strokeRect(px(0), py(0), WORLD * k, WORLD * k);   // pálya széle
-  for (const c of aiCars) { ctx.fillStyle = c.wrecked ? '#333' : c.color[0]; ctx.fillRect(px(c.x) - 2, py(c.y) - 2, 4, 4); }
+  for (const c of aiCars) {
+    ctx.fillStyle = c.wrecked ? '#333' : c.chasing ? (Math.floor(clock * 6) % 2 ? '#f22' : '#26f') : c.color[0];
+    const sz = c.chasing ? 6 : 4;
+    ctx.fillRect(px(c.x) - sz / 2, py(c.y) - sz / 2, sz, sz);
+  }
   ctx.fillStyle = '#e33';
   for (const p of npcs) if (p.kind === 'bandit' && !p.dead) { ctx.beginPath(); ctx.arc(px(p.x), py(p.y), 2.5, 0, Math.PI * 2); ctx.fill(); }
   ctx.fillStyle = '#d42020'; ctx.fillRect(px(car.x) - 3, py(car.y) - 3, 6, 6);

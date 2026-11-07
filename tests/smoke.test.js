@@ -26,7 +26,8 @@ eval(src + `
 ;global.G = { player, car, aiCars, npcs, bullets, storm, skidMarks, smoke, WORLD, OLD_WORLD, CHUNK, C,
   getChunk, chunkCache, onRoad, onSlime, nearestRoad, spawnNpc, spawnAiCar, damageCar, damagePlayer, nightAmount,
   get time(){return time}, set time(v){time=v}, get timeScale(){return timeScale},
-  set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
+  set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, set police(v){policeEnabled=v}, wanted, clearWanted,
+  SPEED_LIMIT, KMH, START_X, START_Y, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
@@ -43,6 +44,7 @@ const near = (a, b, eps = 0.01) => Math.abs(a - b) < eps;
 // a determinisztikus tesztekhez kikapcsoljuk a spawnolást és a nyálkát
 G.spawn = false;
 G.slime = false;
+G.police = false;
 
 step(10);
 check('a játék elindul és fut', typeof rafCb === 'function');
@@ -235,6 +237,51 @@ Object.assign(scared, { moving: true, wanderT: 99 });
 step(240);
 check('megijedés után visszatér a járdára', onSidewalk(scared));
 G.npcs.length = 0;
+
+// --- rendőrség: gyorshajtás → üldözés ---
+G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted();
+G.police = true;
+Object.assign(G.player, { x: 30000, y: G.C, inCar: true, health: 100 });
+Object.assign(G.car, { x: 30000, y: G.C, angle: 0, vx: 0, vy: 0, spin: 0 });
+const speedKmh = () => Math.hypot(G.car.vx, G.car.vy) / G.KMH;
+key('KeyW', true);
+let maxSlow = 0;
+while (speedKmh() < G.SPEED_LIMIT - 8) { step(1); maxSlow = Math.max(maxSlow, speedKmh()); }
+key('KeyW', false); step(30);
+check(`${G.SPEED_LIMIT} km/h alatt nincs körözés`, G.wanted.level === 0 && maxSlow < G.SPEED_LIMIT);
+key('KeyW', true); step(60); key('KeyW', false);
+check(`${G.SPEED_LIMIT} km/h felett körözni kezdenek`, G.wanted.level === 1);
+key('KeyS', true); step(90); key('KeyS', false);    // megállunk
+let cop = null;
+for (let i = 0; i < 600 && !cop; i++) { step(1); cop = G.aiCars.find(c => c.police && c.chasing); }
+check('megjelenik az üldöző rendőrautó', !!cop);
+const d0 = Math.hypot(cop.x - G.car.x, cop.y - G.car.y);
+step(90);
+const d1 = Math.hypot(cop.x - G.car.x, cop.y - G.car.y);
+check('a rendőrautó közeledik', d1 < d0 - 200);
+let busted = false;
+for (let i = 0; i < 900 && !busted; i++) { step(1); busted = G.player.arrested > 0; }
+check('ha megállsz, a rendőr letartóztat', busted);
+step(200);
+check('letartóztatás után újrakezdés, körözés nélkül', G.player.arrested <= 0 && G.wanted.level === 0 && G.player.x === G.START_X);
+check('a rendőrautók eltűnnek', !G.aiCars.some(c => c.police));
+
+// rendőrre lövés: 2 csillag
+G.aiCars.length = 0;
+G.police = false;
+G.wanted.level = 1;
+const cop2 = Object.assign(G.spawnAiCar('h', 1, G.C, 30250), { police: true, vx: 0, vy: 0 });
+cop2.ai.speed = 0;
+Object.assign(G.player, { x: 30000, y: cop2.y, inCar: false, angle: 0 });   // egy vonalban az autóval
+key('KeyF', true); step(10); key('KeyF', false);
+step(20);
+check('rendőrre lövéskor 2 csillagos a körözés', G.wanted.level === 2);
+G.aiCars.length = 0;
+
+// lerázás: ha 12 mp-ig nincs rendőr a közelben
+step(60 * 13);
+check('12 mp rendőr nélkül → lerázod őket', G.wanted.level === 0);
+G.police = false;
 
 // --- Esc menü: szünet, szkin- és autóváltás ---
 Object.assign(G.player, { x: 10000, y: G.C, inCar: false });
