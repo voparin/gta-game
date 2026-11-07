@@ -5,6 +5,16 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.11.0 – 2026-11-07
+- Parkoló minden buszmegálló mellett, bennük bérautó: E-vel $15-ért kibérelhető (ADR-0022)
+- Magyar zászló (piros-fehér-zöld) minden buszmegállóban
+- Csövesek a járdán: E-vel $1–$200 közötti adományt adhatsz nekik (←→ ±1, ↑↓ ±10, egérrel is); az összes adomány a rekordok között
+- Házak az utak mentén, mindkét oldalon (változatos tetők, kémény, bejárat; szilárd akadályok)
+- Kódátnézés után javítva: bérléssel olcsón (tele tankkal) lehetett tankolni a saját autót
+- Kódátnézés után javítva: a csöveseket a homokvihar és a lassú autó leszorította a helyükről az úttestre
+- Kódátnézés után javítva: a házak sarkai nem voltak szilárdak (téglalap-ütközés, ADR-0023); csöves ülhetett a buszváróba; bérlés közbeni újraéledésnél a saját autó nem kapta meg a 40% benzint
+- Tesztek: a rendőrség közeledését rögzített helyzetben mérjük; a homokvihar csak a saját tesztjében jön
+
 ## 0.10.0 – 2026-11-07
 - Végtelen pálya: nincs pályaszél, bármerre lehet menni (ADR-0019)
 - Autóversenyek: rajt a közelben, visszaszámlálás, 3 AI ellenfél, 6 ellenőrzőpont, díj a helyezésért (ADR-0020)

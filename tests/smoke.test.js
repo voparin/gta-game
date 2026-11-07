@@ -30,7 +30,7 @@ eval(src + `
   SPEED_LIMIT, KMH, START_X, START_Y, progress, mission, drift, stationFor, nearPump, earn, levelOf,
   set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
   set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, stationCache, STATION_CACHE_MAX, raiseWanted,
-  get message(){return message}, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
+  get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
@@ -50,6 +50,7 @@ G.slime = false;
 G.police = false;
 G.missions = false;
 G.races = false;
+G.storm.timer = 1e9;      // a homokvihar csak a saját tesztjében jöjjön (a szél sodor mindent)
 
 step(10);
 check('a játék elindul és fut', typeof rafCb === 'function');
@@ -199,6 +200,8 @@ check('3 mp után újraéled teljes életerővel', G.player.dead <= 0 && G.playe
 G.spawn = true;
 step(300);
 check('megjelennek AI gyalogosok', G.npcs.some(p => p.kind === 'ped'));
+for (let i = 0; i < 1800 && !G.npcs.some(p => p.kind === 'homeless'); i++) step(1);
+check('magától megjelennek csövesek a járdán', G.npcs.some(p => p.kind === 'homeless'));
 check('a megjelenő gyalogosok a járdán / zebrán vannak', G.npcs.filter(p => p.kind === 'ped' && !p.dead).every(p => G.onRoad(p.x, p.y, G.SIDEWALK_W)));
 check('megjelennek AI autók', G.aiCars.length > 0);
 for (let i = 0; i < 1800 && !G.aiCars.some(c => c.citybus); i++) step(1);
@@ -212,6 +215,7 @@ check('H gombra homokvihar támad', G.storm.level > 0.9 && G.storm.particles.len
 key('KeyH', true); key('KeyH', false);
 step(300);
 check('H gombra eláll a homokvihar', G.storm.level < 0.1);
+G.storm.timer = 1e9;
 
 // --- járda és sétáló gyalogosok ---
 const onSidewalk = p => {
@@ -223,7 +227,7 @@ const paved = p => G.onRoad(p.x, p.y, G.SIDEWALK_W);
 let blocking = 0, lampsOnWalkLine = 0;
 for (let cx = 20; cx < 34; cx++) for (let cy = 20; cy < 34; cy++) {
   const ch = G.getChunk(cx, cy);
-  for (const o of ch.obstacles) if (o.type !== 'lamp' && G.onRoad(o.x, o.y, G.SIDEWALK_W + o.r)) blocking++;
+  for (const o of ch.obstacles) if ((o.type === 'cactus' || o.type === 'rock') && G.onRoad(o.x, o.y, G.SIDEWALK_W + o.r)) blocking++;
   for (const l of ch.lamps) {
     const d = Math.min(Math.abs(l.y - G.nearestRoad(l.y)), Math.abs(l.x - G.nearestRoad(l.x)));
     if (Math.abs(d - G.WALK_OFF) < 8 + 11) lampsOnWalkLine++;
@@ -284,8 +288,14 @@ G.aiCars.length = 0;                                  // egy frissen érkező re
 let cop = null;
 for (let i = 0; i < 600 && !cop; i++) { step(1); cop = G.aiCars.find(c => c.police && c.chasing); }
 check('megjelenik az üldöző rendőrautó', !!cop);
+// a közeledést rögzített helyzetben mérjük: a rendőr ugyanazon az üres úton jön, 1400 px-ről (ne múljon a véletlen akadályokon)
+G.aiCars.length = 0; G.police = false;
+Object.assign(G.car, { y: G.C, angle: 0, vx: 0, vy: 0 });
+cop = Object.assign(G.spawnAiCar('h', 1, G.C, G.car.x - 1400), { police: true, chasing: true, stuckT: 0, reverseT: 0 });
+cop.y = G.C;
 const d0 = Math.hypot(cop.x - G.car.x, cop.y - G.car.y);
 step(90);
+G.police = true;
 const d1 = Math.hypot(cop.x - G.car.x, cop.y - G.car.y);
 check('a rendőrautó közeledik', d1 < d0 - 200);
 let busted = false;
@@ -648,6 +658,157 @@ G.npcs.length = 0; G.aiCars.length = 0;
   for (let i = 0; i < 400; i++) G.nearestStation(1e6 + i * 60000, -1e6);   // korlát nélkül ~10 000 bejegyzés lenne
   check('a benzinkút-tároló mérete korlátos', G.stationCache.size <= G.STATION_CACHE_MAX);
   G.aiCars.length = 0;
+}
+
+// --- parkolók autóbérléssel és magyar zászlók a megállókban ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted();
+  const stops = G.busStopsIn(G.C - 8000, G.C - 8000, G.C + 8000, G.C + 8000);
+  const lots = stops.map(G.parkingLot);
+  check('minden buszmegálló mellett van parkoló', lots.length === stops.length && lots.every(l =>
+    Math.hypot((l.x0 + l.x1) / 2 - l.bs.x, (l.y0 + l.y1) / 2 - l.bs.y) < 300));
+  check('a parkolók az úton és a járdán kívül vannak', lots.every(l => [[l.x0, l.y0], [l.x1, l.y1], [(l.x0 + l.x1) / 2, (l.y0 + l.y1) / 2]]
+    .every(([x, y]) => !G.onRoad(x, y, G.SIDEWALK_W))));
+  let blocked = 0;
+  for (const l of lots.slice(0, 20)) for (const ch of G.chunksIn(l.x0, l.y0, l.x1, l.y1))
+    for (const o of ch.obstacles) if ((o.type === 'cactus' || o.type === 'rock') && o.x > l.x0 - o.r && o.x < l.x1 + o.r && o.y > l.y0 - o.r && o.y < l.y1 + o.r) blocked++;
+  check('a parkolókban nincs kaktusz vagy szikla', blocked === 0);
+  check('minden megállóban ki van tűzve a magyar zászló (piros-fehér-zöld)', lots.every(l => l.flag && Math.hypot(l.flag.x - l.bs.x, l.flag.y - l.bs.y) < 60)
+    && G.HU_FLAG.join() === '#CD2A3E,#FFFFFF,#436F4D');
+  // bérlés
+  const lot = lots.find(l => l.bs.axis === 'h' && l.bs.side === 1 && l.bs.along > G.C + 3000);
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });         // a saját autó messze van
+  Object.assign(G.player, { x: lot.spot.x, y: lot.spot.y + 50, inCar: false, riding: null, dead: 0, arrested: 0 });
+  G.progress.money = 10;
+  key('KeyE', true); key('KeyE', false);
+  check(`$${G.RENT_PRICE} nélkül nem lehet autót bérelni`, !G.player.inCar && G.progress.money === 10);
+  G.progress.money = 20;
+  key('KeyE', true); key('KeyE', false);
+  check(`$${G.RENT_PRICE}-ért autót lehet bérelni a parkolóban`, G.player.inCar && G.car.rental && G.progress.money === 20 - G.RENT_PRICE
+    && Math.hypot(G.car.x - lot.spot.x, G.car.y - lot.spot.y) < 1 && G.car.fuel === 100 && G.car.type === 'rental');
+  key('KeyW', true); step(60); key('KeyW', false);
+  check('a bérautóval lehet vezetni', Math.hypot(G.car.x - lot.spot.x, G.car.y - lot.spot.y) > 50);
+  key('KeyS', true); step(60); key('KeyS', false);
+  key('KeyE', true); key('KeyE', false);
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  Object.assign(G.player, { x: lot.spot.x, y: lot.spot.y + 50, inCar: false });
+  G.progress.money = 100;
+  key('KeyE', true); key('KeyE', false);
+  check('egy parkolóban csak egy bérautó van', !G.player.inCar && G.progress.money === 100);
+  G.selectCar(0);
+  check('saját autót választva véget ér a bérlés', !G.car.rental && G.car.type !== 'rental');
+  // a bérautó teli tankja nem száll át a saját autóra
+  const lot2 = lots.find(l => l.bs.axis === 'h' && l.bs.side === -1 && l.bs.along > G.C + 3000);
+  G.car.fuel = 5;
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  Object.assign(G.player, { x: lot2.spot.x, y: lot2.spot.y - 50, inCar: false });
+  key('KeyE', true); key('KeyE', false);
+  const rentedFuel = G.car.fuel;
+  G.selectCar(0);
+  check('bérléssel nem lehet olcsón teletankolni a saját autót', rentedFuel === 100 && G.car.fuel === 5);
+  // bérlés közben meghalva a saját autó is megkapja a 40%-os minimumot
+  G.car.fuel = 0;
+  const lot3 = lots.find(l => l.bs.axis === 'h' && l.bs.side === 1 && l.bs.along > G.C + 6000);
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  Object.assign(G.player, { x: lot3.spot.x, y: lot3.spot.y + 50, inCar: false });
+  G.progress.money = 100;
+  key('KeyE', true); key('KeyE', false);
+  G.damagePlayer(1000); step(200);
+  G.selectCar(0);
+  check('bérlés közbeni újraéledés után a saját autóban is van legalább 40% benzin', G.car.fuel >= 40);
+}
+
+// --- csövesek és adományozás ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted();
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  const hx = G.C + 15000, hy = G.C + G.WALK_OFF + 16;
+  const bum = G.spawnNpc('homeless', hx, hy);
+  Object.assign(G.player, { x: hx, y: hy - 30, inCar: false, riding: null, dead: 0, arrested: 0, health: 100 });
+  step(120);
+  check('a csöves ül a helyén, és nem lő', bum.x === hx && bum.y === hy && G.player.health === 100 && G.bullets.length === 0);
+  // homokviharban sem sodródik el, és a lassan nekimenő autó sem tolja le a járdáról
+  G.storm.level = G.storm.target = 1; G.storm.timer = 60;
+  step(240);
+  G.storm.level = G.storm.target = 0; G.storm.timer = 1e9;
+  check('a csöves homokviharban sem sodródik el', bum.x === hx && bum.y === hy);
+  Object.assign(G.player, { x: hx + 300, y: hy - 30 });          // a játékos félreáll, amíg az autó gurul
+  Object.assign(G.car, { x: hx, y: hy - 45, angle: Math.PI / 2, vx: 0, vy: 60 });
+  step(30);
+  check('a lassú autó nem tolja le a csövest a helyéről', bum.x === hx && bum.y === hy && !bum.dead);
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  Object.assign(G.player, { x: hx, y: hy - 30 });
+  G.progress.money = 500;
+  const donated0 = G.progress.donated || 0;
+  press('KeyE');
+  check('E-re megnyílik az adományozás', G.donate.open && G.donate.target === bum);
+  const clk = G.clock; step(30);
+  check('adományozás közben megáll a játék', G.clock === clk);
+  for (let i = 0; i < 30; i++) press('ArrowDown');
+  check(`az összeg legalább $${G.DONATE_MIN}`, G.donate.amount === G.DONATE_MIN);
+  for (let i = 0; i < 30; i++) press('ArrowUp');
+  check(`az összeg legfeljebb $${G.DONATE_MAX}`, G.donate.amount === G.DONATE_MAX);
+  press('ArrowLeft'); press('ArrowDown');
+  check('←/↓ eggyel és tízzel csökkent', G.donate.amount === G.DONATE_MAX - 11);
+  press('Enter');
+  check('az adomány levonódik és összesítődik', !G.donate.open && G.progress.money === 500 - 189 && G.progress.donated === donated0 + 189 && bum.received === 189);
+  // nincs elég pénz
+  G.progress.money = 5;
+  press('KeyE');
+  press('ArrowUp');                                    // 10 → 20
+  press('Enter');
+  check('nem lehet többet adni, mint amennyi pénzed van', G.donate.open && G.progress.money === 5);
+  press('Escape');
+  check('Esc-re bezárul, nem fizetsz', !G.donate.open && G.progress.money === 5 && !G.menu.open);
+  // egérrel: +10, majd „Adományozok”
+  G.progress.money = 100;
+  press('KeyE'); step(1);
+  const before = G.donate.amount;
+  const plus10 = G.donate.hits.find(h => h.delta === 10), give = G.donate.hits.find(h => h.give);
+  listeners.mousedown({ button: 0, clientX: plus10.x + 5, clientY: plus10.y + 5 });
+  check('egérrel is lehet emelni az összeget', G.donate.amount === before + 10);
+  listeners.mousedown({ button: 0, clientX: give.x + 5, clientY: give.y + 5 });
+  check('egérrel is lehet adományozni', !G.donate.open && G.progress.money === 100 - (before + 10));
+  // a csöves helye: járdán igen, kereszteződésben (zebrán / úttesten) soha
+  const spots = [];
+  for (const axis of ['h', 'v']) for (const side of [-1, 1]) for (let along = G.C - 6000; along <= G.C + 6000; along += 37) {
+    spots.push({ along, p: G.homelessSpot(axis, G.C, side, along) });
+  }
+  check('a csöves soha nem ül az úttesten vagy a zebrán', spots.every(o => !o.p || (G.onRoad(o.p.x, o.p.y, G.SIDEWALK_W) && !G.onRoad(o.p.x, o.p.y))));
+  const nearStop = a => { const m = ((a - 1250) % G.STOP_SPACING + G.STOP_SPACING) % G.STOP_SPACING; return Math.min(m, G.STOP_SPACING - m) < 80; };
+  check('kereszteződésnél és megállónál nincs csöveshely, máshol van', spots.filter(o => !o.p).every(o => Math.abs(o.along - G.nearestRoad(o.along)) < 300 || nearStop(o.along))
+    && spots.filter(o => o.p).length > spots.length * 0.75);
+  check('csöves nem ülhet a buszváróba', [-1, 1].every(side => G.homelessSpot('h', G.C, side, G.C + 3750) === null && G.homelessSpot('h', G.C, side, G.C + 3750 + 40) === null));
+  G.npcs.length = 0;
+}
+
+// --- házak az utak mentén ---
+{
+  const area = [G.C - 15000, G.C - 15000, G.C + 15000, G.C + 15000];
+  const hs = G.housesIn(...area);
+  check('vannak házak az utak mentén, mindkét oldalon', hs.length > 100 && hs.some(h => h.side === 1) && hs.some(h => h.side === -1)
+    && hs.some(h => h.axis === 'h') && hs.some(h => h.axis === 'v'));
+  const corners = h => [[h.x0, h.y0], [h.x1, h.y0], [h.x0, h.y1], [h.x1, h.y1], [h.x, h.y]];
+  check('a házak nem lógnak az útra vagy a járdára', hs.every(h => corners(h).every(([x, y]) => !G.onRoad(x, y, G.SIDEWALK_W))));
+  const overlap = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+  const sts = G.stationsIn(...area).map(st => st.rect), lots = G.lotsIn(...area);
+  check('a házak nem ütköznek benzinkúttal vagy parkolóval', hs.every(h => !sts.some(r => overlap(h, r)) && !lots.some(l => overlap(h, l))));
+  check('a házak nem fedik egymást', hs.every((a, i) => hs.every((b, j) => i === j || !overlap(a, b))));
+  let inHouse = 0;
+  for (const h of hs.slice(0, 60)) for (const ch of G.chunksIn(h.x0, h.y0, h.x1, h.y1))
+    for (const o of ch.obstacles) if ((o.type === 'cactus' || o.type === 'rock') && o.x > h.x0 && o.x < h.x1 && o.y > h.y0 && o.y < h.y1) inHouse++;
+  check('a házakban nincs kaktusz vagy szikla', inHouse === 0);
+  const h0 = hs[0], probe = { x: h0.x, y: h0.y, r: 12 };
+  G.collideTest(probe);
+  check('a ház szilárd: nem lehet belemenni', Math.hypot(probe.x - h0.x, probe.y - h0.y) > 10);
+  const cornersIn = hs.slice(0, 30).flatMap(h => [[h.x0 + 3, h.y0 + 3], [h.x1 - 3, h.y0 + 3], [h.x0 + 3, h.y1 - 3], [h.x1 - 3, h.y1 - 3]].map(([x, y]) => ({ h, x, y })));
+  check('a ház sarkai is szilárdak (a gyalogos nem lép a tetőre)', cornersIn.every(({ h, x, y }) => {
+    const pr = { x, y, r: 12 }; G.collideTest(pr);
+    const cx = Math.max(h.x0, Math.min(pr.x, h.x1)), cy = Math.max(h.y0, Math.min(pr.y, h.y1));
+    return Math.hypot(pr.x - cx, pr.y - cy) >= 12 - 1e-6;
+  }));
+  check('a ház akadályt a golyó is érzékeli a saroknál', cornersIn.every(({ x, y }) => G.obstacleAt(x, y)));
+  check('a házak mindig ugyanott vannak', JSON.stringify(G.housesIn(...area).map(h => [h.x, h.y, h.roof])) === JSON.stringify(hs.map(h => [h.x, h.y, h.roof])));
 }
 
 // --- zöld busz: csak a játékosé ---

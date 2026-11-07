@@ -4,6 +4,8 @@ Felülnézetes, GTA-szerű böngészős játék egy végtelen sivatagban: piros 
 
 Élő verzió: https://voparin.github.io/gta-game/
 
+Az utak mentén házak, buszmegállók (magyar zászlóval), parkolók és benzinkutak vannak.
+
 ## Indítás
 Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 
@@ -44,3 +46,12 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Az utak mentén buszmegállók vannak; a narancs városi buszok megállnak bennük.
 - A megálló busz mellett **E**: felszállás ($2), **E** újra: leszállás, amikor a busz megáll.
 - A **zöld busz** csak a tiéd – az Esc menüben választhatod ki.
+- Minden megállóban ki van tűzve a 🇭🇺 magyar zászló.
+
+## Autóbérlés
+- Minden buszmegálló mellett van egy parkoló egy fehér **bérautóval**. Mellé állva **E**: kibérled **$15-ért** (tele tankkal).
+- A saját autóidat az Esc menüben bármikor visszaválaszthatod.
+
+## Csövesek
+- A járdán csövesek ülnek („SEGÍTS” tábla, pohár). Mellettük **E**: adományozhatsz **$1 és $200** között.
+- Az összes adományod az Esc menüben, a rekordok között látszik.

@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.10.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.11.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -35,6 +35,7 @@ const keys = {};
 const mouse = { x: 0, y: 0, down: false, active: false };
 let timeScale = 1;
 window.addEventListener('keydown', e => {
+  if (donate.open) { if (!e.repeat) donateKey(e.code); return; }
   if (e.code === 'Escape') { if (!e.repeat) toggleMenu(); return; }
   if (menu.open) { if (!e.repeat) menuKey(e.code); return; }
   keys[e.code] = true;
@@ -47,6 +48,7 @@ window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; });
 window.addEventListener('mousedown', e => {
   mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+  if (donate.open) { if (e.button === 0) donateClick(e.clientX, e.clientY); return; }
   if (menu.open) { if (e.button === 0) menuClick(e.clientX, e.clientY); return; }
   if (e.button === 0) mouse.down = true;
 });
@@ -110,6 +112,11 @@ function generateChunk(cx, cy) {
     }
   }
   for (const l of ch.lamps) ch.obstacles.push({ x: l.x, y: l.y, r: 8, type: 'lamp' });
+  // házak: téglalap alakú akadály (a sarkok is szilárdak); a chunkba a középpontja szerint kerül
+  for (const hs of housesIn(x0, y0, x0 + CHUNK, y0 + CHUNK)) {
+    if (inChunk(hs.x, hs.y)) ch.obstacles.push({ x: hs.x, y: hs.y, r: Math.hypot(hs.w, hs.d) / 2, type: 'house',
+      rect: { x0: hs.x0, y0: hs.y0, x1: hs.x1, y1: hs.y1 } });
+  }
   // benzinkutak: kutak és az épület fala
   for (const st of stationsIn(x0, y0, x0 + CHUNK, y0 + CHUNK)) {
     for (const q of st.pumps) if (inChunk(q.x, q.y)) ch.obstacles.push({ x: q.x, y: q.y, r: 10, type: 'pump' });
@@ -123,7 +130,7 @@ function generateChunk(cx, cy) {
       const rot = r() * Math.PI * 2, seed = r();
       if (onRoad(x, y, rad + 40 + SIDEWALK_W)) continue;   // úton és járdán nincs akadály
       if (Math.hypot(x - START_X, y - START_Y) < 250) continue;
-      if (insideStation(x, y, rad + 20)) continue;
+      if (insideStation(x, y, rad + 20) || insideLot(x, y, rad + 20) || insideHouse(x, y, rad + 30)) continue;   // a ház mellett egy gyalogos (24 px) is elfér
       ch.obstacles.push({ x, y, r: rad, type, rot, seed });
     }
   };
@@ -178,9 +185,14 @@ function chunksIn(xa, ya, xb, yb) {
 }
 const chunksAround = (x, y, rad) => chunksIn(x - rad, y - rad, x + rad, y + rad);
 
+const OB_REACH = 100;   // a legnagyobb akadály „sugara” (ház fél-átlója) – ennyivel tágabban keresünk chunkot
+
 function obstacleAt(x, y, pad = 0) {
-  for (const ch of chunksAround(x, y, 50 + pad)) {
-    for (const ob of ch.obstacles) if (Math.hypot(x - ob.x, y - ob.y) < ob.r + pad) return true;
+  for (const ch of chunksAround(x, y, OB_REACH + pad)) {
+    for (const ob of ch.obstacles) {
+      if (ob.rect ? x > ob.rect.x0 - pad && x < ob.rect.x1 + pad && y > ob.rect.y0 - pad && y < ob.rect.y1 + pad
+        : Math.hypot(x - ob.x, y - ob.y) < ob.r + pad) return true;
+    }
   }
   return false;
 }
@@ -286,6 +298,86 @@ function busStopsIn(xa, ya, xb, yb) {
   return out;
 }
 
+// ===== Házak az utak mentén (analitikusan, mint az utak és a megállók) =====
+// 420 px-enként egy telek mindkét oldalon, a járdán túl. Nincs ház a kereszteződések / benzinkutak
+// közelében (650 px) és a megállók melletti parkolóknál; a telkek ~25%-a üres.
+const HOUSE_SPACING = 420, HOUSE_START = 210, HOUSE_GAP = 22;
+const ROOF_COLORS = ['#b5533c', '#8c4a3a', '#6d6a66', '#a0643c', '#7a5a8a', '#4f6d7a'];
+
+function housesIn(xa, ya, xb, yb) {
+  const out = [];
+  const forRoad = (axis, R, a0, a1) => {
+    for (let k = Math.ceil((a0 - HOUSE_START) / HOUSE_SPACING); HOUSE_START + k * HOUSE_SPACING <= a1; k++) {
+      const a = HOUSE_START + k * HOUSE_SPACING;
+      if (Math.abs(a - nearestRoad(a)) < 650) continue;                       // kereszteződés, benzinkút
+      const m = ((a - STOP_OFFSET) % STOP_SPACING + STOP_SPACING) % STOP_SPACING;
+      if (m < 360 || m > STOP_SPACING - 40) continue;                         // megálló melletti parkoló
+      for (const side of [-1, 1]) {
+        const h = rng(chunkSeed(Math.round(a / 10) * (axis === 'h' ? 3 : 5), Math.round(R / 10) * side + 77));
+        if (h() < 0.25) continue;                                              // üres telek
+        const w = 150 - h() * 30, d = 100 - h() * 20, d0 = EDGE + HOUSE_GAP;
+        const toXY = (al, dd) => axis === 'h' ? { x: al, y: R + side * dd } : { x: R + side * dd, y: al };
+        const p = toXY(a - w / 2, d0), q = toXY(a + w / 2, d0 + d), c = toXY(a, d0 + d / 2);
+        out.push({ axis, side, road: R, along: a, w, d, x: c.x, y: c.y,
+          x0: Math.min(p.x, q.x), y0: Math.min(p.y, q.y), x1: Math.max(p.x, q.x), y1: Math.max(p.y, q.y),
+          roof: ROOF_COLORS[(h() * ROOF_COLORS.length) | 0], chimney: h() });
+      }
+    }
+  };
+  for (const R of roadsIn(ya - 400, yb + 400)) forRoad('h', R, xa - 200, xb + 200);
+  for (const R of roadsIn(xa - 400, xb + 400)) forRoad('v', R, ya - 200, yb + 200);
+  return out.filter(o => o.x1 >= xa && o.x0 <= xb && o.y1 >= ya && o.y0 <= yb);
+}
+
+function insideHouse(x, y, pad = 0) {
+  return housesIn(x - pad, y - pad, x + pad, y + pad).some(o => x > o.x0 - pad && x < o.x1 + pad && y > o.y0 - pad && y < o.y1 + pad);
+}
+
+// ===== Parkolók autóbérléssel: minden buszmegálló mellett egy (ADR-0022) =====
+const RENT_PRICE = 15;
+const RENTAL_MODEL = { name: 'Bérautó', type: 'rental', color: ['#f4f4f4', '#c8c8c8'], len: 72, wid: 36, accel: 400, maxRoad: 580, maxSand: 360, sandDrag: 0.9, fuelUse: 0.9 };
+const HU_FLAG = ['#CD2A3E', '#FFFFFF', '#436F4D'];   // a magyar zászló színei: piros, fehér, zöld
+const rentedLots = new Set();                       // a már kibérelt parkolók (ott üres a hely)
+const stopKey = bs => `${bs.axis}:${bs.road}:${bs.along}:${bs.side}`;
+
+// a parkoló a megálló utáni részen, a járdán túl (az úttól távolodva) van; a bérautó a 2. helyen áll
+function parkingLot(bs) {
+  const a0 = bs.along + 60, a1 = bs.along + 260, d0 = EDGE + 8, d1 = EDGE + 128;
+  const spotA = a0 + 25 + 50, spotD = (d0 + d1) / 2;
+  const toXY = (a, d) => bs.axis === 'h' ? { x: a, y: bs.road + bs.side * d } : { x: bs.road + bs.side * d, y: a };
+  const p = toXY(a0, d0), q = toXY(a1, d1), sp = toXY(spotA, spotD);
+  const angle = bs.axis === 'h' ? (bs.side > 0 ? -Math.PI / 2 : Math.PI / 2) : (bs.side > 0 ? Math.PI : 0);   // orral az út felé
+  return { bs, key: stopKey(bs), x0: Math.min(p.x, q.x), y0: Math.min(p.y, q.y), x1: Math.max(p.x, q.x), y1: Math.max(p.y, q.y),
+    spot: { x: sp.x, y: sp.y, angle }, flag: toXY(bs.along - 44, EDGE - 8) };
+}
+
+function lotsIn(xa, ya, xb, yb) {
+  return busStopsIn(xa - 400, ya - 400, xb + 400, yb + 400).map(parkingLot)
+    .filter(l => l.x1 >= xa && l.x0 <= xb && l.y1 >= ya && l.y0 <= yb);
+}
+
+function insideLot(x, y, pad = 0) {
+  return lotsIn(x - pad, y - pad, x + pad, y + pad).some(l => x > l.x0 - pad && x < l.x1 + pad && y > l.y0 - pad && y < l.y1 + pad);
+}
+
+function nearestRentable() {
+  return lotsIn(player.x - 100, player.y - 100, player.x + 100, player.y + 100)
+    .find(l => !rentedLots.has(l.key) && Math.hypot(player.x - l.spot.x, player.y - l.spot.y) < 70);
+}
+
+function rentCar(lot) {
+  if (progress.money < RENT_PRICE) { popup(`Az autóbérlés $${RENT_PRICE} – nincs elég pénzed!`, '#f66'); return false; }
+  progress.money -= RENT_PRICE;
+  saveProgress();
+  rentedLots.add(lot.key);
+  if (!car.rental) car.ownFuel = car.fuel;         // a saját autó benzinje: a bérlés végén ez jár vissza
+  applyCarModel(car, RENTAL_MODEL);
+  Object.assign(car, { x: lot.spot.x, y: lot.spot.y, angle: lot.spot.angle, vx: 0, vy: 0, spin: 0, fuel: 100, rental: true, lastWheels: null });
+  player.inCar = true;
+  popup(`🔑 Kibérelted az autót (-$${RENT_PRICE}) – a saját autóidat az Esc menüben választhatod vissza`, '#7f7');
+  return true;
+}
+
 // Homok textúra
 const sandTile = document.createElement('canvas');
 sandTile.width = sandTile.height = 256;
@@ -350,6 +442,7 @@ function sanitizeProgress(p) {
     money: num(src.money), xp: num(src.xp), owned,
     activeCar: owned.includes(src.activeCar) ? src.activeCar : 0,
     bestDrift: num(src.bestDrift), bestStreak: num(src.bestStreak), missions: num(src.missions), raceWins: num(src.raceWins),
+    donated: num(src.donated),
   };
 }
 function loadProgress() {
@@ -430,6 +523,8 @@ function changeChoice(row, delta) {
 
 function selectCar(i) {
   applyCarModel(car, CAR_MODELS[i]);
+  if (car.rental) car.fuel = car.ownFuel;          // a bérautó benzinje nem száll át a saját autóra
+  car.rental = false;                              // saját autó választásával véget ér a bérlés
   progress.activeCar = i;
   saveProgress();
 }
@@ -486,6 +581,10 @@ function toggleCar() {
     return;
   }
   const bus = !player.inCar && dist(player, car) >= 75 ? nearestBoardableBus() : null;
+  const lot = !bus && !player.inCar && dist(player, car) >= 75 ? nearestRentable() : null;
+  const homeless = !bus && !lot && !player.inCar && dist(player, car) >= 75 ? nearestHomeless() : null;
+  if (homeless) { openDonate(homeless); return; }
+  if (lot) { rentCar(lot); return; }
   if (bus) {
     if (progress.money < BUS_FARE) { popup(`A buszjegy $${BUS_FARE} – nincs elég pénzed!`, '#f66'); return; }
     progress.money -= BUS_FARE;
@@ -506,20 +605,99 @@ function toggleCar() {
   }
 }
 
+// kör–téglalap ütközés: a téglalap legközelebbi pontjától tolja ki a kört
+function pushOutOfRect(o, rc) {
+  const cx = clamp(o.x, rc.x0, rc.x1), cy = clamp(o.y, rc.y0, rc.y1);
+  let dx = o.x - cx, dy = o.y - cy, d = Math.hypot(dx, dy);
+  if (d >= o.r) return null;
+  if (d < 0.0001) {                                     // a középpont a téglalapon belül: a legközelebbi oldalon át ki
+    const opts = [[o.x - rc.x0, -1, 0], [rc.x1 - o.x, 1, 0], [o.y - rc.y0, 0, -1], [rc.y1 - o.y, 0, 1]].sort((a, b) => a[0] - b[0]);
+    const [pen, nx, ny] = opts[0];
+    o.x += nx * (pen + o.r); o.y += ny * (pen + o.r);
+    return { nx, ny };
+  }
+  const nx = dx / d, ny = dy / d;
+  o.x = cx + nx * o.r; o.y = cy + ny * o.r;
+  return { nx, ny };
+}
+
 function collide(o, bounce) {
-  for (const ch of chunksAround(o.x, o.y, o.r + 50)) {
+  for (const ch of chunksAround(o.x, o.y, o.r + OB_REACH)) {
     for (const ob of ch.obstacles) {
-      const dx = o.x - ob.x, dy = o.y - ob.y;
-      const d = Math.hypot(dx, dy), min = o.r + ob.r;
-      if (d < min && d > 0.0001) {
-        const nx = dx / d, ny = dy / d;
-        o.x = ob.x + nx * min; o.y = ob.y + ny * min;
+      let n = null;
+      if (ob.rect) n = pushOutOfRect(o, ob.rect);
+      else {
+        const dx = o.x - ob.x, dy = o.y - ob.y;
+        const d = Math.hypot(dx, dy), min = o.r + ob.r;
+        if (d < min && d > 0.0001) { n = { nx: dx / d, ny: dy / d }; o.x = ob.x + n.nx * min; o.y = ob.y + n.ny * min; }
+      }
+      if (n) {
+        const { nx, ny } = n;
         if (bounce) {
           const vn = o.vx * nx + o.vy * ny;
           if (vn < 0) { o.vx -= 1.4 * vn * nx; o.vy -= 1.4 * vn * ny; o.vx *= 0.6; o.vy *= 0.6; }
           if (vn < -150) o.crashT = clock;
         }
       }
+    }
+  }
+}
+
+// ===== Csövesek: a járdán ülnek, $1–$200 adományt lehet nekik adni =====
+const DONATE_MIN = 1, DONATE_MAX = 200;
+const donate = { open: false, target: null, amount: 10, hits: [] };
+
+// a csöves helye a járda külső részén; kereszteződésben (zebrán, úttesten) nincs hely → null
+function homelessSpot(axis, road, side, along) {
+  if (Math.abs(along - nearestRoad(along)) < EDGE + 40) return null;
+  const m = ((along - STOP_OFFSET) % STOP_SPACING + STOP_SPACING) % STOP_SPACING;
+  if (Math.min(m, STOP_SPACING - m) < 80) return null;          // buszmegálló (váró, tábla, zászló) helyén sem
+  const line = road + side * (WALK_OFF + 16);
+  return axis === 'h' ? { x: along, y: line } : { x: line, y: along };
+}
+
+function nearestHomeless() {
+  return npcs.find(p => p.kind === 'homeless' && !p.dead && dist(p, player) < 60);
+}
+
+function openDonate(p) {
+  Object.assign(donate, { open: true, target: p, amount: clamp(10, DONATE_MIN, Math.max(DONATE_MIN, Math.min(DONATE_MAX, Math.floor(progress.money)))) });
+  for (const k in keys) keys[k] = false;
+  mouse.down = false;
+}
+
+function closeDonate() { donate.open = false; donate.target = null; }
+
+function changeDonation(delta) { donate.amount = clamp(donate.amount + delta, DONATE_MIN, DONATE_MAX); }
+
+function giveDonation() {
+  const p = donate.target, amt = donate.amount;
+  if (!p || p.dead || amt < DONATE_MIN || amt > DONATE_MAX) { closeDonate(); return false; }
+  if (progress.money < amt) { popup(`Nincs ennyi pénzed ($${amt})!`, '#f66'); return false; }
+  progress.money -= amt;
+  progress.donated = (progress.donated || 0) + amt;
+  p.received = (p.received || 0) + amt;
+  p.thanksUntil = clock + 3;
+  saveProgress();
+  popup(`🤲 Adományoztál $${amt}-t – „Köszönöm, jó ember!”`, '#7f7');
+  closeDonate();
+  return true;
+}
+
+function donateKey(code) {
+  if (code === 'Escape') closeDonate();
+  else if (code === 'ArrowRight' || code === 'KeyD') changeDonation(1);
+  else if (code === 'ArrowLeft' || code === 'KeyA') changeDonation(-1);
+  else if (code === 'ArrowUp' || code === 'KeyW') changeDonation(10);
+  else if (code === 'ArrowDown' || code === 'KeyS') changeDonation(-10);
+  else if (code === 'Enter' || code === 'Space') giveDonation();
+}
+
+function donateClick(x, y) {
+  for (const h of donate.hits) {
+    if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) {
+      if (h.give) giveDonation(); else if (h.cancel) closeDonate(); else changeDonation(h.delta);
+      return;
     }
   }
 }
@@ -532,6 +710,7 @@ function spawnNpc(kind, x, y) {
     shirt: kind === 'bandit' ? '#1c1c1c' : PED_SHIRTS[(rand() * PED_SHIRTS.length) | 0],
     head: kind === 'bandit' ? '#b01010' : PED_HAIR[(rand() * PED_HAIR.length) | 0] };
   if (kind === 'ped') assignSidewalk(p);
+  if (kind === 'homeless') Object.assign(p, { shirt: '#6b5a44', head: '#8a8a80', health: 1 });
   npcs.push(p);
   return p;
 }
@@ -603,6 +782,16 @@ function spawnAround(dt) {
     const pos = axis === 'h' ? { x: along, y: line } : { x: line, y: along };
     const d = dist(pos, player);
     if (d > 600 && d < 2400 && !obstacleAt(pos.x, pos.y, 15)) spawnPedOnSidewalk(axis, road, side, along);
+  }
+  if (alive('homeless') < 2 && rand() < dt * 0.3) {   // csövesek a járda külső szélén ülnek
+    const axis = rand() < 0.5 ? 'h' : 'v', side = rand() < 0.5 ? -1 : 1;
+    const road = nearestRoad(axis === 'h' ? player.y : player.x);
+    const along = (axis === 'h' ? player.x : player.y) + (rand() < 0.5 ? -1 : 1) * (600 + rand() * 800);
+    const pos = homelessSpot(axis, road, side, along);
+    if (pos && dist(pos, player) > 500 && dist(pos, player) < 2400 && !obstacleAt(pos.x, pos.y, 15)) {
+      const h = spawnNpc('homeless', pos.x, pos.y);
+      h.angle = axis === 'h' ? (side > 0 ? -Math.PI / 2 : Math.PI / 2) : (side > 0 ? Math.PI : 0);   // az út felé néz
+    }
   }
   if (alive('bandit') < 2 && rand() < dt * 0.2) {
     const pos = ring(1000, 1400);
@@ -805,7 +994,10 @@ function carCollisions() {
       const dx = p.x - c.x, dy = p.y - c.y, d = Math.hypot(dx, dy);
       if (d >= c.r + p.r || d < 0.001) continue;
       if (Math.hypot(c.vx, c.vy) > 120) killNpc(p, c === car && player.inCar);
-      else { p.x = c.x + dx / d * (c.r + p.r); p.y = c.y + dy / d * (c.r + p.r); }
+      else if (p.kind === 'homeless') {                // az ülő csöves nem tolható el: az autó áll meg
+        c.x = p.x - dx / d * (c.r + p.r); c.y = p.y - dy / d * (c.r + p.r);
+        c.vx *= 0.3; c.vy *= 0.3;
+      } else { p.x = c.x + dx / d * (c.r + p.r); p.y = c.y + dy / d * (c.r + p.r); }
     }
   }
 }
@@ -843,6 +1035,7 @@ function respawn() {
   clearWanted();
   for (let i = aiCars.length - 1; i >= 0; i--) if (aiCars[i].police) aiCars.splice(i, 1);
   Object.assign(car, { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, spin: 0, lastWheels: null, fuel: Math.max(car.fuel, 40) });
+  if (car.rental) car.ownFuel = Math.max(car.ownFuel || 0, 40);   // bérlés közben a saját autó is megkapja a minimumot
   for (let i = npcs.length - 1; i >= 0; i--) if (npcs[i].kind === 'bandit') npcs.splice(i, 1);
   message = { text: 'Újraéledtél', until: clock + 2 };
 }
@@ -1125,6 +1318,7 @@ function updateNpcs(dt) {
   for (const p of npcs) {
     if (p.dead) continue;
     let speed = 0;
+    if (p.kind === 'homeless') continue;     // ül a helyén: a szél sem sodorja (nem tudna visszaülni)
     if (p.kind === 'ped') {
       if (p.flee > 0) {
         p.flee -= dt;
@@ -1517,6 +1711,64 @@ function drawMissionMarker() {
   ctx.fillText('📦', mission.tx, mission.ty + 8); ctx.textAlign = 'left';
 }
 
+function drawHungarianFlag(x, y) {
+  ctx.fillStyle = '#555'; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();      // zászlórúd
+  const wave = Math.sin(clock * 4 + x * 0.01) * 2;
+  for (let i = 0; i < 3; i++) {                                                               // piros, fehér, zöld csík
+    ctx.fillStyle = HU_FLAG[i];
+    ctx.beginPath();
+    ctx.moveTo(x + 2, y - 18 + i * 6); ctx.lineTo(x + 30, y - 18 + i * 6 + wave);
+    ctx.lineTo(x + 30, y - 12 + i * 6 + wave); ctx.lineTo(x + 2, y - 12 + i * 6); ctx.closePath(); ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(x + 2, y - 18, 28, 18);
+}
+
+function drawHouse(hs, n) {
+  const { x0, y0, x1, y1 } = hs, h = hs.axis === 'h';
+  ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(x0 + 7, y0 + 7, x1 - x0, y1 - y0);   // árnyék
+  // bejárati út a járdáig
+  ctx.fillStyle = '#b9b2a2';
+  if (h) { const yy = hs.side > 0 ? y0 - HOUSE_GAP : y1; ctx.fillRect(hs.along - 9, yy, 18, HOUSE_GAP); }
+  else { const xx = hs.side > 0 ? x0 - HOUSE_GAP : x1; ctx.fillRect(xx, hs.along - 9, HOUSE_GAP, 18); }
+  // nyeregtető: a gerinc az úttal párhuzamos, a két fele eltérő árnyalatú
+  ctx.fillStyle = hs.roof; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';                                                  // a tető túlsó fele árnyékos
+  if (h) ctx.fillRect(x0, (y0 + y1) / 2, x1 - x0, (y1 - y0) / 2); else ctx.fillRect((x0 + x1) / 2, y0, (x1 - x0) / 2, y1 - y0);
+  ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 2;
+  ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  ctx.beginPath();                                                                     // tetőgerinc
+  if (h) { ctx.moveTo(x0, (y0 + y1) / 2); ctx.lineTo(x1, (y0 + y1) / 2); } else { ctx.moveTo((x0 + x1) / 2, y0); ctx.lineTo((x0 + x1) / 2, y1); }
+  ctx.stroke();
+  // kémény
+  const cx = x0 + (x1 - x0) * (0.2 + hs.chimney * 0.6), cy = y0 + (y1 - y0) * (0.2 + (1 - hs.chimney) * 0.6);
+  ctx.fillStyle = '#5a4a40'; ctx.fillRect(cx - 6, cy - 6, 12, 12);
+  ctx.fillStyle = '#222'; ctx.fillRect(cx - 3, cy - 3, 6, 6);
+  if (n > 0.2) {                                                                       // éjszaka világító tetőablak
+    ctx.fillStyle = '#ffe9a0';
+    ctx.fillRect(h ? hs.along + 20 : cx - 4, h ? cy - 4 : hs.along + 20, 8, 8);
+  }
+}
+
+function drawParkingLot(l) {
+  ctx.fillStyle = '#55575b'; ctx.fillRect(l.x0, l.y0, l.x1 - l.x0, l.y1 - l.y0);                // aszfalt
+  ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 2;
+  const h = l.bs.axis === 'h';
+  for (let i = 0; i <= 4; i++) {                                                              // parkolóhelyek
+    ctx.beginPath();
+    if (h) { const x = l.x0 + 25 + i * 50 - 25; ctx.moveTo(x, l.y0 + 10); ctx.lineTo(x, l.y1 - 10); }
+    else { const y = l.y0 + 25 + i * 50 - 25; ctx.moveTo(l.x0 + 10, y); ctx.lineTo(l.x1 - 10, y); }
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#7f7'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(`🔑 AUTÓBÉRLÉS $${RENT_PRICE}`, (l.x0 + l.x1) / 2, h ? (l.bs.side > 0 ? l.y1 - 4 : l.y0 + 14) : l.y0 + 14);
+  ctx.textAlign = 'left';
+  if (!rentedLots.has(l.key)) {
+    const rc = makeCar(l.spot.x, l.spot.y, l.spot.angle, RENTAL_MODEL.color);
+    applyCarModel(rc, RENTAL_MODEL);
+    drawCar(rc, 0);
+  }
+}
+
 function drawBusStop(bs) {
   const h = bs.axis === 'h', w = h ? 56 : 16, hh = h ? 16 : 56;
   ctx.fillStyle = 'rgba(40,90,200,0.85)'; ctx.fillRect(bs.x - w / 2, bs.y - hh / 2, w, hh);       // fedett váró
@@ -1612,6 +1864,11 @@ function drawCar(c, n) {
   ctx.fillRect(L / 2 - 4, -W / 2 + 3, 4, 7); ctx.fillRect(L / 2 - 4, W / 2 - 10, 4, 7);
   ctx.fillStyle = c.braking && !c.wrecked ? '#ff3030' : '#801010';
   ctx.fillRect(-L / 2, -W / 2 + 3, 3, 7); ctx.fillRect(-L / 2, W / 2 - 10, 3, 7);
+  if (c.type === 'rental') {                        // bérautó: zöld csík és felirat
+    ctx.fillStyle = '#2e9e48'; ctx.fillRect(-L / 2 + 2, -2, L - 4, 4);
+    ctx.fillStyle = '#1d6e33'; ctx.font = 'bold 8px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('BÉRAUTÓ', -4, -6); ctx.textAlign = 'left';
+  }
   if (c.racer) {                                     // rajtszám a tetőn
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-4, 0, 9, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#111'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
@@ -1851,6 +2108,12 @@ function drawHud(w, h) {
   } else if (!player.inCar && !player.dead && nearestBoardableBus()) {
     ctx.fillStyle = '#f28c1e';
     ctx.fillText(`🚌 E: felszállás a buszra ($${BUS_FARE})`, w / 2, h - 40);
+  } else if (!player.inCar && !player.dead && nearestRentable()) {
+    ctx.fillStyle = '#7f7';
+    ctx.fillText(`🔑 E: autóbérlés ($${RENT_PRICE})`, w / 2, h - 40);
+  } else if (!player.inCar && !player.dead && nearestHomeless()) {
+    ctx.fillStyle = '#7f7';
+    ctx.fillText(`🤲 E: adományozás ($${DONATE_MIN}–$${DONATE_MAX})`, w / 2, h - 40);
   }
   ctx.fillStyle = '#fff';
   if (message && clock < message.until) {
@@ -1905,6 +2168,47 @@ function drawMinimap(w) {
   ctx.restore();
 }
 
+function drawHomeless(p) {
+  const fx = Math.cos(p.angle), fy = Math.sin(p.angle);
+  ctx.fillStyle = '#a08458'; ctx.fillRect(p.x - 16, p.y - 16, 32, 32);          // kartonlap, amin ül
+  drawPerson(p.x, p.y, p.angle, 0, p.shirt, p.head, false, '#3d3a33');
+  const cx = p.x + fx * 20, cy = p.y + fy * 20;                                 // pohár előtte
+  ctx.fillStyle = '#ddd'; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#c9a43a'; ctx.beginPath(); ctx.arc(cx, cy, 2.5, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#c8b28a'; ctx.fillRect(p.x - fy * 22 - 14, p.y + fx * 22 - 7, 28, 14);   // tábla mellette
+  ctx.fillStyle = '#333'; ctx.font = 'bold 7px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('SEGÍTS', p.x - fy * 22, p.y + fx * 22 + 2.5);
+  if (clock < (p.thanksUntil || 0)) { ctx.fillStyle = '#7f7'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('Köszönöm! ❤', p.x, p.y - 26); }
+  ctx.textAlign = 'left';
+}
+
+function drawDonate(w, h) {
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, w, h);
+  const PW = 460, PH = 250, px = (w - PW) / 2, py = (h - PH) / 2;
+  ctx.fillStyle = 'rgba(30,24,16,0.95)'; ctx.fillRect(px, py, PW, PH);
+  ctx.strokeStyle = '#7f7'; ctx.lineWidth = 3; ctx.strokeRect(px, py, PW, PH);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#7f7'; ctx.font = 'bold 26px sans-serif'; ctx.fillText('🤲 Adományozás', w / 2, py + 42);
+  ctx.fillStyle = '#ccc'; ctx.font = '14px sans-serif';
+  ctx.fillText(`$${DONATE_MIN} és $${DONATE_MAX} között · egyenleged: $${Math.floor(progress.money)}`, w / 2, py + 68);
+  ctx.fillStyle = progress.money >= donate.amount ? '#ffd23a' : '#f66'; ctx.font = 'bold 44px sans-serif';
+  ctx.fillText(`$${donate.amount}`, w / 2, py + 128);
+  donate.hits = [];
+  const btn = (label, x, y, bw, hit, color = '#e2c27d') => {
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(x, y, bw, 36);
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.strokeRect(x, y, bw, 36);
+    ctx.fillStyle = color; ctx.font = 'bold 18px sans-serif'; ctx.fillText(label, x + bw / 2, y + 24);
+    donate.hits.push({ x, y, w: bw, h: 36, ...hit });
+  };
+  btn('−10', px + 30, py + 92, 60, { delta: -10 }); btn('−1', px + 95, py + 92, 50, { delta: -1 });
+  btn('+1', px + PW - 145, py + 92, 50, { delta: 1 }); btn('+10', px + PW - 90, py + 92, 60, { delta: 10 });
+  btn('Adományozok', px + 60, py + 160, 200, { give: true }, '#7f7');
+  btn('Mégse', px + 280, py + 160, 120, { cancel: true }, '#f99');
+  ctx.fillStyle = '#999'; ctx.font = '12px sans-serif';
+  ctx.fillText('←→: ±1 · ↑↓: ±10 · Enter: adományozás · Esc: mégse', w / 2, py + PH - 14);
+  ctx.textAlign = 'left';
+}
+
 function drawMenu(w, h) {
   ctx.fillStyle = 'rgba(0,0,0,0.65)';
   ctx.fillRect(0, 0, w, h);
@@ -1941,7 +2245,7 @@ function drawMenu(w, h) {
   ctx.font = 'bold 18px sans-serif'; ctx.fillStyle = '#ffd23a';
   ctx.fillText(`$${Math.floor(progress.money)} · ${levelOf(progress.xp)}. szint`, w / 2, py + 296);
   ctx.font = '14px sans-serif'; ctx.fillStyle = '#ccc';
-  ctx.fillText(`Legjobb drift: ${progress.bestDrift} · Leghosszabb sorozat: ${progress.bestStreak} · Szállítások: ${progress.missions}`, w / 2, py + 318);
+  ctx.fillText(`Legjobb drift: ${progress.bestDrift} · Leghosszabb sorozat: ${progress.bestStreak} · Adományok: $${progress.donated || 0} · Szállítások: ${progress.missions}`, w / 2, py + 318);
   if (!owns(menu.carModel) || menu.note) {
     ctx.font = 'bold 15px sans-serif';
     ctx.fillStyle = menu.note ? (menu.note.startsWith('Megvetted') ? '#7f7' : '#f66') : progress.money >= cm.price ? '#7f7' : '#f99';
@@ -1997,7 +2301,9 @@ function render() {
   for (const st of stations) drawStation(st, n);
   drawMissionMarker();
   drawRaceMarkers();
-  for (const bs of busStopsIn(view.x0, view.y0, view.x1, view.y1)) drawBusStop(bs);
+  for (const hs of housesIn(view.x0, view.y0, view.x1, view.y1)) drawHouse(hs, n);
+  for (const l of lotsIn(view.x0, view.y0, view.x1, view.y1)) drawParkingLot(l);
+  for (const bs of busStopsIn(view.x0, view.y0, view.x1, view.y1)) { drawBusStop(bs); const f = parkingLot(bs).flag; drawHungarianFlag(f.x, f.y); }
   if (slimeEnabled) for (const ch of chunks) for (const s of ch.slime) if (inView(s)) drawSlime(s);
   drawSkidMarks(view);
   for (const p of npcs) if (p.dead && inView(p)) drawCorpse(p.x, p.y, p.angle, p.shirt, p.head);
@@ -2008,7 +2314,11 @@ function render() {
       else if (o.type === 'rock') drawRock(o);
     }
   }
-  for (const p of npcs) if (!p.dead && inView(p)) drawPerson(p.x, p.y, p.angle, p.walk, p.shirt, p.head, p.kind === 'bandit');
+  for (const p of npcs) {
+    if (p.dead || !inView(p)) continue;
+    if (p.kind === 'homeless') drawHomeless(p);
+    else drawPerson(p.x, p.y, p.angle, p.walk, p.shirt, p.head, p.kind === 'bandit');
+  }
   const sk = SKINS[menu.skin];
   if (player.dead) drawCorpse(player.x, player.y, player.angle, sk.shirt, sk.head);
   else if (!player.inCar && !player.riding) drawPerson(player.x, player.y, player.angle, player.walk, sk.shirt, sk.head, true, sk.legs, sk.hat);
@@ -2029,6 +2339,7 @@ function render() {
   drawHud(w, h);
   drawMinimap(w);
   if (menu.open) drawMenu(w, h);
+  if (donate.open) drawDonate(w, h);
 }
 
 // ===== Fő ciklus =====
@@ -2036,7 +2347,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (!menu.open) {                // menüben megáll a játék
+  if (!menu.open && !donate.open) {   // menüben és adományozás közben megáll a játék
     time = (time + dt * timeScale) % CYCLE;
     clock += dt;
     update(dt);

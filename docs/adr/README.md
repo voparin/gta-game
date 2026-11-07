@@ -26,3 +26,5 @@ Itt van naplózva minden architekturális döntés: mit, miért és milyen alter
 | [0019](0019-vegtelen-palya.md) | Végtelen pálya | Elfogadva | 2026-11-07 |
 | [0020](0020-autoversenyek-ellenorzopontokkal-a-racson.md) | Autóversenyek ellenőrzőpontokkal a rácson, versenyzők az aiCars-ban | Elfogadva | 2026-11-07 |
 | [0021](0021-varosi-buszok-buszmegallok-es-utazas.md) | Városi buszok, buszmegállók és utazás a buszon | Elfogadva | 2026-11-07 |
+| [0022](0022-autoberles-a-megallok-melletti-parkolokban.md) | Autóbérlés a megállók melletti parkolókban: a játékos autója bérautóvá válik | Elfogadva | 2026-11-07 |
+| [0023](0023-teglalap-alaku-akadalyok-a-kor-alakuak-mellett.md) | Téglalap alakú akadályok (házak) a kör alakúak mellett | Elfogadva | 2026-11-07 |

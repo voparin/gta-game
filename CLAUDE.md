@@ -29,8 +29,11 @@ Felépítés a `game.js`-en belül:
 - **Végtelen pálya** (ADR-0019): nincs `WORLD` határ; „egész pályás” keresés helyett mindig korlátos sugarú keresés (pl. `nearestStation`).
 - **Versenyek** (ADR-0020): `race` állapot, `planRace`, `startRace`, `updateRace`, `racerInput`; versenyzők az `aiCars`-ban `racer` jelzővel.
 - **Buszok** (ADR-0021): `busStopsIn` (analitikus megállók), `spawnCityBus` (`citybus` jelző), `player.riding` (utas), `BUS_FARE`. A zöld busz (`BUS`) csak a játékosé.
+- **Parkolók, bérlés** (ADR-0022): `parkingLot`, `lotsIn`, `rentCar`, `RENT_PRICE`, `rentedLots`; zászló: `HU_FLAG`. Bérléskor a `car` veszi fel a `RENTAL_MODEL`-t (nincs második játékosautó).
+- **Házak**: `housesIn` (analitikus, 420 px-enként, nincs a kereszteződések/kutak 650 px-es körzetében és a parkolóknál), ütközés: téglalap-akadály (`rect`, ADR-0023, `pushOutOfRect`, `OB_REACH`), `insideHouse`.
+- **Csövesek** (`homeless` NPC): `homelessSpot`, `donate` (modális ablak, mint a menü), `DONATE_MIN`–`DONATE_MAX`; az összeg a `progress.donated`-ben.
 - **Rendőrség**: `wanted` (körözési szint), `updateWanted` (gyorshajtás `SPEED_LIMIT` felett, lerázás, letartóztatás), `policeInput` (üldözés). A rendőrautók az `aiCars`-ban vannak `police`/`chasing` jelzővel. Tesztben a `policeEnabled` kikapcsolható.
-- Tesztekben a `spawnEnabled`, `slimeEnabled`, `policeEnabled`, `missionsEnabled` és `racesEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el. Ne írj olyan tesztet, ami véletlen szóráson vagy időzítési szerencsén múlik.
+- Tesztekben a `spawnEnabled`, `slimeEnabled`, `policeEnabled`, `missionsEnabled` és `racesEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el. Ne írj olyan tesztet, ami véletlen szóráson vagy időzítési szerencsén múlik. A homokvihar a tesztben ki van kapcsolva (`storm.timer = 1e9`), mert a szél minden járművet sodor. Ha egy hely vagy döntés helyességét kell ellenőrizni, ne véletlen szimulációval teszteld, hanem emeld ki tiszta függvénybe (pl. `homelessSpot`), és azt teszteld.
 
 ## Architekturális döntések (ADR)
 
