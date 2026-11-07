@@ -99,9 +99,11 @@ const sandPattern = ctx.createPattern(sandTile, 'repeat');
 // ===== Szereplők =====
 const player = { x: START_X, y: START_Y, angle: 0, r: 12, inCar: false, walk: 0 };
 const car = { x: START_X + 100, y: START_Y - 50, angle: 0, vx: 0, vy: 0, r: 28, len: 72, wid: 36, skid: false };
-const skidMarks = [];   // féknyomok: {x1, y1, x2, y2}
+const skidMarks = [];   // féknyomok: {x1, y1, x2, y2, born}
 const smoke = [];       // füstrészecskék: {x, y, vx, vy, r, life, max}
 const MAX_SKID = 4000, MAX_SMOKE = 300;
+const SKID_LIFE = 5;    // ennyi másodperc alatt tűnik el egy féknyom
+let clock = 0;          // valós idő másodpercben (a T gomb nem gyorsítja)
 let lastWheels = null;
 let time = 60;   // játékidő másodpercben: nappal indulunk
 
@@ -200,7 +202,7 @@ function updateCar(dt) {
   if (car.skid) {
     if (lastWheels) {
       for (let i = 0; i < 2; i++) {
-        skidMarks.push({ x1: lastWheels[i].x, y1: lastWheels[i].y, x2: wheels[i].x, y2: wheels[i].y });
+        skidMarks.push({ x1: lastWheels[i].x, y1: lastWheels[i].y, x2: wheels[i].x, y2: wheels[i].y, born: clock });
       }
       if (skidMarks.length > MAX_SKID) skidMarks.splice(0, skidMarks.length - MAX_SKID);
     }
@@ -290,16 +292,27 @@ function drawRoads(view) {
     if (Math.abs(i - c) > ROAD_W) ctx.fillRect(c - 2, i, 4, 40);
 }
 
+function updateSkidMarks() {
+  let old = 0;
+  while (old < skidMarks.length && clock - skidMarks[old].born >= SKID_LIFE) old++;
+  if (old) skidMarks.splice(0, old);
+}
+
 function drawSkidMarks(view) {
-  ctx.strokeStyle = 'rgba(25,20,15,0.35)';
+  // halványodó nyomok: átlátszóság szerint 8 csoportban rajzoljuk ki
+  const BUCKETS = 8;
   ctx.lineWidth = 5;
   ctx.lineCap = 'round';
-  ctx.beginPath();
-  for (const m of skidMarks) {
-    if (m.x2 < view.x0 || m.x2 > view.x1 || m.y2 < view.y0 || m.y2 > view.y1) continue;
-    ctx.moveTo(m.x1, m.y1); ctx.lineTo(m.x2, m.y2);
+  for (let b = 0; b < BUCKETS; b++) {
+    ctx.strokeStyle = `rgba(25,20,15,${0.35 * (1 - b / BUCKETS)})`;
+    ctx.beginPath();
+    for (const m of skidMarks) {
+      if (Math.min(BUCKETS - 1, Math.floor((clock - m.born) / SKID_LIFE * BUCKETS)) !== b) continue;
+      if (m.x2 < view.x0 || m.x2 > view.x1 || m.y2 < view.y0 || m.y2 > view.y1) continue;
+      ctx.moveTo(m.x1, m.y1); ctx.lineTo(m.x2, m.y2);
+    }
+    ctx.stroke();
   }
-  ctx.stroke();
 }
 
 function drawSmoke() {
@@ -474,9 +487,11 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   time = (time + dt * timeScale) % CYCLE;
+  clock += dt;
   if (!player.inCar) updatePlayer(dt);
   updateCar(dt);
   updateSmoke(dt);
+  updateSkidMarks();
   render();
   requestAnimationFrame(frame);
 }

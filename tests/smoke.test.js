@@ -64,9 +64,11 @@ key('Space', true); key('KeyD', true); step(40);
 check('kézifékes kanyarban féknyom keletkezik', G.skidMarks.length > 10);
 check('kézifékes kanyarban füstöl', G.smoke.length > 5);
 key('Space', false); key('KeyD', false); key('KeyW', false);
-step(200);
+step(150);   // ~2,5 mp
 check('a füst idővel eloszlik', G.smoke.length === 0);
-check('a féknyom megmarad', G.skidMarks.length > 10);
+check('a féknyom 2,5 mp után még látszik', G.skidMarks.length > 10);
+step(180);   // összesen ~5,5 mp a csúszás vége óta
+check('a féknyom 5 mp alatt eltűnik', G.skidMarks.length === 0);
 
 key('KeyE', true); key('KeyE', false);
 check('ki lehet szállni az autóból', G.player.inCar === false);
