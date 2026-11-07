@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.15.1 – 2026-11-07
+- Ittas vezetés: már egy ital után is üldöz a rendőrség (eddig csak 50% részegség felett), és nem csak az úton, hanem bárhol
+
 ## 0.15.0 – 2026-11-07
 - Kocsmák (a házak egy része, zöld tető, „KOCSMA” tábla): a pultnál 1: sör $2, 2: bor $3
 - Részegség: imbolyogsz, himbálózik a kép, húz a kormány; erősen részegen az úton vezetni ittas vezetés (rendőrség); túl sok italtól elájulsz, és a kocsma előtt térsz magadhoz

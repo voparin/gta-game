@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.15.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.15.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -458,7 +458,7 @@ const PUB_FURNITURE = [
 ];
 const atBar = () => player.inHouse && player.inHouse.hs.pub && player.inHouse.iy < 20 + 40 + 70 && player.inHouse.ix > 110 && player.inHouse.ix < 450;
 const DRUNK_DECAY = 1.2;      // ennyit józanodsz másodpercenként
-const DRUNK_DRIVE = 50;       // e fölött az úton vezetni ittas vezetés (rendőrség)
+const DRUNK_DRIVE = 1;        // ittasan (már egy ital után is) vezetni ittas vezetés – a rendőrség üldöz
 
 function buyDrink(kind) {
   const d = DRINKS[kind];
@@ -1462,7 +1462,7 @@ function updateWanted(dt) {
   // gyorshajtás az úton (és járdán)
   const kmh = Math.hypot(car.vx, car.vy) / KMH;
   if (player.inCar && controllable() && onRoad(car.x, car.y, SIDEWALK_W) && kmh > SPEED_LIMIT) raiseWanted(1);
-  if (player.inCar && controllable() && onRoad(car.x, car.y, SIDEWALK_W) && kmh > 10 && (player.drunk || 0) >= DRUNK_DRIVE) raiseWanted(1, 'ITTAS VEZETÉS! ÜLDÖZ A RENDŐRSÉG!');
+  if (player.inCar && controllable() && kmh > 10 && (player.drunk || 0) >= DRUNK_DRIVE) raiseWanted(1, 'ITTAS VEZETÉS! ÜLDÖZ A RENDŐRSÉG!');   // bárhol, nem csak az úton
   if (!wanted.level) return;
 
   const cops = aiCars.filter(c => c.chasing && !c.wrecked);
@@ -2459,8 +2459,8 @@ function drawHud(w, h) {
   ctx.fillStyle = speeding ? '#f55' : '#fff';
   ctx.fillText(player.inCar ? `Sebesség: ${speed} km/h (korlát: ${SPEED_LIMIT})` : 'Gyalog', 20, 80);
   if (player.drunk > 1) {                            // részegség
-    ctx.fillStyle = player.drunk >= DRUNK_DRIVE ? '#f6c' : '#c9a'; ctx.font = 'bold 12px sans-serif';
-    ctx.fillText(`🍺 ${player.drunk >= DRUNK_DRIVE ? 'Részeg – ne vezess!' : 'Ittas'} ${Math.round(player.drunk)}%`, player.inCar ? 20 : 120, player.inCar ? 92 : 80);
+    ctx.fillStyle = player.drunk >= 50 ? '#f6c' : '#c9a'; ctx.font = 'bold 12px sans-serif';
+    ctx.fillText(`🍺 ${player.drunk >= 50 ? 'Részeg' : 'Ittas'} – ne vezess! ${Math.round(player.drunk)}%`, player.inCar ? 20 : 120, player.inCar ? 92 : 80);
     ctx.font = '14px sans-serif';
   }
   if (player.inCar && car.nitroCfg) {                // nitrótartály

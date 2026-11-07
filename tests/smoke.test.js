@@ -1094,7 +1094,17 @@ G.npcs.length = 0; G.aiCars.length = 0;
   Object.assign(G.player, { drunk: 10 });
   Object.assign(G.car, { x: 1000, y: G.C, angle: 0, vx: 0, vy: 0 });
   key('KeyW', true); step(20); key('KeyW', false);
-  check('egy-két ital után (kicsit ittasan) még nem üldöz', G.wanted.level === 0);
+  check('már egy ital után (kicsit ittasan) is üldöz a rendőrség', G.wanted.level === 1);
+  G.clearWanted();
+  Object.assign(G.player, { drunk: 10 });
+  Object.assign(G.car, { x: 1000, y: G.C + 3000, angle: 0, vx: 0, vy: 0 });   // a homokban, úttól távol
+  key('KeyW', true); step(20); key('KeyW', false);
+  check('ittasan nem csak az úton, hanem bárhol üldöz', !G.onRoad(G.car.x, G.car.y, G.SIDEWALK_W) && G.wanted.level === 1);
+  G.clearWanted();
+  Object.assign(G.player, { drunk: 0 });
+  Object.assign(G.car, { x: 1000, y: G.C, angle: 0, vx: 0, vy: 0 });
+  key('KeyW', true); step(20); key('KeyW', false);
+  check('józanon (lassan) nem üldöz', G.wanted.level === 0);
   Object.assign(G.player, { drunk: 0, inCar: false }); G.clearWanted(); step(60);
 }
 

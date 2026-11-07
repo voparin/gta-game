@@ -69,4 +69,4 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 
 ## Kocsmák
 - A házak egy része **kocsma** (zöld tető, „KOCSMA” tábla). A pultnál **1: sör ($2)**, **2: bor ($3)**.
-- Ha sokat iszol, imbolyogsz, és himbálózik a kép. **Részegen ne vezess:** az úton ittas vezetésért üldöz a rendőrség. Túl sok italtól elájulsz, és a kocsma előtt térsz magadhoz.
+- Ha sokat iszol, imbolyogsz, és himbálózik a kép. **Ittasan ne vezess:** már egy ital után is üldöz a rendőrség, amíg ki nem józanodsz. Túl sok italtól elájulsz, és a kocsma előtt térsz magadhoz.
