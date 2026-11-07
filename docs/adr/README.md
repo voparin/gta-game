@@ -35,3 +35,4 @@ Itt van naplózva minden architekturális döntés: mit, miért és milyen alter
 | [0028](0028-bank-egy-hitel-fix-dijjal-automatikus-torlesztes.md) | Bank: egyszerre egy hitel fix díjjal és automatikus törlesztéssel | Elfogadva | 2026-11-07 |
 | [0029](0029-taxi-hivhato-uti-cel-valasztassal.md) | Taxi: hívható, úti cél választással, az utazás átugorható | Elfogadva | 2026-11-07 |
 | [0030](0030-terkep-elemzett-poi-k-es-mentett-jelolesek.md) | Térkép: képletből számolt nevezetes helyek és mentett saját jelölések | Elfogadva | 2026-11-07 |
+| [0031](0031-tuning-es-fenyezes-autonkent-a-mentesben.md) | Tuning és fényezés autómodellenként, a mentésben | Elfogadva | 2026-11-07 |

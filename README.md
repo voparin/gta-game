@@ -68,7 +68,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Minden házban van **rádió**: bemenéskor egy véletlen, a játék által generált szám szól. **R**: következő szám, **M**: rádió ki/be.
 
 ## Szkinek
-- Az Esc menüben választhatsz szkint. A **Pókhős** (piros-kék, hálómintás) **$900**-ba kerül; a többi – köztük a **Peppa malac** – ingyenes.
+- Az Esc menüben választhatsz szkint. A **Pókhős** (piros-kék, hálómintás) **$900**-ba kerül; a többi – köztük a **Peppa malac**, **Alex**, Rendőr, Szakács, Focista, Bohóc, Űrhajós, Kalóz és Zombi – ingyenes.
 
 ## Kocsmák
 - A házak egy része **kocsma** (zöld tető, „KOCSMA” tábla). A pultnál **1: sör ($2)**, **2: bor ($3)**.
@@ -102,15 +102,31 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - **1–3** gombbal vagy kattintással válaszolsz. Jó válaszonként **$5**, hibátlan óráért **+$25** jár. Óra után **60 mp szünet** van.
 - 👩‍🏫 **Vigyázz a gonosz tanárral!** Ha rohangálsz (Shift), üldözni kezd – ha elkap, kidob és elkoboz **$5**-t. Az órán siettet (**10 mp** feladatonként), és rossz vagy késő válaszért **$2** büntetést ad, és azt ordítja: **„IDIÓTA VAGY!”**
 
+## Éttermek
+- A házak egy része **étterem** (narancs tető, „ÉTTEREM” tábla). A pultnál **E**: kóla ($2), leves ($4), torta ($4), hamburger ($6), **gulyásleves** ($7, józanít is), pizza ($9, teljes élet).
+
+## Autószerelők
+- A házak egy része **autószerelő** (szürke tető, „AUTÓSZERELŐ” tábla). Állj az autóddal a műhely elé, menj be, és a pultnál **E**:
+  - 🔧 **Tuning**: +8% sebesség és +10% gyorsulás szintenként, legfeljebb 3 szint ($400 / $800 / $1200)
+  - 🎨 **Új fényezés**: új szín ($40)
+  - 🚀 **Nitró feltöltés** ($15, nitrós autóba)
+- A tuning és a szín autónként megmarad.
+
+## Tévé
+- Minden lakóházban van tévé: mellette **E** – 4 csatorna (**1–4** vagy nyilak): 📰 hírek, 🐷 mese, ⚽ foci, 🏎 autóverseny. **E / Esc**: kikapcsolás.
+
+## Alexek
+- Az utcán sok **Alex** sétál (zöld póló, narancs haj, névtábla). Mellette **E**: beszélget veled.
+
 ## Bomba
 - **B**: lerakod (autóból hátra ejted), **3 mp** múlva felrobban: a közeli autókból roncs lesz, a házak ledőlnek, az emberek meghalnak – és téged is megsebez, ha túl közel vagy. Robbantásért ★★ körözés jár.
 - Legfeljebb 5 bombád lehet, percenként kapsz egy újat (a HUD-on: 💣 3/5).
 
 ## Taxi
-- **X**: hívsz egy taxit, pár másodperc alatt odajön. Mellette **E**: választhatsz úti célt (kezdőhely, az autód, a legközelebbi benzinkút / bank / kocsma / gyár / bolt / iskola, verseny rajt, saját 📍 jelölés) – **$5**-ért bárhova elvisz.
+- **X**: hívsz egy taxit, pár másodperc alatt odajön. Mellette **E**: választhatsz úti célt (kezdőhely, az autód, a legközelebbi benzinkút / bank / kocsma / gyár / bolt / iskola / étterem / autószerelő, verseny rajt, saját 📍 jelölés) – **$5**-ért bárhova elvisz.
 - Ha beülsz az autódba, vagy a taxi 45 mp alatt nem ér oda, lemond. A tönkrement taxi nem visz. A szállítási célpontra nem visz el (a szállítást vezetned kell).
 
 ## Térkép
-- **K**: megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák, 🛒 boltok, 🏫 iskolák. Az **1–7** gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
+- **K**: megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák, 🛒 boltok, 🏫 iskolák, 🍽 éttermek, 🔧 autószerelők. Az **1–9** gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
 - **Kattints a térképre:** saját pontot jelölsz 📍 (legfeljebb 10, megmaradnak). Egy jelölésre kattintva törlöd, a **Delete** gomb mindet törli.
 - A jelölések a radaron és a világban is látszanak, a képernyő szélén nyíl mutat a legközelebbire, és a **taxi** is elvisz oda (a 3 legközelebbihez).

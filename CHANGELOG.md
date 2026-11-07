@@ -5,6 +5,16 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.24.0 – 2026-11-07
+- Alexek: a járókelők egy része Alex (zöld póló, narancs haj, „Alex” névtábla); mellette E – beszélget veled
+- 8 új autó: Fehér limuzin, Narancs sportkocsi, Rózsaszín kisautó, Szürke furgon, Mentőautó (villogó fénnyel), Fekete versenyautó, Barna dzsip, Arany autó – és egy Bicikli ($100, nem kell bele benzin)
+- 8 új ingyenes szkin: Alex, Rendőr, Szakács, Focista, Bohóc, Űrhajós, Kalóz, Zombi
+- Autószerelők (🔧, a házak ~5%-a): tuning 3 szintig (+8% sebesség, +10% gyorsulás szintenként, $400/$800/$1200), új fényezés ($40), nitró feltöltés ($15) – az autódnak a műhely előtt kell állnia; a tuning és a szín megmarad (ADR-0031)
+- Éttermek (🍽, a házak ~6%-a): kóla, leves, torta, hamburger, gulyásleves (józanít is), pizza (teljes élet)
+- Tévé: a házakban a tévénél E – 4 csatorna: hírek, mese (malac ugrál a sárban), foci, autóverseny; minden lakóházban van tévé
+- Az éttermek és a szerelők a térképen és a taxi úti céljai között is ott vannak; a térkép kategóriái 1–9 gombbal kapcsolhatók
+- Javítva: ha a ház egy nyitott ablak (pl. tévé) közben dőlt össze, a játék megállt
+
 ## 0.23.1 – 2026-11-07
 - A gonosz tanár azt ordítja: „IDIÓTA VAGY!” – rossz vagy késő válasznál nagy piros felirattal a tábla fölött, üldözés közben a feje fölött, kidobáskor is; recsegő kiabáló hanggal
 

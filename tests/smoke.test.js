@@ -42,7 +42,7 @@ eval(src + `
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
-  school, makeQuestion, TEACHER_HOME, SHOUT, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
+  school, makeQuestion, TEACHER_HOME, SHOUT, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, nearestAlex, talkToAlex, ALEX_LINES, selectCar, tv, TV_CHANNELS, atTv, RESTAURANT_ITEMS, MECHANIC_ITEMS, TUNE_MAX, TUNE_SPEED, PAINTS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
 const key = (code, down) => listeners[down ? 'keydown' : 'keyup']({ code, repeat: false });
@@ -483,10 +483,11 @@ G.npcs.length = 0; G.aiCars.length = 0;
 }
 // sérült / régi mentés
 {
-  const p1 = G.sanitizeProgress({ money: 0, owned: [0, 7], activeCar: 7 });
+  const bad = G.CAR_MODELS.length;                     // nem létező autó (a lista hosszánál nagyobb index)
+  const p1 = G.sanitizeProgress({ money: 0, owned: [0, bad], activeCar: bad });
   const p2 = G.sanitizeProgress({ money: 'x', owned: null, xp: -5 });
   const p3 = G.sanitizeProgress(null);
-  check('érvénytelen autó-index a mentésben nem omlasztja össze a játékot', p1.activeCar === 0 && !p1.owned.includes(7));
+  check('érvénytelen autó-index a mentésben nem omlasztja össze a játékot', p1.activeCar === 0 && !p1.owned.includes(bad));
   check('hibás típusú mentés alapértékre javul', p2.money === 0 && p2.xp === 0 && Array.isArray(p2.owned) && p2.owned[0] === 0);
   check('üres mentés alapállapot', p3.money === 0 && p3.owned.length === 2 && p3.activeCar === 0);
 }
@@ -943,8 +944,9 @@ G.npcs.length = 0; G.aiCars.length = 0;
 
 // --- kódátnézés (v0.13.0): a mentés sorszám szerint tárol ---
 {
-  const carOrder = ['Piros sportkocsi', 'Fekete terepjáró', 'Sárga taxi', 'Kék rakétaautó', 'Zöld pickup', 'Zöld busz', 'Nitró Villám'];
-  const skinOrder = ['Klasszikus', 'Cowboy', 'Sivatagi katona', 'Rózsaszín párduc', 'Ninja', 'Turista', 'Pókhős', 'Peppa malac'];
+  const carOrder = ['Piros sportkocsi', 'Fekete terepjáró', 'Sárga taxi', 'Kék rakétaautó', 'Zöld pickup', 'Zöld busz', 'Nitró Villám',
+    'Fehér limuzin', 'Narancs sportkocsi', 'Rózsaszín kisautó', 'Szürke furgon', 'Mentőautó', 'Fekete versenyautó', 'Barna dzsip', 'Arany autó', 'Bicikli'];
+  const skinOrder = ['Klasszikus', 'Cowboy', 'Sivatagi katona', 'Rózsaszín párduc', 'Ninja', 'Turista', 'Pókhős', 'Peppa malac', 'Alex', 'Rendőr', 'Szakács', 'Focista', 'Bohóc', 'Űrhajós', 'Kalóz', 'Zombi'];
   check('a meglévő autók sorrendje nem változott (új autó csak a végére kerülhet)', carOrder.every((n, i) => G.CAR_MODELS[i] && G.CAR_MODELS[i].name === n));
   check('a meglévő szkinek sorrendje nem változott (új szkin csak a végére kerülhet)', skinOrder.every((n, i) => G.SKINS[i] && G.SKINS[i].name === n));
   const old = G.sanitizeProgress({ money: 0, owned: [0, 5], activeCar: 5 });   // egy v0.12-es mentés, a busszal
@@ -1655,6 +1657,131 @@ G.npcs.length = 0; G.aiCars.length = 0;
   G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
   check('az iskolából ki lehet jönni', !G.player.inHouse);
   G.progress.money = 0;
+}
+
+// --- új autók, bicikli, szkinek ---
+{
+  const newCars = G.CAR_MODELS.slice(7);
+  check('8 új autó és egy bicikli van', newCars.length === 9 && newCars.filter(m => m.type !== 'bike').length === 8 && newCars.some(m => m.type === 'bike'));
+  check('az új autók megvehetők (mindnek van ára és leírása)', newCars.every(m => m.price > 0 && m.desc && m.maxRoad > 0 && m.accel > 0));
+  check('8 új szkin van, mind ingyenes', G.SKINS.length === 16 && G.SKINS.slice(8).every((k, i) => !k.price && G.ownsSkin(8 + i)));
+  const bi = G.CAR_MODELS.findIndex(m => m.type === 'bike');
+  const prevCar = G.progress.activeCar;
+  if (!G.progress.owned.includes(bi)) G.progress.owned.push(bi);
+  G.selectCar(bi);
+  Object.assign(G.car, { x: 1000, y: G.C, angle: 0, vx: 0, vy: 0, fuel: 50 });
+  Object.assign(G.player, { x: 960, y: G.C, inCar: false, inHouse: null, riding: null, dead: 0 });
+  press('KeyE');
+  key('KeyW', true); step(240); key('KeyW', false);
+  const kmh = Math.hypot(G.car.vx, G.car.vy) / G.KMH;
+  check('biciklivel lehet menni, de lassan (legfeljebb ~40 km/h)', G.player.inCar && G.car.x > 1300 && kmh <= 40);
+  check('a biciklibe nem kell benzin', G.car.fuel === 50);
+  G.car.fuel = 0; G.car.vx = G.car.vy = 0; key('KeyW', true); step(180); key('KeyW', false);
+  check('üres tankkal is lehet biciklizni (nem vánszorog)', Math.hypot(G.car.vx, G.car.vy) > 100);
+  G.progress.money = 100; const ns = G.nearestStation(G.car.x, G.car.y), m0 = G.progress.money;
+  let pump = null;
+  for (let dx = -300; dx <= 300 && !pump; dx += 10) for (let dy = -300; dy <= 300 && !pump; dy += 10) if (G.nearPump(ns.x + dx, ns.y + dy)) pump = { x: ns.x + dx, y: ns.y + dy };
+  Object.assign(G.car, { x: pump.x, y: pump.y, vx: 0, vy: 0, fuel: 10 }); step(60);
+  check('a bicikli a benzinkútnál sem tankol (nem kér pénzt)', G.progress.money === m0 && G.car.fuel === 10);
+  G.car.fuel = 50;
+  press('KeyE'); G.selectCar(prevCar);
+}
+
+// --- Alex nevű járókelők ---
+{
+  G.npcs.length = 0;
+  let alexes = 0; for (let i = 0; i < 400; i++) { const p = G.spawnNpc('ped', G.C, G.C + 60); if (p.alex) alexes++; }
+  check('a járókelők egy része Alex (zöld póló, narancs haj)', alexes > 30 && alexes < 140 && G.npcs.filter(p => p.alex).every(p => p.shirt === '#3aa04a' && p.head === '#e07020'));
+  G.npcs.length = 0;
+  Object.assign(G.player, { x: 5000, y: G.C + 60, inCar: false, inHouse: null, riding: null, dead: 0, arrested: 0, passedOut: 0 });
+  Object.assign(G.car, { x: 2000, y: G.C });
+  let a; do { G.npcs.length = 0; a = G.spawnNpc('ped', 5030, G.C + 60); } while (!a.alex);
+  check('Alex mellett kiírja: beszélgetés', /Alex/.test((G.interactionPrompt() || {}).text || ''));
+  press('KeyE');
+  check('E-re Alex mond valamit', G.ALEX_LINES.includes(a.line) && a.lineUntil > G.clock);
+  const first = a.line; press('KeyE');
+  check('újra E: mást mond', a.line !== first);
+  G.npcs.length = 0;
+}
+
+// --- éttermek, autószerelők, tévé ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null;
+  const all = G.housesIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000);
+  const rests = all.filter(h => h.restaurant), mechs = all.filter(h => h.mechanic);
+  check('vannak éttermek és autószerelők, ritkán', rests.length > 5 && mechs.length > 5 && rests.length < all.length * 0.1 && mechs.length < all.length * 0.1);
+  check('egy ház csak egyféle lehet (az étterem és a szerelő is)', all.every(h => [h.pub, h.bank, h.factory, h.shop, h.school, h.restaurant, h.mechanic].filter(Boolean).length <= 1));
+  const reset = () => Object.assign(G.player, { inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0, drunk: 0, passedOut: 0, health: 100 });
+  const counter = () => { G.player.inHouse.ix = 280; G.player.inHouse.iy = 100; };
+  const out = () => { G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE'); };
+  // étterem
+  reset(); Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  Object.assign(G.player, G.doorOf(rests[0])); press('KeyE');
+  check('az étterembe be lehet menni, vannak asztalok', G.player.inHouse && G.player.inHouse.hs.restaurant && G.player.inHouse.furniture.filter(f => f.k === 'rtable').length === 4);
+  counter();
+  check('az étterem pultjánál kiírja a rendelést', /rendelés/.test(G.interactionPrompt().text));
+  press('KeyE');
+  check('E-re megnyílik az étterem, az ételekkel', G.shop.open && G.shop.items === G.RESTAURANT_ITEMS);
+  const ri = id => G.RESTAURANT_ITEMS.findIndex(it => it.id === id);
+  G.progress.money = 50; G.player.health = 20; press('Digit' + (ri('pizza') + 1));
+  check('a pizza teljes életet ad ($9)', G.player.health === 100 && G.progress.money === 41);
+  press('Digit' + (ri('burger') + 1));
+  check('teljes élettel nem eszel (nem fizetsz)', G.progress.money === 41);
+  G.player.drunk = 60; press('Digit' + (ri('gulyas') + 1));
+  check('a gulyásleves józanít is (teljes élettel is megveheted, ha részeg vagy)', G.player.drunk === 10 && G.progress.money === 34);
+  press('Escape'); out();
+  // autószerelő
+  reset();
+  const mi = G.progress.activeCar, base = G.CAR_MODELS[mi];
+  G.progress.tuning = []; G.progress.paint = []; G.selectCar(mi);
+  Object.assign(G.player, G.doorOf(mechs[0])); press('KeyE');
+  check('az autószerelőhöz be lehet menni, van emelő', G.player.inHouse && G.player.inHouse.hs.mechanic && G.player.inHouse.furniture.some(f => f.k === 'lift'));
+  counter(); press('KeyE');
+  check('E-re megnyílik a szerelő', G.shop.open && G.shop.items === G.MECHANIC_ITEMS);
+  const mk = id => G.MECHANIC_ITEMS.findIndex(it => it.id === id);
+  G.progress.money = 5000; press('Digit' + (mk('tune') + 1));
+  check('ha az autód messze van, nem tuningolják', G.progress.money === 5000 && !G.car.tune);
+  const door = G.doorOf(mechs[0]); Object.assign(G.car, { x: door.x + 120, y: door.y, vx: 0, vy: 0 });
+  press('Digit' + (mk('tune') + 1));
+  check('tuning: +8% végsebesség, $400', G.car.tune === 1 && Math.abs(G.car.maxRoad - base.maxRoad * (1 + G.TUNE_SPEED)) < 0.01 && G.progress.money === 4600);
+  press('Digit' + (mk('tune') + 1)); press('Digit' + (mk('tune') + 1));
+  check(`a tuning drágul ($800, $1200), legfeljebb ${G.TUNE_MAX} szint`, G.car.tune === G.TUNE_MAX && G.progress.money === 2600);
+  press('Digit' + (mk('tune') + 1));
+  check('a legjobb tuningon túl nem lehet fizetni', G.car.tune === G.TUNE_MAX && G.progress.money === 2600);
+  check('a tuning megmarad (mentés, autóváltás)', G.sanitizeProgress(JSON.parse(JSON.stringify(G.progress))).tuning[mi] === G.TUNE_MAX && (G.selectCar(mi), G.car.tune === G.TUNE_MAX));
+  const col0 = G.car.color[0]; press('Digit' + (mk('paint') + 1));
+  check('fényezés: új szín ($40), és megmarad', G.car.color[0] !== col0 && G.progress.money === 2560 && G.progress.paint[mi] != null && (G.selectCar(mi), G.car.color[0] !== col0));
+  press('Digit' + (mk('nitro') + 1));
+  check('nitrót csak nitrós autóba töltenek', G.progress.money === 2560 || G.car.nitroCfg);
+  const bad = G.sanitizeProgress({ tuning: [9, -1, 'x', 2], paint: [99, -1, 3, 'a'] });
+  check('a hibás mentett tuning / fényezés kiszűrődik', bad.tuning.join() === '3,0,0,2' && bad.paint[0] === null && bad.paint[1] === null && bad.paint[2] === 3 && bad.paint[3] === null);
+  check('régi mentésben nincs tuning (az autók változatlanok)', G.sanitizeProgress({}).tuning.length === 0);
+  press('Escape'); out();
+  G.progress.tuning = []; G.progress.paint = []; G.selectCar(mi);
+  // tévé
+  reset();
+  const tvHouse = all.find(h => !h.pub && !h.bank && !h.factory && !h.shop && !h.school && !h.restaurant && !h.mechanic && G.furnitureOf(h).some(f => f.k === 'tv'));
+  Object.assign(G.player, G.doorOf(tvHouse)); press('KeyE');
+  const tvF = G.player.inHouse.furniture.find(f => f.k === 'tv');
+  G.player.inHouse.ix = tvF.x + tvF.w / 2; G.player.inHouse.iy = tvF.y + tvF.h + 30;
+  check('a tévénél kiírja: tévé', G.atTv() && /tévé/.test(G.interactionPrompt().text));
+  press('KeyE');
+  check('E-re bekapcsol a tévé', G.tv.open && G.tv.on);
+  const clk = G.clock, t0 = G.tv.t; step(60);
+  check('a műsor megy, közben a játék áll', G.tv.t > t0 + 0.5 && G.clock === clk);
+  let okAll = true; for (let c = 1; c <= G.TV_CHANNELS.length; c++) { press('Digit' + c); step(3); if (G.tv.ch !== c - 1) okAll = false; }
+  check('4 csatorna van, mindegyik nézhető (hírek, mese, foci, autóverseny)', G.TV_CHANNELS.length === 4 && okAll);
+  press('ArrowRight');
+  check('nyilakkal is lehet csatornát váltani', G.tv.ch === 0);
+  press('Escape');
+  check('Esc: kikapcsolás, a játék megy tovább', !G.tv.open && (step(5), G.clock > clk));
+  check('kilépéskor a tévé ki is kapcsol', !G.tv.on && /bekapcsolása/.test(G.interactionPrompt().text));
+  out();
+  // térkép, taxi
+  const types = new Set(G.poisIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000).map(p => p.type));
+  check('a térképen az éttermek és a szerelők is látszanak', types.has('restaurant') && types.has('mechanic'));
+  const labels = G.taxiDestinations().map(d => d.label).join(' ');
+  check('a taxi étterembe és szerelőhöz is visz', labels.includes('étterem') && labels.includes('autószerelő'));
 }
 
 // --- telepítés: a böngésző ne a régi, tárolt game.js-t futtassa ---
