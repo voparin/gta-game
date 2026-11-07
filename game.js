@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.22.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.23.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -456,7 +456,34 @@ const SCHOOL_FURNITURE = [
   ...[70, 160, 350, 440].flatMap(x => [160, 230].map(y => ({ k: 'desk', x, y, w: 50, h: 30 }))),
   { k: 'plant', x: 30, y: 30, w: 34, h: 34 }, { k: 'radio', x: ROOM_W - 70, y: 22, w: 38, h: 22 },
 ];
-const LESSON_LEN = 5, ANSWER_PAY = 5, LESSON_BONUS = 25, LESSON_BREAK = 60;   // óra után 60 mp szünet (ne lehessen végtelenül pénzt gyűjteni)
+const LESSON_LEN = 5, ANSWER_PAY = 5, LESSON_BONUS = 25, LESSON_BREAK = 60;
+// a gonosz tanár: rossz válaszért büntet és leszól, siettet (QUESTION_TIME mp / feladat), a rohangálót üldözi és kidobja
+const WRONG_FINE = 2, QUESTION_TIME = 10, RUN_FINE = 5, TEACHER_HOME = { x: 495, y: 112 }, TEACHER_CHASE = 170, TEACHER_WALK = 80;
+const TAUNTS = ['Ezt még egy óvodás is tudja!', 'Egyes! Ülj le!', 'Hát te semmit sem tanultál?', 'Pfuj, de buta vagy!', 'Majd a szüleidnek is elmondom!'];
+const fine = n => { const f = Math.min(Math.max(0, Math.floor(progress.money) || 0), n); progress.money -= f; saveProgress(); return f; };   // sosem megy mínuszba
+function newTeacher() { return { x: TEACHER_HOME.x, y: TEACHER_HOME.y, angle: Math.PI / 2, walk: 0, chase: 0 }; }
+function updateTeacher(dt) {
+  const H = player.inHouse, T = H.teacher;
+  const moving = keys.KeyW || keys.KeyS || keys.KeyA || keys.KeyD || keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight;
+  if (moving && (keys.ShiftLeft || keys.ShiftRight)) {
+    if (!T.chase) popup('👩‍🏫 „NE ROHANGÁLJ!” – a gonosz tanár üldöz!', '#f66');
+    T.chase = 2;                                       // a rohanás után még 2 mp-ig üldöz
+  } else T.chase = Math.max(0, T.chase - dt);
+  const tx = T.chase ? H.ix : TEACHER_HOME.x, ty = T.chase ? H.iy : TEACHER_HOME.y, d = Math.hypot(tx - T.x, ty - T.y);
+  if (d > 2) {
+    const sp = Math.min(d, (T.chase ? TEACHER_CHASE : TEACHER_WALK) * dt);
+    T.x += (tx - T.x) / d * sp; T.y += (ty - T.y) / d * sp; T.angle = Math.atan2(ty - T.y, tx - T.x); T.walk += sp / 12;
+    const o = { x: T.x, y: T.y, r: 12 };                // a padokon nem megy át
+    for (const f of H.furniture) pushOutOfRect(o, { x0: f.x, y0: f.y, x1: f.x + f.w, y1: f.y + f.h });
+    T.x = o.x; T.y = o.y;
+  } else if (!T.chase) T.angle = Math.atan2(H.iy - T.y, H.ix - T.x);   // otthon: téged figyel
+  if (T.chase && Math.hypot(H.ix - T.x, H.iy - T.y) < 26) {              // elkapott: kidob és elkobozza a pénzed
+    const f = fine(RUN_FINE);
+    exitHouse();
+    school.nextAt = clock + LESSON_BREAK;
+    popup(`👩‍🏫 A gonosz tanár kidobott, mert rohangáltál!${f ? ` (elkobzott $${f})` : ''}`, '#f66');
+  }
+}   // óra után 60 mp szünet (ne lehessen végtelenül pénzt gyűjteni)
 const atBlackboard = () => player.inHouse && player.inHouse.hs.school && player.inHouse.iy < 140 && player.inHouse.ix > 120 && player.inHouse.ix < 440;
 // tiszta függvény: egy feladat a véletlenszám-forrásból (r() 0..1) – tesztelhető
 function makeQuestion(r) {
@@ -471,19 +498,27 @@ function makeQuestion(r) {
   for (let i = opts.length - 1; i > 0; i--) { const j = (r() * (i + 1)) | 0; [opts[i], opts[j]] = [opts[j], opts[i]]; }   // keverés
   return { text: `${a} ${op} ${b} = ?`, ans, opts };
 }
-const school = { open: false, q: null, n: 0, correct: 0, feedback: null, nextAt: 0 };
+const school = { open: false, q: null, n: 0, correct: 0, feedback: null, nextAt: 0, timeLeft: QUESTION_TIME, taunt: null };
 const breakLeft = () => Math.max(0, Math.ceil(school.nextAt - clock));
 function openSchool() {
   if (breakLeft() > 0) { popup(`🔔 Szünet van – a következő óra ${breakLeft()} mp múlva`, '#ffd23a'); return false; }
-  Object.assign(school, { open: true, n: 0, correct: 0, feedback: null, q: makeQuestion(Math.random) });
+  Object.assign(school, { open: true, n: 0, correct: 0, feedback: null, taunt: null, timeLeft: QUESTION_TIME, q: makeQuestion(Math.random) });
   for (const k in keys) keys[k] = false; mouse.down = false;
 }
 function closeSchool() { if (school.open) school.nextAt = clock + LESSON_BREAK; school.open = false; }   // abbahagyás után is szünet
 function answerQuestion(i, next = Math.random) {
   if (!school.open || !school.q || !school.q.opts[i] && school.q.opts[i] !== 0) return false;
-  const ok = school.q.opts[i] === school.q.ans;
-  if (ok) { school.correct++; earn(ANSWER_PAY, 'jó válasz ✏️'); } else popup(`✗ Nem jó – a helyes válasz: ${school.q.ans}`, '#f66');
+  return resolveAnswer(school.q.opts[i] === school.q.ans, next);
+}
+function resolveAnswer(ok, next = Math.random, late = false) {
+  if (ok) { school.correct++; earn(ANSWER_PAY, 'jó válasz ✏️'); school.taunt = null; }
+  else {                                               // a gonosz tanár büntet és leszól
+    const f = fine(WRONG_FINE);
+    school.taunt = (late ? 'Lassú vagy, mint a csiga! ' : '') + TAUNTS[school.n % TAUNTS.length];
+    popup(`👩‍🏫 ${late ? 'Lejárt az idő' : 'Rossz válasz'}!${f ? ` Büntetés: -$${f}` : ''} (helyesen: ${school.q.ans})`, '#f66');
+  }
   school.feedback = { ok, ans: school.q.ans };
+  school.timeLeft = QUESTION_TIME;
   school.n++;
   if (school.n >= LESSON_LEN) {                         // vége az órának
     if (school.correct === LESSON_LEN) earn(LESSON_BONUS, 'hibátlan óra – ötös! 🏅');
@@ -491,6 +526,10 @@ function answerQuestion(i, next = Math.random) {
     closeSchool();
   } else school.q = makeQuestion(next);
   return ok;
+}
+function tickSchool(dt) {                            // a tanár siettet: lejárt idő = rossz válasz
+  school.timeLeft -= dt;
+  if (school.timeLeft <= 0) resolveAnswer(false, Math.random, true);
 }
 function schoolKey(code) {
   if (code === 'Escape') closeSchool();
@@ -694,9 +733,9 @@ function wakeUp() {
 const drunkK = () => clamp(((player.drunk || 0) - 25) / 75, 0, 1);   // 0: józan … 1: nagyon részeg
 
 function enterHouse(hs) {
-  player.inHouse = { hs, ix: ROOM_W / 2, iy: ROOM_H - 50, furniture: furnitureOf(hs), factory: hs.factory ? newFactory() : null };
+  player.inHouse = { hs, ix: ROOM_W / 2, iy: ROOM_H - 50, furniture: furnitureOf(hs), factory: hs.factory ? newFactory() : null, teacher: hs.school ? newTeacher() : null };
   Object.assign(player, doorOf(hs));
-  popup(hs.pub ? '🍺 Bementél a kocsmába – a pultnál ihatsz' : hs.bank ? '🏦 Bementél a bankba – a pultnál E' : hs.factory ? '🏭 Bementél a gyárba – pakold a zacskókat (Space)' : hs.shop ? '🛒 Bementél a boltba – a pultnál E' : hs.school ? '🏫 Bementél az iskolába – a táblánál E: óra' : '🏠 Bementél a házba – itt nem talál meg a rendőrség', '#7df');
+  popup(hs.pub ? '🍺 Bementél a kocsmába – a pultnál ihatsz' : hs.bank ? '🏦 Bementél a bankba – a pultnál E' : hs.factory ? '🏭 Bementél a gyárba – pakold a zacskókat (Space)' : hs.shop ? '🛒 Bementél a boltba – a pultnál E' : hs.school ? '🏫 Bementél az iskolába – vigyázz a gonosz tanárral, ne rohangálj!' : '🏠 Bementél a házba – itt nem talál meg a rendőrség', '#7df');
   startRadio();
 }
 function exitHouse() {
@@ -2379,6 +2418,7 @@ function update(dt) {
   } else if (player.inHouse) {
     updateInterior(dt);
     if (player.inHouse && player.inHouse.factory) updateFactory(dt);
+    if (player.inHouse && player.inHouse.teacher) updateTeacher(dt);
   } else if (player.riding) {                        // utas: a busszal együtt mozog
     const b = player.riding;
     if (!aiCars.includes(b) || b.wrecked) { player.riding = null; collide(player); }
@@ -2694,13 +2734,23 @@ function drawInterior(w, h) {
   }
   ctx.strokeStyle = '#e8dcc6'; ctx.lineWidth = ROOM_WALL; ctx.strokeRect(ROOM_WALL / 2, ROOM_WALL / 2, ROOM_W - ROOM_WALL, ROOM_H - ROOM_WALL);   // falak
   ctx.fillStyle = '#6b4a2e'; ctx.fillRect(ROOM_W / 2 - 34, ROOM_H - ROOM_WALL, 68, ROOM_WALL);                                  // ajtó
+  if (H.teacher) {                                                                     // gonosz tanár: lila ruha, ősz konty, szemüveg
+    const T = H.teacher;
+    drawPerson(T.x, T.y, T.angle, T.walk, '#4a2060', '#bbb', false, '#222', null, null);
+    ctx.save(); ctx.translate(T.x, T.y); ctx.rotate(T.angle);
+    ctx.fillStyle = '#999'; ctx.beginPath(); ctx.arc(-4, 0, 3.5, 0, Math.PI * 2); ctx.fill();                      // konty
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(5, -2.6, 1.8, 0, Math.PI * 2); ctx.moveTo(6.8, 2.6); ctx.arc(5, 2.6, 1.8, 0, Math.PI * 2); ctx.stroke();   // szemüveg
+    ctx.restore();
+    ctx.fillStyle = T.chase ? '#f44' : '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(T.chase ? '😠 ÁLLJ MEG!' : '😒', T.x, T.y - 20); ctx.textAlign = 'left';
+  }
   if (H.factory) for (const b of H.factory.bags) { ctx.fillStyle = b.color; ctx.fillRect(b.x - 8, BELT.y + 8, 16, 24); ctx.fillStyle = '#fff'; ctx.fillRect(b.x - 5, BELT.y + 16, 10, 4); }
   const sk = SKINS[activeSkin];
   drawPerson(H.ix, H.iy, player.angle, player.walk, sk.shirt, sk.head, false, sk.legs, sk.hat, sk.pattern);
   if (H.factory && H.factory.carrying) { ctx.fillStyle = '#f2c230'; ctx.fillRect(H.ix + 8, H.iy - 18, 14, 20); }
   ctx.restore();
   ctx.fillStyle = '#7df'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(H.hs.school ? '🏫 Iskolában vagy – a táblánál E: matekóra' : H.hs.shop ? '🛒 Boltban vagy – a pultnál E: vásárlás' : H.hs.bank ? '🏦 Bankban vagy – a pultnál E: hitel vagy törlesztés' : H.hs.factory ? `🏭 Gyár – fizetés $${FACTORY_WAGE}/perc · következő: ${Math.ceil(WAGE_PERIOD - H.factory.shift)} mp · ebben a percben bepakolva: ${H.factory.minutePacked}` : H.hs.pub ? `🍺 Kocsmában vagy – a pultnál ihatsz: sör $${BEER_PRICE}, bor $${WINE_PRICE}` : '🏠 Bent vagy a házban – itt nem talál meg a rendőrség, és gyorsabban gyógyulsz', w / 2, oy - 14);
+  ctx.fillText(H.hs.school ? '🏫 Iskola – a táblánál E: óra · 👩‍🏫 ne rohangálj!' : H.hs.shop ? '🛒 Boltban vagy – a pultnál E: vásárlás' : H.hs.bank ? '🏦 Bankban vagy – a pultnál E: hitel vagy törlesztés' : H.hs.factory ? `🏭 Gyár – fizetés $${FACTORY_WAGE}/perc · következő: ${Math.ceil(WAGE_PERIOD - H.factory.shift)} mp · ebben a percben bepakolva: ${H.factory.minutePacked}` : H.hs.pub ? `🍺 Kocsmában vagy – a pultnál ihatsz: sör $${BEER_PRICE}, bor $${WINE_PRICE}` : '🏠 Bent vagy a házban – itt nem talál meg a rendőrség, és gyorsabban gyógyulsz', w / 2, oy - 14);
   ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 16px sans-serif';
   if (radio.playing && radio.ac && radio.ac.state === 'suspended') ctx.fillText('🔇 A böngésző lenémította a hangot – kattints vagy nyomj meg egy gombot', w / 2, oy + 24);
   ctx.fillText(radio.playing && radio.song ? `📻 Most szól: ${radio.song.name} (${radio.song.scaleName}, ${radio.song.bpm} BPM) · R: következő szám · M: rádió ki`
@@ -3267,9 +3317,12 @@ function drawSchool(w, h) {
     ctx.fillStyle = '#fff'; ctx.font = 'bold 22px sans-serif'; ctx.fillText(`${i + 1}: ${o}`, x + bw / 2, y + 33);
     school.hits.push({ i, x, y, w: bw, h: 50 });
   });
-  if (school.feedback) { ctx.fillStyle = school.feedback.ok ? '#7f7' : '#f66'; ctx.font = 'bold 15px sans-serif'; ctx.fillText(school.feedback.ok ? '✓ Jó válasz!' : `✗ Az előző helyesen: ${school.feedback.ans}`, w / 2, py + 248); }
+  if (school.feedback) { ctx.fillStyle = school.feedback.ok ? '#7f7' : '#f66'; ctx.font = 'bold 15px sans-serif'; ctx.fillText(school.feedback.ok ? '✓ Jó válasz!' : `👩‍🏫 „${school.taunt}” (helyesen: ${school.feedback.ans})`, w / 2, py + 248); }
+  const tk = clamp(school.timeLeft / QUESTION_TIME, 0, 1);                       // idősáv: a tanár siettet
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(px + 40, py + 80, PW - 80, 8);
+  ctx.fillStyle = tk > 0.3 ? '#7f7' : '#f44'; ctx.fillRect(px + 40, py + 80, (PW - 80) * tk, 8);
   ctx.fillStyle = '#aaa'; ctx.font = '12px sans-serif';
-  ctx.fillText(`1–3 vagy kattintás: válasz · jó válasz $${ANSWER_PAY}, hibátlan óra +$${LESSON_BONUS} · Esc: kilépés`, w / 2, py + PH - 16); ctx.textAlign = 'left';
+  ctx.fillText(`1–3: válasz · jó $${ANSWER_PAY}, hibátlan óra +$${LESSON_BONUS} · rossz / lassú: -$${WRONG_FINE} · Esc: kilépés`, w / 2, py + PH - 16); ctx.textAlign = 'left';
 }
 
 function drawShop(w, h) {
@@ -3516,6 +3569,7 @@ function frame(now) {
     update(dt);
     updateRadio();                  // szünetben (menü, adományozás) nem ütemez új hangot
   } else if (radio.playing && radio.ac) radio.nextTime = radio.ac.currentTime + 0.05;
+  if (school.open) tickSchool(dt);                  // az óra ideje szünetben is telik (a tanár nem vár)
   render();
   requestAnimationFrame(frame);
 }

@@ -42,7 +42,7 @@ eval(src + `
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
-  school, makeQuestion, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
+  school, makeQuestion, TEACHER_HOME, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
 const key = (code, down) => listeners[down ? 'keydown' : 'keyup']({ code, repeat: false });
@@ -1604,23 +1604,51 @@ G.npcs.length = 0; G.aiCars.length = 0;
   press('Digit' + (right() + 1));
   check(`jó válaszért $${G.ANSWER_PAY} jár`, G.progress.money === G.ANSWER_PAY && G.school.n === 1);
   press('Digit' + (wrong() + 1));
-  check('rossz válaszért nem jár pénz, de jön a következő feladat', G.progress.money === G.ANSWER_PAY && G.school.n === 2 && G.school.feedback && !G.school.feedback.ok);
+  check(`rossz válaszért a gonosz tanár $${G.WRONG_FINE}-t büntet és leszól, de jön a következő feladat`, G.progress.money === G.ANSWER_PAY - G.WRONG_FINE && G.school.n === 2 && G.school.feedback && !G.school.feedback.ok && G.TAUNTS.some(t => G.school.taunt.includes(t)));
   press('Digit' + (right() + 1)); press('Digit' + (right() + 1));
   step(1);
   listeners.mousedown({ button: 0, clientX: G.school.hits[right()].x + 5, clientY: G.school.hits[right()].y + 5 });
-  check('kattintással is lehet válaszolni; 5 feladat után vége az órának', !G.school.open && G.progress.money === 4 * G.ANSWER_PAY);
+  check('kattintással is lehet válaszolni; 5 feladat után vége az órának', !G.school.open && G.progress.money === 4 * G.ANSWER_PAY - G.WRONG_FINE);
   press('KeyE');
   check('óra után szünet van: nem kezdhető rögtön új óra', !G.school.open && /Szünet/.test(G.interactionPrompt().text));
   G.school.nextAt = 0;                                  // a szünet letelt
   press('KeyE');
   for (let i = 0; i < G.LESSON_LEN; i++) press('Digit' + (right() + 1));
-  check(`hibátlan óráért +$${G.LESSON_BONUS} bónusz`, !G.school.open && G.progress.money === 4 * G.ANSWER_PAY + G.LESSON_LEN * G.ANSWER_PAY + G.LESSON_BONUS);
+  check(`hibátlan óráért +$${G.LESSON_BONUS} bónusz`, !G.school.open && G.progress.money === 4 * G.ANSWER_PAY - G.WRONG_FINE + G.LESSON_LEN * G.ANSWER_PAY + G.LESSON_BONUS);
   G.school.nextAt = 0; press('KeyE'); press('Escape');
   check('Esc: az óra abbahagyható', !G.school.open);
   press('KeyE');
   check('abbahagyás után is szünet jön (nem lehet újrakezdéssel pénzt gyűjteni)', !G.school.open);
   check('a térképen az iskolák is látszanak', G.poisIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000).some(p => p.type === 'school'));
   check('a taxi a legközelebbi iskolába is elvisz', G.taxiDestinations().some(d => d.label.includes('iskola')));
+  // --- a gonosz tanár ---
+  const Tc = G.player.inHouse.teacher;
+  check('az iskolában van egy gonosz tanár', !!Tc);
+  { const sv = { ix: G.player.inHouse.ix, iy: G.player.inHouse.iy }; Object.assign(G.player.inHouse, { ix: G.TEACHER_HOME.x - 26, iy: G.TEACHER_HOME.y });
+    check('a tanár helye nincs a táblánál (ott nem kaphat el váratlanul)', !G.atBlackboard()); Object.assign(G.player.inHouse, sv); }
+  G.school.nextAt = 0; G.progress.money = 10; press('KeyE');
+  step(60 * (G.QUESTION_TIME + 1));
+  check('a tanár siettet: ha lejár az idő, rossz válasznak számít (büntetéssel)', G.school.open && G.school.n === 1 && !G.school.feedback.ok && G.progress.money === 10 - G.WRONG_FINE && /csiga/.test(G.school.taunt));
+  G.progress.money = 1; press('Digit' + (wrong() + 1));
+  check('a büntetés nem visz mínuszba', G.progress.money === 0);
+  press('Escape');
+  const H = G.player.inHouse;
+  Object.assign(Tc, { x: 380, y: 112, chase: 0 }); H.ix = 300; H.iy = 112;
+  key('KeyD', true); step(20); key('KeyD', false); step(30);
+  check('ha sétálsz, a tanár nem bánt (nem üldöz)', G.player.inHouse === H && !Tc.chase);
+  G.progress.money = 20; H.ix = 140; H.iy = 250; Object.assign(Tc, { x: 380, y: 112 });
+  key('ShiftLeft', true); key('KeyD', true); step(5); key('KeyD', false); key('ShiftLeft', false);
+  check('ha rohansz, a tanár üldözni kezd', Tc.chase > 0 && G.player.inHouse === H);
+  { const inF = () => H.furniture.some(f => Tc.x > f.x + 2 && Tc.x < f.x + f.w - 2 && Tc.y > f.y + 2 && Tc.y < f.y + f.h - 2);
+    let ok = true; const sv = { x: Tc.x, y: Tc.y, chase: Tc.chase, ix: H.ix, iy: H.iy };
+    Object.assign(Tc, { x: 95, y: 175, chase: 2 }); H.ix = 95; H.iy = 300;     // a pad (70–120, 160–190) mögött
+    for (let i = 0; i < 20; i++) { step(1); if (inF()) ok = false; }
+    check('a tanár nem megy át a padokon', ok);
+    Object.assign(Tc, { x: sv.x, y: sv.y, chase: sv.chase }); H.ix = sv.ix; H.iy = sv.iy; }
+  for (let i = 0; i < 120 && G.player.inHouse; i++) step(1);
+  check(`a tanár elkap, kidob az iskolából és elkoboz $${G.RUN_FINE}-t`, !G.player.inHouse && G.progress.money === 20 - G.RUN_FINE);
+  Object.assign(G.player, G.doorOf(sc)); press('KeyE');
+  check('az iskolába vissza lehet menni (a tanár a helyén van)', G.player.inHouse && G.player.inHouse.teacher.chase === 0);
   G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
   check('az iskolából ki lehet jönni', !G.player.inHouse);
   G.progress.money = 0;

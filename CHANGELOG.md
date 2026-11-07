@@ -5,6 +5,10 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.23.0 – 2026-11-07
+- Gonosz tanár az iskolákban (lila ruha, ősz konty, szemüveg): ha rohangálsz (Shift), üldöz, és ha elkap, kidob az iskolából és elkoboz $5-t
+- Az órán a tanár siettet (10 mp / feladat, idősáv), rossz vagy késő válaszért $2 büntetés és csúnya megjegyzés („Ezt még egy óvodás is tudja!”); a büntetés sosem visz mínuszba
+
 ## 0.22.0 – 2026-11-07
 - Iskolák (a házak ~5%-a, sárga tető, „ISKOLA” tábla): be lehet menni, a táblánál E – matekóra: 5 feladat (összeadás, kivonás, szorzás), 3 válaszból kell választani; jó válaszonként $5, hibátlan óráért +$25; óra után 60 mp szünet
 - Új szkin: Peppa malac (ingyenes) – rózsaszín malac piros ruhában, ormánnyal és fülekkel
