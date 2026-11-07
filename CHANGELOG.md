@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.9.1 – 2026-11-07
+- Architekturális döntések naplója (`docs/adr/`, 16 ADR), a CLAUDE.md szabályaival
+
 ## 0.9.0 – 2026-11-07
 - Verziózás: verziószám a játékban (Esc menü alján), változásnapló, git-címkék minden kiadáshoz
 

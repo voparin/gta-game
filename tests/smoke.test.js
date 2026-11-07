@@ -436,5 +436,18 @@ const topEntry = (changelog.match(/^## (\d+\.\d+\.\d+)/m) || [])[1];
 check(`a verziószám érvényes (v${G.VERSION})`, /^\d+\.\d+\.\d+$/.test(G.VERSION));
 check('a CHANGELOG legfelső bejegyzése a jelenlegi verzió', topEntry === G.VERSION);
 
+// --- architekturális döntések (ADR) ---
+const adrDir = path.join(__dirname, '..', 'docs', 'adr');
+const adrIndex = fs.readFileSync(path.join(adrDir, 'README.md'), 'utf8');
+const adrFiles = fs.readdirSync(adrDir).filter(f => /^\d{4}-.+\.md$/.test(f)).sort();
+check('vannak ADR-ek', adrFiles.length > 0);
+check('minden ADR szerepel az ADR-listában', adrFiles.every(f => adrIndex.includes(`](${f})`)));
+check('az ADR-ek sorszáma folytonos', adrFiles.every((f, i) => f.startsWith(String(i + 1).padStart(4, '0') + '-')));
+check('minden ADR-ben van státusz, kontextus, döntés, alternatívák és következmények', adrFiles.every(f => {
+  const t = fs.readFileSync(path.join(adrDir, f), 'utf8');
+  return /\*\*Státusz:\*\* (Javasolt|Elfogadva|Elvetve|Felváltva)/.test(t)
+    && ['## Kontextus', '## Döntés', '## Elvetett alternatívák', '## Következmények'].every(h => t.includes(h));
+}));
+
 console.log(failed ? `\n${failed} teszt elbukott` : '\nMinden teszt sikeres');
 process.exit(failed ? 1 : 0);

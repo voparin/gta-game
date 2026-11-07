@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.9.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.9.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 const OLD_WORLD = 10000;

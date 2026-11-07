@@ -14,6 +14,7 @@ Felülnézetes, GTA-szerű böngészős játék. Tiszta HTML + JavaScript (Canva
 | `tests/smoke.test.js` | füstteszt kamu böngészőkörnyezetben (Node, függőség nélkül) |
 | `.github/workflows/deploy.yml` | CI: teszt, majd publikálás GitHub Pages-re |
 | `CHANGELOG.md` | változásnapló, verziónként |
+| `docs/adr/` | architekturális döntések naplója (ADR), lásd lent |
 
 Fontos állandók a `game.js` elején: `WORLD` (pályaméret, a régi 10 000 px-es pálya 30-szoros területe), `CHUNK`, `ROAD_SPACING`, `HALF_CYCLE` (30 perc nappal / 30 perc éjszaka), `FADE` (alkonyat hossza).
 
@@ -28,10 +29,32 @@ Felépítés a `game.js`-en belül:
 - **Rendőrség**: `wanted` (körözési szint), `updateWanted` (gyorshajtás `SPEED_LIMIT` felett, lerázás, letartóztatás), `policeInput` (üldözés). A rendőrautók az `aiCars`-ban vannak `police`/`chasing` jelzővel. Tesztben a `policeEnabled` kikapcsolható.
 - Tesztekben a `spawnEnabled`, `slimeEnabled`, `policeEnabled` és `missionsEnabled` kikapcsolható, hogy determinisztikus legyen a futás; a teszt szereplőit a játékos közelében, akadálymentes helyen (az úton) helyezd el. Ne írj olyan tesztet, ami véletlen szóráson vagy időzítési szerencsén múlik.
 
+## Architekturális döntések (ADR)
+
+Minden architekturális döntést a `docs/adr/` mappában naplózunk. A meglévők listája: [docs/adr/README.md](docs/adr/README.md).
+**Mielőtt a kódban egy meglévő döntéssel ellentétes irányba mennél, olvasd el a vonatkozó ADR-t.**
+
+Mi számít architekturális döntésnek (ilyenkor ADR kell):
+- technológia, könyvtár, fájlszerkezet, build vagy futtatási mód megválasztása vagy cseréje
+- adatszerkezet, állapotkezelés, mentés formátuma (pl. `progress` mezők jelentése)
+- világgenerálás, koordináták, mértékegységek, időkezelés
+- közös rendszerek kialakítása (fizika, AI, spawnolás, fények, rendőrség, jutalmak)
+- teszt-, CI-, publikálási vagy verziózási folyamat
+- olyan termék- vagy tervezési elv, ami a későbbi fejlesztéseket korlátozza
+
+Nem kell ADR: hangolás és beállítás (pl. sebességkorlát értéke, árak), szöveg, apró hibajavítás, új funkció, ami a meglévő döntéseket követi.
+
+Szabályok:
+1. Másold a `docs/adr/template.md`-t a következő sorszámmal (`NNNN-rovid-cim.md`), töltsd ki magyarul: Kontextus, Döntés, Elvetett alternatívák, Következmények.
+2. Vedd fel a `docs/adr/README.md` táblázatába.
+3. Elfogadott ADR tartalmát **nem írjuk át**. Ha egy döntés megváltozik, új ADR készül, a régi státusza pedig `Felváltva: [ADR-XXXX](…)` lesz (a táblázatban is).
+4. Az ADR ugyanabban a commitban kerüljön a repóba, mint a döntést megvalósító kód.
+5. Ha a felhasználó egy irányt kér, de félbehagyatja (pl. elkezdett, majd leállított átalakítás), és nem került kódba, nem kell ADR.
+
 ## Szokásos fejlesztési flow
 
 1. **Megértés** – olvasd el az érintett részt a `game.js`-ben, mielőtt módosítasz. Kövesd a meglévő stílust (magyar kommentek, rövid függvények, `ctx.save()/restore()` párok).
-2. **Fejlesztés** – kis, egy célú változtatások. Új funkció esetén bővítsd a `tests/smoke.test.js`-t is egy `check(...)` sorral, ami az új viselkedést ellenőrzi.
+2. **Fejlesztés** – kis, egy célú változtatások. Új funkció esetén bővítsd a `tests/smoke.test.js`-t is egy `check(...)` sorral, ami az új viselkedést ellenőrzi. Ha a változás architekturális döntést tartalmaz, írd meg hozzá az ADR-t (lásd fent).
 3. **Ellenőrzés helyben** – kötelező, mielőtt bármit publikálsz:
    ```bash
    node --check game.js && node tests/smoke.test.js
