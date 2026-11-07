@@ -13,6 +13,7 @@ Felülnézetes, GTA-szerű böngészős játék. Tiszta HTML + JavaScript (Canva
 | `game.js` | a teljes játék: világ, karakter, autó, nappal/éjszaka, fények, HUD |
 | `tests/smoke.test.js` | füstteszt kamu böngészőkörnyezetben (Node, függőség nélkül) |
 | `.github/workflows/deploy.yml` | CI: teszt, majd publikálás GitHub Pages-re |
+| `CHANGELOG.md` | változásnapló, verziónként |
 
 Fontos állandók a `game.js` elején: `WORLD` (pályaméret, a régi 10 000 px-es pálya 30-szoros területe), `CHUNK`, `ROAD_SPACING`, `HALF_CYCLE` (30 perc nappal / 30 perc éjszaka), `FADE` (alkonyat hossza).
 
@@ -37,18 +38,23 @@ Felépítés a `game.js`-en belül:
    ```
    Csak akkor „működik”, ha mindkettő 0-s kilépési kóddal fut le és minden sor `✓`.
 4. **Kipróbálás** – `open index.html`, hogy a felhasználó a böngészőben is lássa.
-5. **Publikálás (automatikus)** – ha a 3. lépés sikeres, kérdezés nélkül:
+5. **Verzióléptetés** – minden kiadás előtt:
+   - új funkció → a középső szám nő (0.8.0 → 0.9.0); hibajavítás / beállítás → az utolsó (0.8.0 → 0.8.1)
+   - írd át a `VERSION` állandót a `game.js` elején, és tegyél a `CHANGELOG.md` tetejére egy új bejegyzést (verzió, dátum, változások magyarul)
+   - a teszt ellenőrzi, hogy a kettő egyezik
+6. **Publikálás (automatikus)** – ha a 3. lépés sikeres, kérdezés nélkül:
    ```bash
    git add -A
-   git commit -m "<rövid, magyar leírás a változásról>"
-   git push
+   git commit -m "v<verzió>: <rövid, magyar leírás a változásról>"
+   git tag v<verzió>
+   git push && git push origin v<verzió>
    ```
    A push után a GitHub Actions újra lefuttatja a tesztet, és csak siker esetén teszi ki a játékot a GitHub Pages-re. Ellenőrizd az eredményt:
    ```bash
    gh run watch --exit-status $(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
    ```
    Ha a CI elbukik, javítsd és pushold újra – ne hagyd piros állapotban.
-6. **Jelentés** – írd meg a felhasználónak magyarul: mi változott, a tesztek eredménye, és az élő link.
+7. **Jelentés** – írd meg a felhasználónak magyarul: mi változott, az új verziószám, a tesztek eredménye, és az élő link.
 
 ## Szabályok
 

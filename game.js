@@ -1,5 +1,7 @@
 'use strict';
 
+const VERSION = '0.9.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+
 // ===== Beállítások =====
 const OLD_WORLD = 10000;
 const WORLD = Math.round(OLD_WORLD * Math.sqrt(30) / 1000) * 1000;  // 30x akkora terület (~55 000 px)
@@ -1674,7 +1676,7 @@ function drawMenu(w, h) {
   ctx.fillText(m.desc + ` · ${Math.round(m.maxRoad / 4)} km/h · fogyasztás x${m.fuelUse}`, px + 410, prevY + 58);
 
   ctx.fillStyle = '#999'; ctx.font = '13px sans-serif';
-  ctx.fillText('↑↓: választás · ←→: váltás · Enter: Folytatás · Esc: vissza a játékba · egérrel is kattintható', w / 2, py + PH - 14);
+  ctx.fillText(`↑↓: választás · ←→: váltás · Enter: Folytatás · Esc: vissza a játékba · egérrel is kattintható · v${VERSION}`, w / 2, py + PH - 14);
   ctx.textAlign = 'left';
 }
 

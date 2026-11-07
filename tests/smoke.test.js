@@ -28,7 +28,7 @@ eval(src + `
   get time(){return time}, set time(v){time=v}, get timeScale(){return timeScale},
   set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, set police(v){policeEnabled=v}, wanted, clearWanted,
   SPEED_LIMIT, KMH, START_X, START_Y, progress, mission, drift, stationFor, allStations, nearPump, earn, levelOf,
-  set missions(v){missionsEnabled=v}, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
+  set missions(v){missionsEnabled=v}, VERSION, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
@@ -429,6 +429,12 @@ check('éjszakai kirajzolás hiba nélkül', true);
 key('KeyT', true); key('KeyT', false);
 const t0 = G.time; step(60);
 check('T gomb gyorsítja az időt (60x)', G.timeScale === 60 && Math.abs((G.time - t0) - 60) < 2);
+
+// --- verzió ---
+const changelog = fs.readFileSync(path.join(__dirname, '..', 'CHANGELOG.md'), 'utf8');
+const topEntry = (changelog.match(/^## (\d+\.\d+\.\d+)/m) || [])[1];
+check(`a verziószám érvényes (v${G.VERSION})`, /^\d+\.\d+\.\d+$/.test(G.VERSION));
+check('a CHANGELOG legfelső bejegyzése a jelenlegi verzió', topEntry === G.VERSION);
 
 console.log(failed ? `\n${failed} teszt elbukott` : '\nMinden teszt sikeres');
 process.exit(failed ? 1 : 0);
