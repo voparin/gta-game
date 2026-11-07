@@ -24,7 +24,7 @@ global.window.AudioContext = class {
   constructor() { this.currentTime = 0; this.state = 'running'; this.destination = {}; audio.ctx = this; }
   createGain() { const g = { gain: param(), connect() {}, disconnect() { this.off = true; } }; audio.gains.push(g); return g; }
   createOscillator() { audio.tones++; return { type: '', frequency: param(), connect() {}, start() {}, stop() {} }; }
-  resume() {}
+  resume() { this.state = 'running'; audio.resumed = (audio.resumed || 0) + 1; }
 };
 global.document = { getElementById: mkCanvas, createElement: mkCanvas };
 global.performance = { now: () => now };
@@ -41,7 +41,7 @@ eval(src + `
   set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, stationCache, STATION_CACHE_MAX, raiseWanted,
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
-  get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
+  get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
@@ -1030,7 +1030,72 @@ G.npcs.length = 0; G.aiCars.length = 0;
   const t2 = audio.tones;
   for (let i = 0; i < 60; i++) { audio.ctx.currentTime += 1 / 60; step(1); }
   check('kilépéskor elhallgat a rádió', !G.player.inHouse && !G.radio.playing && audio.tones === t2);
+  // ha a böngésző lenémította a hangot, bármely gomb feloldja
+  audio.ctx.state = 'suspended';
+  press('KeyX');
+  check('lenémított hangot egy gombnyomás feloldja', audio.ctx.state === 'running');
   check('kilépéskor a már beütemezett hangok is elnémulnak', audio.gains.filter(g => g.off).every(g => g.gain.value === 0) && G.radio.songOut === null);
+}
+
+// --- kocsmák: sör $2, bor $3, részegség ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null; G.police = false;
+  const all = G.housesIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000);
+  const pubs = all.filter(h => h.pub);
+  check('vannak kocsmák, de a legtöbb ház sima ház', pubs.length > 20 && pubs.length < all.length * 0.25);
+  check(`a sör $${G.BEER_PRICE}, a bor $${G.WINE_PRICE}`, G.BEER_PRICE === 2 && G.WINE_PRICE === 3);
+  const pub = pubs[0], home = all.find(h => !h.pub);
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  Object.assign(G.player, { inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0, drunk: 0, passedOut: 0 });
+  // sima házban nincs ital
+  Object.assign(G.player, G.doorOf(home)); press('KeyE');
+  G.player.inHouse.ix = 280; G.player.inHouse.iy = 110;
+  G.progress.money = 50; press('Digit1');
+  check('sima házban nem lehet inni', G.progress.money === 50 && G.player.drunk === 0);
+  G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
+  // kocsma
+  Object.assign(G.player, G.doorOf(pub)); press('KeyE');
+  check('a kocsmába be lehet menni', G.player.inHouse && G.player.inHouse.hs.pub && G.player.inHouse.furniture.some(f => f.k === 'bar'));
+  press('Digit1');
+  check('a pulttól távol nem lehet inni', G.progress.money === 50);
+  G.player.inHouse.ix = 280; G.player.inHouse.iy = 110;
+  check('a pultnál kiírja az árakat', /sör.*\$2.*bor.*\$3/.test(G.interactionPrompt().text));
+  press('Digit1');
+  check('egy sör $2, és ittasabb leszel', G.progress.money === 48 && G.player.drunk > 10);
+  const d1 = G.player.drunk;
+  press('Digit2');
+  check('egy bor $3, és jobban üt', G.progress.money === 45 && G.player.drunk - d1 > 20);
+  G.progress.money = 1;
+  press('Digit1');
+  check('pénz nélkül nem kapsz italt', G.progress.money === 1 && G.player.drunk < d1 + 30);
+  const d2 = G.player.drunk; step(300);
+  check('idővel kijózanodsz', G.player.drunk < d2 - 4);
+  // részegen imbolyog: egyenesen menve is oldalra tér ki
+  G.player.drunk = 90; G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = 300;
+  let maxDx = 0; key('KeyW', true); for (let i = 0; i < 40; i++) { step(1); maxDx = Math.max(maxDx, Math.abs(G.player.inHouse.ix - G.ROOM_W / 2)); } key('KeyW', false);
+  check('részegen imbolyogsz', G.drunkK() > 0.5 && maxDx > 5);
+  // túl sok ital: ájulás, utána a kocsma előtt térsz magadhoz
+  G.progress.money = 100; G.player.inHouse.ix = 280; G.player.inHouse.iy = 110; G.player.drunk = 80;
+  press('Digit2');
+  check('túl sok italtól elájulsz', G.player.passedOut > 0);
+  check('ájultan nincs italfelirat', G.interactionPrompt() === null);
+  press('Digit1');
+  check('ájultan nem lehet inni', G.progress.money === 97);
+  step(330);
+  const door = G.doorOf(pub);
+  check('magadhoz térsz a kocsma előtt, kicsit józanabban', !(G.player.passedOut > 0) && !G.player.inHouse && Math.hypot(G.player.x - door.x, G.player.y - door.y) < 1 && G.player.drunk < 50);
+  // ittas vezetés: részegen az úton vezetve üldöz a rendőrség (lassan is)
+  G.clearWanted();
+  Object.assign(G.player, { x: 1000, y: G.C, inCar: true, drunk: 80 });
+  Object.assign(G.car, { x: 1000, y: G.C, angle: 0, vx: 0, vy: 0, fuel: 100 });
+  key('KeyW', true); step(20); key('KeyW', false);
+  check('ittas vezetésért üldöz a rendőrség', G.wanted.level === 1 && Math.hypot(G.car.vx, G.car.vy) / G.KMH < 100);
+  G.clearWanted();
+  Object.assign(G.player, { drunk: 10 });
+  Object.assign(G.car, { x: 1000, y: G.C, angle: 0, vx: 0, vy: 0 });
+  key('KeyW', true); step(20); key('KeyW', false);
+  check('egy-két ital után (kicsit ittasan) még nem üldöz', G.wanted.level === 0);
+  Object.assign(G.player, { drunk: 0, inCar: false }); G.clearWanted(); step(60);
 }
 
 // --- Pókhős szkin ($900) ---
@@ -1120,6 +1185,12 @@ G.npcs.length = 0; G.aiCars.length = 0;
   check('AI sosem vezet buszt', G.aiCars.every(c => c.type !== 'bus' && c.color !== bus.color));
   G.aiCars.length = 0;
   G.selectCar(prev);
+}
+
+// --- telepítés: a böngésző ne a régi, tárolt game.js-t futtassa ---
+{
+  const wf = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'deploy.yml'), 'utf8');
+  check('kiadáskor a game.js címe egyedi (nem a régi, tárolt változat fut)', /game\.js\?v=\$\{GITHUB_SHA\}/.test(wf));
 }
 
 // --- verzió ---

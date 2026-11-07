@@ -66,3 +66,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 
 ## Szkinek
 - Az Esc menüben választhatsz szkint. A **Pókhős** (piros-kék, hálómintás) **$900**-ba kerül; a többi ingyenes.
+
+## Kocsmák
+- A házak egy része **kocsma** (zöld tető, „KOCSMA” tábla). A pultnál **1: sör ($2)**, **2: bor ($3)**.
+- Ha sokat iszol, imbolyogsz, és himbálózik a kép. **Részegen ne vezess:** az úton ittas vezetésért üldöz a rendőrség. Túl sok italtól elájulsz, és a kocsma előtt térsz magadhoz.

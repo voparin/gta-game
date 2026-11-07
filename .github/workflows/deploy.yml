@@ -36,7 +36,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Publikálandó fájlok összegyűjtése
-        run: mkdir _site && cp index.html game.js _site/
+        run: |
+          mkdir _site && cp index.html game.js _site/
+          # a game.js címe minden kiadásnál más, így a böngésző nem a régi, tárolt változatot futtatja
+          sed -i "s|src=\"game.js\"|src=\"game.js?v=${GITHUB_SHA}\"|" _site/index.html
+          grep -q "game.js?v=${GITHUB_SHA}" _site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

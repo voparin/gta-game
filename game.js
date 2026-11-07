@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.14.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.15.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -34,7 +34,10 @@ resize();
 const keys = {};
 const mouse = { x: 0, y: 0, down: false, active: false };
 let timeScale = 1;
+// a böngészők csak felhasználói művelet után engedik a hangot: bármely gomb / kattintás feloldja, ha le volt tiltva
+function unlockAudio() { if (radio.ac && radio.ac.state === 'suspended') radio.ac.resume(); }
 window.addEventListener('keydown', e => {
+  unlockAudio();
   if (donate.open) { if (!e.repeat) donateKey(e.code); return; }
   if (e.code === 'Escape') { if (!e.repeat) toggleMenu(); return; }
   if (menu.open) { if (!e.repeat) menuKey(e.code); return; }
@@ -44,11 +47,14 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyT') timeScale = timeScale === 1 ? 60 : 1;
   if (e.code === 'KeyH') toggleStorm();
   if (e.code === 'KeyR' && player.inHouse) startRadio();                            // következő szám
+  if (e.code === 'Digit1' || e.code === 'Numpad1') buyDrink('beer');
+  if (e.code === 'Digit2' || e.code === 'Numpad2') buyDrink('wine');
   if (e.code === 'KeyM' && player.inHouse) { if (radio.playing) stopRadio(); else startRadio(); }
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true; });
 window.addEventListener('mousedown', e => {
+  unlockAudio();
   mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
   if (donate.open) { if (e.button === 0) donateClick(e.clientX, e.clientY); return; }
   if (menu.open) { if (e.button === 0) menuClick(e.clientX, e.clientY); return; }
@@ -322,7 +328,7 @@ function housesIn(xa, ya, xb, yb) {
         const p = toXY(a - w / 2, d0), q = toXY(a + w / 2, d0 + d), c = toXY(a, d0 + d / 2);
         out.push({ id: `${axis}:${R}:${a}:${side}`, axis, side, road: R, along: a, w, d, x: c.x, y: c.y,
           x0: Math.min(p.x, q.x), y0: Math.min(p.y, q.y), x1: Math.max(p.x, q.x), y1: Math.max(p.y, q.y),
-          roof: ROOF_COLORS[(h() * ROOF_COLORS.length) | 0], chimney: h() });
+          roof: ROOF_COLORS[(h() * ROOF_COLORS.length) | 0], chimney: h(), pub: h() < 0.12 });
       }
     }
   };
@@ -344,6 +350,7 @@ function nearestDoor() {
 }
 // bútorok: két elrendezés (tükrözve is), az ajtó előtti sáv mindig szabad
 function furnitureOf(hs) {
+  if (hs.pub) return PUB_FURNITURE;
   const r = rng(chunkSeed(Math.round(hs.x), Math.round(hs.y)));
   const mirror = r() < 0.5, alt = r() < 0.5;
   const items = alt ? [
@@ -385,7 +392,7 @@ function audioOut() {
   if (!radio.ac) {
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) { radio.ac = new AC(); radio.out = radio.ac.createGain(); radio.out.gain.value = 0.12; radio.out.connect(radio.ac.destination); }
+      if (AC) { radio.ac = new AC(); radio.out = radio.ac.createGain(); radio.out.gain.value = 0.25; radio.out.connect(radio.ac.destination); }
     } catch (e) { radio.ac = null; }                       // nincs hang (pl. teszt) – a rádió állapota attól még működik
   }
   return radio.ac;
@@ -440,10 +447,46 @@ function updateRadio() {
   }
 }
 
+// ===== Kocsma: pult, székek, asztalok; a pultnál 1: sör, 2: bor =====
+const BEER_PRICE = 2, WINE_PRICE = 3;
+const DRINKS = { beer: { name: 'sör', price: BEER_PRICE, drunk: 15 }, wine: { name: 'bor', price: WINE_PRICE, drunk: 22 } };
+const PUB_FURNITURE = [
+  { k: 'bar', x: 120, y: 20, w: 320, h: 40 },
+  ...[150, 210, 270, 330, 390].map(x => ({ k: 'stool', x: x - 10, y: 76, w: 20, h: 20 })),
+  { k: 'table', x: 40, y: 160, w: 70, h: 70 }, { k: 'table', x: ROOM_W - 110, y: 160, w: 70, h: 70 },
+  { k: 'radio', x: 30, y: 22, w: 38, h: 22 },
+];
+const atBar = () => player.inHouse && player.inHouse.hs.pub && player.inHouse.iy < 20 + 40 + 70 && player.inHouse.ix > 110 && player.inHouse.ix < 450;
+const DRUNK_DECAY = 1.2;      // ennyit józanodsz másodpercenként
+const DRUNK_DRIVE = 50;       // e fölött az úton vezetni ittas vezetés (rendőrség)
+
+function buyDrink(kind) {
+  const d = DRINKS[kind];
+  if (!atBar() || !controllable()) return false;      // ájultan (vagy holtan) nem lehet inni
+  if (progress.money < d.price) { popup(`A ${d.name} $${d.price} – nincs elég pénzed!`, '#f66'); return false; }
+  progress.money -= d.price; saveProgress();
+  player.drunk = Math.min(100, (player.drunk || 0) + d.drunk);
+  popup(`🍺 Ittál egy ${d.name}t (-$${d.price})`, '#ffd23a');
+  if (player.drunk >= 100) passOut();
+  return true;
+}
+
+// túl sokat ittál: elájulsz, és pár mp múlva a kocsma előtt térsz magadhoz
+function passOut() {
+  player.passedOut = 5;
+  message = { text: 'BERÚGTÁL – ELÁJULTÁL…', until: clock + 5, color: '#c9a' };
+}
+function wakeUp() {
+  if (player.inHouse) { Object.assign(player, doorOf(player.inHouse.hs)); player.inHouse = null; stopRadio(); }
+  player.drunk = 40; player.passedOut = 0;
+  popup('😵 Magadhoz tértél a kocsma előtt', '#c9a');
+}
+const drunkK = () => clamp(((player.drunk || 0) - 25) / 75, 0, 1);   // 0: józan … 1: nagyon részeg
+
 function enterHouse(hs) {
   player.inHouse = { hs, ix: ROOM_W / 2, iy: ROOM_H - 50, furniture: furnitureOf(hs) };
   Object.assign(player, doorOf(hs));
-  popup('🏠 Bementél a házba – itt nem talál meg a rendőrség', '#7df');
+  popup(hs.pub ? '🍺 Bementél a kocsmába – a pultnál ihatsz' : '🏠 Bementél a házba – itt nem talál meg a rendőrség', '#7df');
   startRadio();
 }
 function exitHouse() {
@@ -464,7 +507,8 @@ function updateInterior(dt) {
   if (keys.KeyD || keys.ArrowRight) mx += 1;
   if (mx || my) {
     const len = Math.hypot(mx, my), sp = keys.ShiftLeft || keys.ShiftRight ? 220 : 130;
-    H.ix += (mx / len) * sp * dt; H.iy += (my / len) * sp * dt;
+    const sway = Math.sin(clock * 3.1) * 70 * drunkK();                          // részegen imbolyog
+    H.ix += ((mx / len) * sp + (-my / len) * sway) * dt; H.iy += ((my / len) * sp + (mx / len) * sway) * dt;
     player.angle = Math.atan2(my, mx); player.walk += dt * sp / 12;
   }
   const o = { x: clamp(H.ix, ROOM_WALL + 12, ROOM_W - ROOM_WALL - 12), y: clamp(H.iy, ROOM_WALL + 12, ROOM_H - ROOM_WALL - 12), r: 12 };
@@ -657,7 +701,7 @@ let policeEnabled = true;   // teszteléshez kikapcsolható
 // körözés: 0 = nincs, 1 = gyorshajtás, 2 = rendőrre lőtt
 const wanted = { level: 0, lostTimer: 0, bustTimer: 0 };
 const POLICE_COUNT = [0, 2, 3];
-const controllable = () => !player.dead && !player.arrested;
+const controllable = () => !player.dead && !player.arrested && !(player.passedOut > 0);
 let lastCam = { x: player.x, y: player.y };
 
 // Homokvihar
@@ -754,8 +798,9 @@ function nearestBoardableBus() {
 
 // az E gomb felirata – PONTOSAN a toggleCar sorrendjét követi
 function interactionPrompt() {
-  if (player.dead || player.arrested) return null;
+  if (player.dead || player.arrested || player.passedOut > 0) return null;
   if (player.riding) return { text: '🚌 Buszon utazol – E: leszállás (amikor megáll)', color: '#f28c1e' };
+  if (atBar()) return { text: `🍺 1: sör ($${BEER_PRICE}) · 🍷 2: bor ($${WINE_PRICE})`, color: '#ffd23a' };
   if (player.inHouse) return { text: atInnerDoor() ? '🚪 E: kimenés' : 'Menj az ajtóhoz (lent) a kimenéshez', color: '#7df' };
   if (player.inCar) return null;
   if (dist(player, car) < 75) return { text: 'Nyomd meg az E-t a beszálláshoz', color: '#fff' };
@@ -1018,8 +1063,9 @@ function updatePlayer(dt) {
   if (mx || my) {
     const len = Math.hypot(mx, my);
     const sp = (keys.ShiftLeft || keys.ShiftRight ? 260 : 140) * (1 - 0.3 * storm.level);
-    player.x += (mx / len) * sp * dt;
-    player.y += (my / len) * sp * dt;
+    const sway = Math.sin(clock * 3.1) * 70 * drunkK();                          // részegen imbolyog
+    player.x += ((mx / len) * sp + (-my / len) * sway) * dt;
+    player.y += ((my / len) * sp + (mx / len) * sway) * dt;
     player.angle = Math.atan2(my, mx);
     player.walk += dt * sp / 12;
   }
@@ -1111,7 +1157,8 @@ function updateCarPhysics(c, input, dt) {
 
   // először fordul az autó, a sebesség viszont nem fordul vele azonnal → oldalirányú csúszás
   const fwd0 = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
-  c.angle += steer * (handbrake ? 3.4 : 2.6) * dt * clamp(fwd0 / 160, -1, 1)
+  const drunkSteer = c === car && player.inCar ? Math.sin(clock * 1.7) * 0.6 * drunkK() : 0;   // részegen „húz” a kormány
+  c.angle += (steer + drunkSteer) * (handbrake ? 3.4 : 2.6) * dt * clamp(fwd0 / 160, -1, 1)
     + c.spin * dt * clamp(Math.abs(fwd0) / 200, 0, 1);
 
   const fx = Math.cos(c.angle), fy = Math.sin(c.angle);
@@ -1229,7 +1276,7 @@ function damagePlayer(n) {
 }
 
 function respawn() {
-  Object.assign(player, { x: START_X, y: START_Y, angle: 0, inCar: false, riding: null, inHouse: null, health: 100, dead: 0, arrested: 0 });
+  Object.assign(player, { x: START_X, y: START_Y, angle: 0, inCar: false, riding: null, inHouse: null, health: 100, dead: 0, arrested: 0, drunk: 0, passedOut: 0 });
   stopRadio();
   clearWanted();
   for (let i = aiCars.length - 1; i >= 0; i--) if (aiCars[i].police) aiCars.splice(i, 1);
@@ -1239,11 +1286,11 @@ function respawn() {
 }
 
 // ===== Rendőrség =====
-function raiseWanted(level) {
+function raiseWanted(level, why) {
   if (level <= wanted.level) return;
   wanted.level = level;
   wanted.lostTimer = 0;
-  message = { text: level === 1 ? 'GYORSHAJTÁS! ÜLDÖZ A RENDŐRSÉG!' : 'RENDŐRRE LŐTTÉL! ★★', until: clock + 2.5, color: '#4af' };
+  message = { text: why || (level === 1 ? 'GYORSHAJTÁS! ÜLDÖZ A RENDŐRSÉG!' : 'RENDŐRRE LŐTTÉL! ★★'), until: clock + 2.5, color: '#4af' };
 }
 
 function clearWanted() {
@@ -1415,6 +1462,7 @@ function updateWanted(dt) {
   // gyorshajtás az úton (és járdán)
   const kmh = Math.hypot(car.vx, car.vy) / KMH;
   if (player.inCar && controllable() && onRoad(car.x, car.y, SIDEWALK_W) && kmh > SPEED_LIMIT) raiseWanted(1);
+  if (player.inCar && controllable() && onRoad(car.x, car.y, SIDEWALK_W) && kmh > 10 && (player.drunk || 0) >= DRUNK_DRIVE) raiseWanted(1, 'ITTAS VEZETÉS! ÜLDÖZ A RENDŐRSÉG!');
   if (!wanted.level) return;
 
   const cops = aiCars.filter(c => c.chasing && !c.wrecked);
@@ -1805,6 +1853,7 @@ function nightAmount(t) {
 
 function update(dt) {
   updateStorm(dt);
+  if (player.drunk > 0 && !(player.passedOut > 0)) player.drunk = Math.max(0, player.drunk - DRUNK_DECAY * dt);   // józanodás
   updateTornado(dt);
   if (player.dead > 0) {
     player.dead -= dt;
@@ -1812,6 +1861,9 @@ function update(dt) {
   } else if (player.arrested > 0) {
     player.arrested -= dt;
     if (player.arrested <= 0) respawn();
+  } else if (player.passedOut > 0) {
+    player.passedOut -= dt;
+    if (player.passedOut <= 0) wakeUp();
   } else if (player.inHouse) {
     updateInterior(dt);
   } else if (player.riding) {                        // utas: a busszal együtt mozog
@@ -2006,6 +2058,12 @@ function drawHouse(hs, n) {
   ctx.beginPath();                                                                     // tetőgerinc
   if (h) { ctx.moveTo(x0, (y0 + y1) / 2); ctx.lineTo(x1, (y0 + y1) / 2); } else { ctx.moveTo((x0 + x1) / 2, y0); ctx.lineTo((x0 + x1) / 2, y1); }
   ctx.stroke();
+  if (hs.pub) {                                                                        // kocsma: zöld tető, cégtábla
+    ctx.fillStyle = 'rgba(30,90,40,0.85)'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.fillStyle = '#2b1a0e'; ctx.fillRect(hs.x - 42, hs.y - 11, 84, 22);
+    ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('🍺 KOCSMA', hs.x, hs.y + 5); ctx.textAlign = 'left';
+  }
   // kémény
   const cx = x0 + (x1 - x0) * (0.2 + hs.chimney * 0.6), cy = y0 + (y1 - y0) * (0.2 + (1 - hs.chimney) * 0.6);
   ctx.fillStyle = '#5a4a40'; ctx.fillRect(cx - 6, cy - 6, 12, 12);
@@ -2057,11 +2115,16 @@ function roomLayout(w, h) {
   return { sc, ox: Math.round((w - ROOM_W * sc) / 2), oy };
 }
 
+function applyDrunkSway(w, h) {
+  const dk = drunkK();
+  if (dk > 0) { ctx.translate(w / 2, h / 2); ctx.rotate(Math.sin(clock * 1.3) * 0.05 * dk); ctx.scale(1 + 0.03 * dk * Math.sin(clock * 2.1), 1); ctx.translate(-w / 2, -h / 2); }
+}
+
 function drawInterior(w, h) {
   const H = player.inHouse, L = roomLayout(w, h), ox = L.ox, oy = L.oy;
   ctx.fillStyle = '#1a1612'; ctx.fillRect(0, 0, w, h);
   ctx.save(); ctx.translate(ox, oy); ctx.scale(L.sc, L.sc);
-  ctx.fillStyle = '#b07a4a'; ctx.fillRect(0, 0, ROOM_W, ROOM_H);                         // fapadló
+  ctx.fillStyle = H.hs.pub ? '#7a5030' : '#b07a4a'; ctx.fillRect(0, 0, ROOM_W, ROOM_H);                         // fapadló
   ctx.strokeStyle = 'rgba(80,45,20,0.35)'; ctx.lineWidth = 1;
   for (let y = 18; y < ROOM_H; y += 18) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(ROOM_W, y); ctx.stroke(); }
   ctx.fillStyle = 'rgba(150,40,40,0.55)'; ctx.fillRect(ROOM_W / 2 - 110, ROOM_H / 2 - 60, 220, 130);   // szőnyeg
@@ -2073,6 +2136,11 @@ function drawInterior(w, h) {
     if (f.k === 'bed') { ctx.fillStyle = '#fff'; ctx.fillRect(f.x + 6, f.y + 6, f.w * 0.25, f.h - 12); ctx.fillStyle = '#4a7ab0'; ctx.fillRect(f.x + f.w * 0.35, f.y + 4, f.w * 0.6, f.h - 8); }
     if (f.k === 'kitchen') { ctx.fillStyle = '#8a9096'; ctx.fillRect(f.x + 4, f.y + 20, f.w - 8, 26); }
     if (f.k === 'tv') { ctx.fillStyle = '#2a5a8a'; ctx.fillRect(f.x + 4, f.y + 3, f.w - 8, f.h - 6); }
+    if (f.k === 'bar') {                                                                // pult poharakkal, csapokkal
+      ctx.fillStyle = '#5a3418'; ctx.fillRect(f.x, f.y + f.h - 10, f.w, 10);
+      for (let x = f.x + 20; x < f.x + f.w - 10; x += 40) { ctx.fillStyle = '#d8b04a'; ctx.fillRect(x, f.y + 8, 6, 14); ctx.fillStyle = '#c0203a'; ctx.fillRect(x + 14, f.y + 10, 5, 12); }
+    }
+    if (f.k === 'stool') { ctx.fillStyle = '#3a2a1a'; ctx.beginPath(); ctx.arc(f.x + f.w / 2, f.y + f.h / 2, f.w / 2, 0, Math.PI * 2); ctx.fill(); }
     if (f.k === 'radio') {                                                              // rádió: hangszóró, antenna
       ctx.fillStyle = '#3a2a1a'; ctx.fillRect(f.x, f.y, f.w, f.h);
       ctx.fillStyle = '#c9a45a'; ctx.beginPath(); ctx.arc(f.x + 10, f.y + f.h / 2, 6, 0, Math.PI * 2); ctx.arc(f.x + f.w - 10, f.y + f.h / 2, 6, 0, Math.PI * 2); ctx.fill();
@@ -2091,8 +2159,9 @@ function drawInterior(w, h) {
   drawPerson(H.ix, H.iy, player.angle, player.walk, sk.shirt, sk.head, false, sk.legs, sk.hat, sk.pattern);
   ctx.restore();
   ctx.fillStyle = '#7df'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('🏠 Bent vagy a házban – itt nem talál meg a rendőrség, és gyorsabban gyógyulsz', w / 2, oy - 14);
+  ctx.fillText(H.hs.pub ? `🍺 Kocsmában vagy – a pultnál ihatsz: sör $${BEER_PRICE}, bor $${WINE_PRICE}` : '🏠 Bent vagy a házban – itt nem talál meg a rendőrség, és gyorsabban gyógyulsz', w / 2, oy - 14);
   ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 16px sans-serif';
+  if (radio.playing && radio.ac && radio.ac.state === 'suspended') ctx.fillText('🔇 A böngésző lenémította a hangot – kattints vagy nyomj meg egy gombot', w / 2, oy + 24);
   ctx.fillText(radio.playing && radio.song ? `📻 Most szól: ${radio.song.name} (${radio.song.scaleName}, ${radio.song.bpm} BPM) · R: következő szám · M: rádió ki`
     : '📻 A rádió ki van kapcsolva · M: bekapcsolás', w / 2, Math.min(h - 62, oy + ROOM_H * L.sc + 22));
   ctx.textAlign = 'left';
@@ -2389,6 +2458,11 @@ function drawHud(w, h) {
   const speeding = player.inCar && onRoad(car.x, car.y, SIDEWALK_W) && speed > SPEED_LIMIT;
   ctx.fillStyle = speeding ? '#f55' : '#fff';
   ctx.fillText(player.inCar ? `Sebesség: ${speed} km/h (korlát: ${SPEED_LIMIT})` : 'Gyalog', 20, 80);
+  if (player.drunk > 1) {                            // részegség
+    ctx.fillStyle = player.drunk >= DRUNK_DRIVE ? '#f6c' : '#c9a'; ctx.font = 'bold 12px sans-serif';
+    ctx.fillText(`🍺 ${player.drunk >= DRUNK_DRIVE ? 'Részeg – ne vezess!' : 'Ittas'} ${Math.round(player.drunk)}%`, player.inCar ? 20 : 120, player.inCar ? 92 : 80);
+    ctx.font = '14px sans-serif';
+  }
   if (player.inCar && car.nitroCfg) {                // nitrótartály
     ctx.fillStyle = '#333'; ctx.fillRect(300, 70, 90, 10);
     ctx.fillStyle = car.nitroOn ? '#9fe0ff' : '#4ab0ff'; ctx.fillRect(300, 70, 90 * car.nitro / 100, 10);
@@ -2652,6 +2726,7 @@ function render() {
 
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
   ctx.save();
+  applyDrunkSway(w, h);                                                               // részegen himbálózik a kép
   ctx.translate(Math.round(w / 2 - cam.x), Math.round(h / 2 - cam.y));
 
   ctx.fillStyle = sandPattern;
@@ -2703,9 +2778,13 @@ function render() {
   ctx.restore();
 
   const lights = lamps.concat(stations.flatMap(st => st.pumps.map(p => ({ hx: p.x, hy: p.y }))));
+  ctx.save(); applyDrunkSway(w, h);                                                   // a fények a világgal együtt himbálóznak
   drawLighting(n, cam, w, h, lights, cars);
+  ctx.restore();
   drawStorm(w, h, n);
   if (player.inHouse) drawInterior(w, h);
+  if (player.passedOut > 0) { ctx.fillStyle = `rgba(0,0,0,${clamp(player.passedOut / 2, 0.6, 0.95)})`; ctx.fillRect(0, 0, w, h); }   // ájulás: elsötétül
+  else if (drunkK() > 0) { ctx.fillStyle = `rgba(160,60,140,${0.12 * drunkK()})`; ctx.fillRect(0, 0, w, h); }
   drawHud(w, h);
   drawMinimap(w);
   if (menu.open) drawMenu(w, h);

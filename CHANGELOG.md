@@ -5,6 +5,13 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.15.0 – 2026-11-07
+- Kocsmák (a házak egy része, zöld tető, „KOCSMA” tábla): a pultnál 1: sör $2, 2: bor $3
+- Részegség: imbolyogsz, himbálózik a kép, húz a kormány; erősen részegen az úton vezetni ittas vezetés (rendőrség); túl sok italtól elájulsz, és a kocsma előtt térsz magadhoz
+- Javítva: frissítés után a böngésző akár 10 percig a régi, tárolt game.js-t futtatta (ezért nem látszott pl. a rádió) – most minden kiadás egyedi címen tölti be a játékot
+- Rádió: hangosabb, és ha a böngésző lenémította a hangot, bármely gomb / kattintás feloldja (a szobában ki is írja)
+- Kódátnézés után javítva: ájultan is látszott az italfelirat; a kocsma fejlécében beégetett árak; részegen az éjszakai fények nem himbálóztak a világgal
+
 ## 0.14.0 – 2026-11-07
 - Rádió minden házban: bemenéskor egy véletlen, menet közben generált szám szól (saját címmel); R: következő szám, M: ki/be; kilépéskor elhallgat (ADR-0026)
 - Kódátnézés után javítva (kiadás előtt): háttérből visszatérve hangrobbanás; kikapcsolás után még szóló hangok, R-nél két szám egymásra; a rádió szünetben is szólt
