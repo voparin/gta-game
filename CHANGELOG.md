@@ -5,6 +5,11 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.21.0 – 2026-11-07
+- Boltok (a házak ~8%-a, lila tető, „BOLT” tábla): a pultnál E – csoki ($2, +20 élet), szendvics ($5, +50 élet), elsősegélycsomag ($15, teljes élet), kávé ($3, kijózanít), benzinkanna ($30, +50% benzin), bomba ($50), sorsjegy ($5, 20% eséllyel $20)
+- Amire nincs szükséged (pl. teljes élettel étel, tele tankkal benzin), azt nem adja el – nem fizetsz feleslegesen
+- A boltok a térképen (🛒, 5-ös gomb) és a taxi úti céljai között is ott vannak
+
 ## 0.20.0 – 2026-11-07
 - Térkép: K – nagy térkép a benzinkutakkal ⛽, gyárakkal 🏭, bankokkal 🏦 és kocsmákkal 🍺 (kategóriánként ki-be kapcsolható: 1–5); kattintással saját pontokat jelölhetsz 📍 (max. 10, megmaradnak), újra kattintva törlöd, Delete: mindet törli (ADR-0030)
 - A jelölt pontok a radaron és a világban is látszanak, nyíl mutat a legközelebbire, és a taxi is elvisz oda (a taxi-listában a 3 legközelebbi)

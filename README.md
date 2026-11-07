@@ -82,15 +82,30 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - A házak egy része **gyár** (szürke tető, „GYÁR” tábla). Bent futószalagon jönnek a sós zacskók: **Space**: felveszed, **Space** egy doboz mellett: berakod.
 - **Fizetés: $500 percenként** – ha abban a percben legalább egy zacskót bepakoltál. A le nem szedett zacskók a szalag végén leesnek.
 
+## Boltok
+- A házak egy része **bolt** (lila tető, „BOLT” tábla). A pultnál **E**: megnyílik a bolt, **1–7** gombbal vagy kattintással vásárolsz:
+
+| Áru | Ár | Hatás |
+|---|---|---|
+| 🍫 Csoki | $2 | +20 élet |
+| 🥪 Szendvics | $5 | +50 élet |
+| 🩹 Elsősegélycsomag | $15 | teljes élet |
+| ☕ Kávé | $3 | kijózanít |
+| ⛽ Benzinkanna | $30 | +50% benzin az autódba |
+| 💣 Bomba | $50 | +1 bomba (max 5) |
+| 🎟 Sorsjegy | $5 | 20% eséllyel $20 |
+
+- Amire nincs szükséged (pl. teljes élettel étel), azt nem adja el.
+
 ## Bomba
 - **B**: lerakod (autóból hátra ejted), **3 mp** múlva felrobban: a közeli autókból roncs lesz, a házak ledőlnek, az emberek meghalnak – és téged is megsebez, ha túl közel vagy. Robbantásért ★★ körözés jár.
 - Legfeljebb 5 bombád lehet, percenként kapsz egy újat (a HUD-on: 💣 3/5).
 
 ## Taxi
-- **X**: hívsz egy taxit, pár másodperc alatt odajön. Mellette **E**: választhatsz úti célt (kezdőhely, az autód, a legközelebbi benzinkút / bank / kocsma / gyár, verseny rajt, saját 📍 jelölés) – **$5**-ért bárhova elvisz.
+- **X**: hívsz egy taxit, pár másodperc alatt odajön. Mellette **E**: választhatsz úti célt (kezdőhely, az autód, a legközelebbi benzinkút / bank / kocsma / gyár / bolt, verseny rajt, saját 📍 jelölés) – **$5**-ért bárhova elvisz.
 - Ha beülsz az autódba, vagy a taxi 45 mp alatt nem ér oda, lemond. A tönkrement taxi nem visz. A szállítási célpontra nem visz el (a szállítást vezetned kell).
 
 ## Térkép
-- **K**: megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák. Az **1–5** gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
+- **K**: megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák, 🛒 boltok. Az **1–6** gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
 - **Kattints a térképre:** saját pontot jelölsz 📍 (legfeljebb 10, megmaradnak). Egy jelölésre kattintva törlöd, a **Delete** gomb mindet törli.
 - A jelölések a radaron és a világban is látszanak, a képernyő szélén nyíl mutat a legközelebbire, és a **taxi** is elvisz oda (a 3 legközelebbihez).

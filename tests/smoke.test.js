@@ -42,7 +42,7 @@ eval(src + `
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
-  mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
+  shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
 const key = (code, down) => listeners[down ? 'keydown' : 'keyup']({ code, repeat: false });
@@ -1492,6 +1492,72 @@ G.npcs.length = 0; G.aiCars.length = 0;
     step(60 * 4); G.aiCars.length = 0;
   }
   G.progress.pins = [];
+}
+
+// --- boltok: a pultnál E, mindenféle áru ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null;
+  const all = G.housesIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000);
+  const shops = all.filter(h => h.shop);
+  check('vannak boltok, ritkán', shops.length > 5 && shops.length < all.length * 0.14);
+  check('egy ház csak egyféle lehet (kocsma / bank / gyár / bolt)', all.every(h => [h.pub, h.bank, h.factory, h.shop].filter(Boolean).length <= 1));
+  const sh = shops[0];
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  Object.assign(G.player, { inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0, drunk: 0, passedOut: 0, health: 100 });
+  Object.assign(G.player, G.doorOf(sh)); press('KeyE');
+  check('a boltba be lehet menni, van pult és polc', G.player.inHouse && G.player.inHouse.hs.shop && G.player.inHouse.furniture.some(f => f.k === 'shelf'));
+  press('KeyE');
+  check('az ajtónál az E kivisz (nem a bolt nyílik)', !G.player.inHouse && !G.shop.open);
+  press('KeyE');
+  G.player.inHouse.ix = 280; G.player.inHouse.iy = 100;
+  check('a pultnál kiírja a vásárlást', /vásárlás/.test(G.interactionPrompt().text));
+  press('KeyE');
+  check('E-re megnyílik a bolt', G.shop.open);
+  const clk = G.clock; step(30);
+  check('vásárlás közben áll a játék', G.clock === clk);
+  const idx = id => G.SHOP_ITEMS.findIndex(it => it.id === id);
+  G.progress.money = 100;
+  press('Digit' + (idx('sandwich') + 1));
+  check('teljes élettel nem veszel ételt (nem vonja le a pénzt)', G.progress.money === 100);
+  G.player.health = 30;
+  press('Digit' + (idx('sandwich') + 1));
+  check('a szendvics +50 élet, $5', G.player.health === 80 && G.progress.money === 95);
+  press('Digit' + (idx('choc') + 1));
+  check('a csoki +20 élet (max 100), $2', G.player.health === 100 && G.progress.money === 93);
+  G.player.health = 10; press('Digit' + (idx('medkit') + 1));
+  check('az elsősegélycsomag teljes életet ad', G.player.health === 100 && G.progress.money === 78);
+  G.player.drunk = 70; press('Digit' + (idx('coffee') + 1));
+  check('a kávé kijózanít', G.player.drunk === 20 && G.progress.money === 75);
+  G.car.fuel = 30; press('Digit' + (idx('fuel') + 1));
+  check('a benzinkanna +50% benzint tölt az autódba', G.car.fuel === 80 && G.progress.money === 45);
+  G.car.fuel = 100;
+  Object.assign(G.car, { rental: true, ownFuel: 20 }); press('Digit' + (idx('fuel') + 1));
+  check('bérautóval a kanna a saját autód tankjába megy (nem vész el)', G.car.ownFuel === 70 && G.car.fuel === 100 && G.progress.money === 15);
+  Object.assign(G.car, { rental: false, ownFuel: undefined });
+  G.progress.money = NaN; G.player.health = 50; press('Digit' + (idx('sandwich') + 1));
+  check('hibás (NaN) egyenleggel nem lehet ingyen vásárolni', G.player.health === 50);
+  G.bombInv.count = 2; G.progress.money = 200; press('Digit' + (idx('bomb') + 1));
+  check('bombát is lehet venni', G.bombInv.count === 3 && G.progress.money === 150);
+  G.bombInv.count = G.BOMB_MAX; press('Digit' + (idx('bomb') + 1));
+  check(`${G.BOMB_MAX} bombánál többet nem lehet venni`, G.bombInv.count === G.BOMB_MAX && G.progress.money === 150);
+  check('a sorsjegy 20% eséllyel nyer', G.lotteryPrize(0.1) === G.LOTTERY_PRIZE && G.lotteryPrize(0.5) === 0);
+  G.progress.money = 10;
+  G.buyItem(idx('ticket'), 0.05);
+  check('nyertes sorsjegy: -$5 +$20', G.progress.money === 25);
+  G.buyItem(idx('ticket'), 0.9);
+  check('vesztes sorsjegy: -$5', G.progress.money === 20);
+  G.progress.money = 1; G.player.health = 50; press('Digit' + (idx('medkit') + 1));
+  check('pénz nélkül nem lehet vásárolni', G.progress.money === 1 && G.player.health === 50);
+  G.progress.money = 2;
+  const hit = G.shop.hits.find(h => h.i === idx('choc'));
+  listeners.mousedown({ button: 0, clientX: hit.x + 5, clientY: hit.y + 5 });
+  check('kattintással is lehet vásárolni', G.progress.money === 0 && G.player.health === 70);
+  press('Escape');
+  check('Esc: kilépés a boltból', !G.shop.open);
+  check('a térképen a boltok is látszanak', G.poisIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000).some(p => p.type === 'shop'));
+  check('a taxi a legközelebbi boltba is elvisz', G.taxiDestinations().some(d => d.label.includes('bolt')));
+  G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
+  G.player.health = 100;
 }
 
 // --- telepítés: a böngésző ne a régi, tárolt game.js-t futtassa ---
