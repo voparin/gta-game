@@ -26,7 +26,7 @@ eval(src + `
 ;global.G = { player, car, aiCars, npcs, bullets, storm, skidMarks, smoke, WORLD, OLD_WORLD, CHUNK, C,
   getChunk, chunkCache, onRoad, onSlime, nearestRoad, spawnNpc, spawnAiCar, damageCar, damagePlayer, nightAmount,
   get time(){return time}, set time(v){time=v}, get timeScale(){return timeScale},
-  set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, menu, SKINS, CAR_MODELS,
+  set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
@@ -171,6 +171,7 @@ check('3 mp után újraéled teljes életerővel', G.player.dead <= 0 && G.playe
 G.spawn = true;
 step(300);
 check('megjelennek AI gyalogosok', G.npcs.some(p => p.kind === 'ped'));
+check('a megjelenő gyalogosok a járdán / zebrán vannak', G.npcs.filter(p => p.kind === 'ped' && !p.dead).every(p => G.onRoad(p.x, p.y, G.SIDEWALK_W)));
 check('megjelennek AI autók', G.aiCars.length > 0);
 G.spawn = false;
 
@@ -181,6 +182,59 @@ check('H gombra homokvihar támad', G.storm.level > 0.9 && G.storm.particles.len
 key('KeyH', true); key('KeyH', false);
 step(300);
 check('H gombra eláll a homokvihar', G.storm.level < 0.1);
+
+// --- járda és sétáló gyalogosok ---
+const onSidewalk = p => {
+  const dy = Math.abs(p.y - G.nearestRoad(p.y)), dx = Math.abs(p.x - G.nearestRoad(p.x));
+  const band = d => d >= G.ROAD_W / 2 && d <= G.EDGE;
+  return band(dy) || band(dx);
+};
+const paved = p => G.onRoad(p.x, p.y, G.SIDEWALK_W);
+let blocking = 0, lampsOnWalkLine = 0;
+for (let cx = 20; cx < 34; cx++) for (let cy = 20; cy < 34; cy++) {
+  const ch = G.getChunk(cx, cy);
+  for (const o of ch.obstacles) if (o.type !== 'lamp' && G.onRoad(o.x, o.y, G.SIDEWALK_W + o.r)) blocking++;
+  for (const l of ch.lamps) {
+    const d = Math.min(Math.abs(l.y - G.nearestRoad(l.y)), Math.abs(l.x - G.nearestRoad(l.x)));
+    if (Math.abs(d - G.WALK_OFF) < 8 + 11) lampsOnWalkLine++;
+  }
+}
+check('a járdán nincs kaktusz vagy szikla', blocking === 0);
+check('a villanyoszlopok nem állják el a sétáló vonalat', lampsOnWalkLine === 0);
+
+G.npcs.length = 0; G.aiCars.length = 0;
+Object.assign(G.player, { x: 14000, y: G.C - 400, inCar: false });
+const walker = G.spawnPedOnSidewalk('h', G.C, -1, 14000, 1);
+Object.assign(walker, { moving: true, wanderT: 99 });
+check('a gyalogos a járdán jelenik meg', onSidewalk(walker));
+const wx0 = walker.x;
+step(180);
+check('a gyalogos végigsétál a járdán', walker.x - wx0 > 80 && onSidewalk(walker));
+
+// hosszabb séta kereszteződéseken át: végig burkolt felületen marad
+const strollers = [];
+for (let i = 0; i < 8; i++) {
+  const p = G.spawnPedOnSidewalk(i % 2 ? 'h' : 'v', G.C, i % 4 < 2 ? -1 : 1, G.C - 200 + i * 50, i % 3 ? 1 : -1);
+  Object.assign(p, { moving: true, wanderT: 99 });
+  strollers.push(p);
+}
+Object.assign(G.player, { x: G.C, y: G.C });
+let offPaved = 0;
+for (let i = 0; i < 1500; i++) {      // ~25 mp
+  step(1);
+  G.player.x = G.C; G.player.y = G.C;  // a közelben maradunk, hogy ne tűnjenek el
+  for (const p of strollers) if (!paved(p)) offPaved++;
+}
+check('a gyalogosok kereszteződéseken át is a járdán / zebrán maradnak', offPaved === 0);
+check('a gyalogosok a sarkon be is fordulnak', strollers.some(p => p.axis !== (strollers.indexOf(p) % 2 ? 'h' : 'v')));
+
+const scared = G.spawnPedOnSidewalk('h', G.C, 1, G.C + 600, 1);
+Object.assign(scared, { flee: 0.5, fx: scared.x, fy: scared.y - 50 });
+step(60);
+Object.assign(scared, { moving: true, wanderT: 99 });
+step(240);
+check('megijedés után visszatér a járdára', onSidewalk(scared));
+G.npcs.length = 0;
 
 // --- Esc menü: szünet, szkin- és autóváltás ---
 Object.assign(G.player, { x: 10000, y: G.C, inCar: false });

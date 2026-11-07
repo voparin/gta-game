@@ -8,7 +8,10 @@ const CHUNKS = WORLD / CHUNK;
 const ROAD_W = 160;
 const ROAD_SPACING = 5000;       // utak távolsága (rácsban)
 const ROAD_OFFSET = 2500;
-const LAMP_OFF = ROAD_W / 2 + 22;
+const SIDEWALK_W = 50;           // járda szélessége az út mindkét oldalán
+const WALK_OFF = ROAD_W / 2 + 18; // a gyalogosok ezen a vonalon sétálnak (az út közepétől)
+const EDGE = ROAD_W / 2 + SIDEWALK_W;   // út + járda fél szélessége
+const LAMP_OFF = EDGE - 6;        // villanyoszlopok a járda külső szélén
 const C = WORLD / 2;             // a pálya közepe (itt egy kereszteződés van)
 const START_X = C - 300, START_Y = C - 250;   // kezdőhely
 const HALF_CYCLE = 30 * 60;      // 30 perc nappal, 30 perc éjszaka (másodperc)
@@ -114,7 +117,7 @@ function generateChunk(cx, cy) {
       const x = x0 + r() * CHUNK, y = y0 + r() * CHUNK, rad = rMin + r() * (rMax - rMin);
       const rot = r() * Math.PI * 2, seed = r();
       if (x < 60 || y < 60 || x > WORLD - 60 || y > WORLD - 60) continue;
-      if (onRoad(x, y, rad + 40)) continue;
+      if (onRoad(x, y, rad + 40 + SIDEWALK_W)) continue;   // úton és járdán nincs akadály
       if (Math.hypot(x - START_X, y - START_Y) < 250) continue;
       ch.obstacles.push({ x, y, r: rad, type, rot, seed });
     }
@@ -342,7 +345,25 @@ function spawnNpc(kind, x, y) {
     cooldown: 1 + rand(),
     shirt: kind === 'bandit' ? '#1c1c1c' : PED_SHIRTS[(rand() * PED_SHIRTS.length) | 0],
     head: kind === 'bandit' ? '#b01010' : PED_HAIR[(rand() * PED_HAIR.length) | 0] };
+  if (kind === 'ped') assignSidewalk(p);
   npcs.push(p);
+  return p;
+}
+
+// a gyalogos a legközelebbi járdára áll be, véletlen irányban
+function assignSidewalk(p) {
+  const rx = nearestRoad(p.x), ry = nearestRoad(p.y);
+  if (Math.abs(p.y - ry) < Math.abs(p.x - rx)) { p.axis = 'h'; p.road = ry; p.side = p.y < ry ? -1 : 1; }
+  else { p.axis = 'v'; p.road = rx; p.side = p.x < rx ? -1 : 1; }
+  p.dir = rand() < 0.5 ? -1 : 1;
+  p.lastCross = null;
+}
+const walkLine = p => p.road + p.side * WALK_OFF;
+
+function spawnPedOnSidewalk(axis, road, side, along, dir) {
+  const line = road + side * WALK_OFF;
+  const p = spawnNpc('ped', axis === 'h' ? along : line, axis === 'h' ? line : along);
+  if (dir) p.dir = dir;
   return p;
 }
 
@@ -376,9 +397,14 @@ function spawnAround(dt) {
   };
   const alive = kind => npcs.filter(p => p.kind === kind && !p.dead).length;
 
-  if (alive('ped') < 14) {
-    const pos = ring(700, 1400);
-    if (!obstacleAt(pos.x, pos.y, 15)) spawnNpc('ped', pos.x, pos.y);
+  if (alive('ped') < 14) {           // gyalogosok a közeli járdákon
+    const axis = rand() < 0.5 ? 'h' : 'v', side = rand() < 0.5 ? -1 : 1;
+    const road = nearestRoad(axis === 'h' ? player.y : player.x);
+    const along = clamp((axis === 'h' ? player.x : player.y) + (rand() < 0.5 ? -1 : 1) * (700 + rand() * 700), 300, WORLD - 300);
+    const line = road + side * WALK_OFF;
+    const pos = axis === 'h' ? { x: along, y: line } : { x: line, y: along };
+    const d = dist(pos, player);
+    if (d > 600 && d < 2400 && !obstacleAt(pos.x, pos.y, 15)) spawnPedOnSidewalk(axis, road, side, along);
   }
   if (alive('bandit') < 2 && rand() < dt * 0.2) {
     const pos = ring(1000, 1400);
@@ -470,7 +496,8 @@ function aiCarInput(c) {
     const dx = o.x - c.x, dy = o.y - c.y, d = Math.hypot(dx, dy);
     return d > 0 && d < 150 && (dx * hx + dy * hy) / d > 0.8;
   };
-  const blocked = [car, ...aiCars].some(o => o !== c && ahead(o)) || (!player.inCar && !player.dead && ahead(player));
+  const blocked = [car, ...aiCars].some(o => o !== c && ahead(o)) || (!player.inCar && !player.dead && ahead(player))
+    || npcs.some(p => !p.dead && ahead(p));   // a zebrán átkelő gyalogosnak is megáll
 
   return {
     up: !blocked && fwd < target,
@@ -482,7 +509,7 @@ function aiCarInput(c) {
 
 function updateCarPhysics(c, input, dt) {
   const { up, down, steer, handbrake } = input;
-  const sandy = !onRoad(c.x, c.y);
+  const sandy = !onRoad(c.x, c.y, SIDEWALK_W);   // a járda is szilárd burkolat
   const slimy = slimeEnabled && onSlime(c.x, c.y);
   if (slimy && !c.onSlime) c.spin = (rand() < 0.5 ? -1 : 1) * (2.5 + rand() * 2);   // nyálkán megpördül
   c.onSlime = slimy;
@@ -669,10 +696,11 @@ function updateNpcs(dt) {
         p.flee -= dt;
         p.angle = Math.atan2(p.y - p.fy, p.x - p.fx);
         speed = 200;
+        if (p.flee <= 0) assignSidewalk(p);   // megnyugodva visszamegy a járdára
       } else {
         p.wanderT -= dt;
-        if (p.wanderT <= 0) { p.angle = rand() * Math.PI * 2; p.wanderT = 2 + rand() * 4; p.moving = rand() < 0.75; }
-        speed = p.moving ? 60 : 0;
+        if (p.wanderT <= 0) { p.moving = rand() < 0.85; p.wanderT = p.moving ? 4 + rand() * 8 : 1 + rand() * 2; }
+        if (p.moving) { walkSidewalk(p); speed = 60; }
       }
     } else {
       const d = dist(p, player);
@@ -694,6 +722,30 @@ function updateNpcs(dt) {
     p.walk += dt * speed / 12;
     collide(p);
   }
+}
+
+// séta a járdán: a sarkon befordul vagy a zebrán átkel
+function walkSidewalk(p) {
+  const along = p.axis === 'h' ? p.x : p.y;
+  const cross = nearestRoad(along);
+  const corner = cross - p.dir * WALK_OFF;
+  const key = p.axis + p.road + ':' + cross;
+  if (Math.abs(along - corner) < 8 && p.lastCross !== key) {
+    p.lastCross = key;
+    if (rand() < 0.5) {                     // befordul a sarkon, el az úttól
+      const oldRoad = p.road, oldSide = p.side;
+      p.axis = p.axis === 'h' ? 'v' : 'h';
+      p.road = cross;
+      p.side = Math.sign(along - cross) || -1;
+      p.dir = oldSide;
+      p.lastCross = p.axis + p.road + ':' + oldRoad;
+    }
+  }
+  const al = p.axis === 'h' ? p.x : p.y;     // a pálya szélén visszafordul
+  if ((p.dir > 0 && al > WORLD - 300) || (p.dir < 0 && al < 300)) p.dir = -p.dir;
+  const tx = p.axis === 'h' ? p.x + p.dir * 40 : walkLine(p);
+  const ty = p.axis === 'h' ? walkLine(p) : p.y + p.dir * 40;
+  p.angle = Math.atan2(ty - p.y, tx - p.x);
 }
 
 function updateSmoke(dt) {
@@ -813,7 +865,22 @@ function drawSlime(s) {
 function drawRoads(view) {
   const xa = Math.max(0, view.x0), xb = Math.min(WORLD, view.x1);
   const ya = Math.max(0, view.y0), yb = Math.min(WORLD, view.y1);
-  const hRoads = roadsIn(view.y0 - ROAD_W, view.y1 + ROAD_W), vRoads = roadsIn(view.x0 - ROAD_W, view.x1 + ROAD_W);
+  const hRoads = roadsIn(view.y0 - EDGE, view.y1 + EDGE), vRoads = roadsIn(view.x0 - EDGE, view.x1 + EDGE);
+  // járdák (az út alatt, így a kereszteződésben az úttest takarja)
+  ctx.fillStyle = '#bdb6a8';
+  for (const R of hRoads) ctx.fillRect(xa, R - EDGE, xb - xa, EDGE * 2);
+  for (const R of vRoads) ctx.fillRect(R - EDGE, ya, EDGE * 2, yb - ya);
+  ctx.fillStyle = '#8f887a';                 // járdaszegély és lapok illesztése
+  for (const R of hRoads) {
+    ctx.fillRect(xa, R - EDGE, xb - xa, 2); ctx.fillRect(xa, R + EDGE - 2, xb - xa, 2);
+    ctx.fillRect(xa, R - ROAD_W / 2 - 3, xb - xa, 3); ctx.fillRect(xa, R + ROAD_W / 2, xb - xa, 3);
+    for (let i = Math.floor(xa / 40) * 40; i < xb; i += 40) { ctx.fillRect(i, R - EDGE, 1, SIDEWALK_W); ctx.fillRect(i, R + ROAD_W / 2, 1, SIDEWALK_W); }
+  }
+  for (const R of vRoads) {
+    ctx.fillRect(R - EDGE, ya, 2, yb - ya); ctx.fillRect(R + EDGE - 2, ya, 2, yb - ya);
+    ctx.fillRect(R - ROAD_W / 2 - 3, ya, 3, yb - ya); ctx.fillRect(R + ROAD_W / 2, ya, 3, yb - ya);
+    for (let i = Math.floor(ya / 40) * 40; i < yb; i += 40) { ctx.fillRect(R - EDGE, i, SIDEWALK_W, 1); ctx.fillRect(R + ROAD_W / 2, i, SIDEWALK_W, 1); }
+  }
   ctx.fillStyle = '#4a4a4a';
   for (const R of hRoads) ctx.fillRect(xa, R - ROAD_W / 2, xb - xa, ROAD_W);
   for (const R of vRoads) ctx.fillRect(R - ROAD_W / 2, ya, ROAD_W, yb - ya);
@@ -822,10 +889,22 @@ function drawRoads(view) {
   for (const R of vRoads) { ctx.fillRect(R - ROAD_W / 2 + 6, ya, 3, yb - ya); ctx.fillRect(R + ROAD_W / 2 - 9, ya, 3, yb - ya); }
   ctx.fillStyle = '#f2c230';
   for (const R of hRoads) {
-    for (let i = Math.floor(xa / 80) * 80; i < xb; i += 80) if (Math.abs(i - nearestRoad(i)) > ROAD_W) ctx.fillRect(i, R - 2, 40, 4);
+    for (let i = Math.floor(xa / 80) * 80; i < xb; i += 80) if (Math.abs(i - nearestRoad(i)) > EDGE + 10) ctx.fillRect(i, R - 2, 40, 4);
   }
   for (const R of vRoads) {
-    for (let i = Math.floor(ya / 80) * 80; i < yb; i += 80) if (Math.abs(i - nearestRoad(i)) > ROAD_W) ctx.fillRect(R - 2, i, 4, 40);
+    for (let i = Math.floor(ya / 80) * 80; i < yb; i += 80) if (Math.abs(i - nearestRoad(i)) > EDGE + 10) ctx.fillRect(R - 2, i, 4, 40);
+  }
+  // zebrák a kereszteződésekben, ahol a járda átvezet az úttesten
+  ctx.fillStyle = '#f0f0f0';
+  for (const H of hRoads) {
+    for (const V of vRoads) {
+      for (const s of [-1, 1]) {
+        const y0 = s < 0 ? H - EDGE + 6 : H + ROAD_W / 2 + 6;     // a függőleges úton át
+        for (let x = V - ROAD_W / 2 + 6; x < V + ROAD_W / 2 - 6; x += 20) ctx.fillRect(x, y0, 10, SIDEWALK_W - 12);
+        const x0 = s < 0 ? V - EDGE + 6 : V + ROAD_W / 2 + 6;     // a vízszintes úton át
+        for (let y = H - ROAD_W / 2 + 6; y < H + ROAD_W / 2 - 6; y += 20) ctx.fillRect(x0, y, SIDEWALK_W - 12, 10);
+      }
+    }
   }
 }
 
