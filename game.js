@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.19.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.20.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -41,6 +41,7 @@ window.addEventListener('keydown', e => {
   if (donate.open) { if (!e.repeat) donateKey(e.code); return; }
   if (bank.open) { if (!e.repeat) bankKey(e.code); return; }
   if (taxiMenu.open) { if (!e.repeat) taxiMenuKey(e.code); return; }
+  if (mapView.open) { if (!e.repeat) mapKey(e.code); return; }
   if (e.code === 'Escape') { if (!e.repeat) toggleMenu(); return; }
   if (menu.open) { if (!e.repeat) menuKey(e.code); return; }
   keys[e.code] = true;
@@ -50,6 +51,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyH') toggleStorm();
   if (e.code === 'KeyB') dropBomb();
   if (e.code === 'KeyX') callTaxi();
+  if (e.code === 'KeyK' && !taxiTrip) openMap();
   if (e.code === 'KeyR' && player.inHouse) startRadio();                            // következő szám
   if (e.code === 'Space' && player.inHouse && player.inHouse.factory) factoryAction();
   if (e.code === 'Digit1' || e.code === 'Numpad1') buyDrink('beer');
@@ -64,6 +66,7 @@ window.addEventListener('mousedown', e => {
   if (donate.open) { if (e.button === 0) donateClick(e.clientX, e.clientY); return; }
   if (bank.open) { if (e.button === 0) bankClick(e.clientX, e.clientY); return; }
   if (taxiMenu.open) { if (e.button === 0) taxiMenuClick(e.clientX, e.clientY); return; }
+  if (mapView.open) { if (e.button === 0) mapClick(e.clientX, e.clientY); return; }
   if (menu.open) { if (e.button === 0) menuClick(e.clientX, e.clientY); return; }
   if (e.button === 0) mouse.down = true;
 });
@@ -723,6 +726,7 @@ function saveChoice(key, v) { try { window.localStorage.setItem(key, String(v));
 
 // Előrehaladás (pénz, XP, megvett autók, rekordok) – a böngésző megjegyzi
 const PROGRESS_KEY = 'gta.progress';
+const PIN_MAX = 10;                     // saját térképes jelölések száma (ADR-0030)
 // a sérült vagy más verzióból származó mentést érvényes állapotra javítja
 function sanitizeProgress(p) {
   const num = v => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0);
@@ -734,6 +738,7 @@ function sanitizeProgress(p) {
     activeCar: owned.includes(src.activeCar) ? src.activeCar : 0,
     bestDrift: num(src.bestDrift), bestStreak: num(src.bestStreak), missions: num(src.missions), raceWins: num(src.raceWins),
     donated: num(src.donated), debt: num(src.debt),
+    pins: (Array.isArray(src.pins) ? src.pins : []).filter(pn => pn && Number.isFinite(pn.x) && Number.isFinite(pn.y)).slice(0, PIN_MAX).map(pn => ({ x: +pn.x, y: +pn.y })),
     ownedSkins: [...SKINS.map((k, i) => i).filter(i => !skinPrice(i)),
       ...(Array.isArray(src.ownedSkins) ? src.ownedSkins.filter(i => Number.isInteger(i) && i >= 0 && i < SKINS.length) : [])]
       .filter((v, i, a) => a.indexOf(v) === i),
@@ -1397,6 +1402,74 @@ function damagePlayer(n) {
   }
 }
 
+// ===== Térkép (ADR-0030): K – nagy térkép a nevezetes helyekkel; kattintással saját pontok jelölése =====
+const MAP_RADIUS = 25000, TAXI_PINS = 3;   // a taxi-listában csak a 3 legközelebbi jelölés (különben kilóg a képernyőről)
+const POI_TYPES = {
+  station: { icon: '⛽', name: 'Benzinkutak', color: '#ff8a1f' },
+  factory: { icon: '🏭', name: 'Gyárak', color: '#bbb' },
+  bank: { icon: '🏦', name: 'Bankok', color: '#7df' },
+  pub: { icon: '🍺', name: 'Kocsmák', color: '#7f7' },
+  pin: { icon: '📍', name: 'Saját jelölések', color: '#f6c' },
+};
+const mapView = { open: false, pois: [], cats: { station: true, factory: true, bank: true, pub: true, pin: true }, hits: [], layout: null };
+
+// nevezetes helyek egy négyzetben (benzinkút, gyár, bank, kocsma)
+function poisIn(xa, ya, xb, yb) {
+  const out = stationsIn(xa, ya, xb, yb).map(st => ({ type: 'station', x: (st.canopy.x0 + st.canopy.x1) / 2, y: (st.canopy.y0 + st.canopy.y1) / 2 }));
+  for (const hs of housesIn(xa, ya, xb, yb)) {
+    const type = hs.bank ? 'bank' : hs.factory ? 'factory' : hs.pub ? 'pub' : null;
+    if (type) out.push({ type, x: hs.x, y: hs.y });
+  }
+  return out;
+}
+const visiblePois = () => mapView.pois.filter(p => mapView.cats[p.type]);
+
+function openMap() {
+  mapView.pois = poisIn(player.x - MAP_RADIUS, player.y - MAP_RADIUS, player.x + MAP_RADIUS, player.y + MAP_RADIUS);
+  mapView.center = { x: player.x, y: player.y };
+  mapView.open = true;
+  for (const k in keys) keys[k] = false; mouse.down = false;
+}
+function closeMap() { mapView.open = false; }
+function toggleMapCat(type) { mapView.cats[type] = !mapView.cats[type]; }
+
+// képernyő ↔ világ átváltás a nagy térképen
+function mapLayout(w, h) {
+  const S = Math.max(200, Math.min(w - 300, h - 80)), x0 = 40, y0 = (h - S) / 2;
+  return { S, x0, y0, k: S / (2 * MAP_RADIUS) };
+}
+const mapToWorld = (L, sx, sy) => ({ x: mapView.center.x + (sx - L.x0 - L.S / 2) / L.k, y: mapView.center.y + (sy - L.y0 - L.S / 2) / L.k });
+const worldToMap = (L, x, y) => ({ x: L.x0 + L.S / 2 + (x - mapView.center.x) * L.k, y: L.y0 + L.S / 2 + (y - mapView.center.y) * L.k });
+
+// kattintás: a jelmagyarázaton kategória ki/be, a térképen saját pont jelölése (vagy a meglévő törlése)
+function mapClick(sx, sy) {
+  for (const h of mapView.hits) if (sx >= h.x && sx <= h.x + h.w && sy >= h.y && sy <= h.y + h.h) { if (h.close) closeMap(); else toggleMapCat(h.cat); return; }
+  const L = mapView.layout;
+  if (!L || sx < L.x0 || sx > L.x0 + L.S || sy < L.y0 || sy > L.y0 + L.S) return;
+  const hit = progress.pins.findIndex(pn => { const m = worldToMap(L, pn.x, pn.y); return Math.hypot(m.x - sx, m.y - sy) < 12; });
+  if (hit >= 0) { progress.pins.splice(hit, 1); popup('📍 Jelölés törölve', '#f6c'); }
+  else if (progress.pins.length >= PIN_MAX) popup(`Legfeljebb ${PIN_MAX} jelölésed lehet – kattints egyre a törléshez`, '#f66');
+  else { progress.pins.push(mapToWorld(L, sx, sy)); popup('📍 Pont megjelölve (a radaron és taxi célként is)', '#f6c'); }
+  saveProgress();
+}
+function mapKey(code) {
+  if (code === 'Escape' || code === 'KeyK') closeMap();
+  if ((code === 'Delete' || code === 'Backspace') && progress.pins.length) {   // a térképen kívülre esett jelölések is törölhetők
+    progress.pins = []; saveProgress(); popup('📍 Minden jelölés törölve', '#f6c');
+  }
+  const cat = { Digit1: 'station', Digit2: 'factory', Digit3: 'bank', Digit4: 'pub', Digit5: 'pin' }[code];
+  if (cat) toggleMapCat(cat);
+}
+
+// a radarhoz: a közeli nevezetes helyek másodpercenként frissítve (ne számoljuk minden képkockában)
+const radarPoiCache = { t: -99, x: 0, y: 0, list: [] };
+function radarPois() {
+  if (clock - radarPoiCache.t > 1 || Math.hypot(player.x - radarPoiCache.x, player.y - radarPoiCache.y) > 600) {
+    Object.assign(radarPoiCache, { t: clock, x: player.x, y: player.y, list: poisIn(player.x - 4700, player.y - 4700, player.x + 4700, player.y + 4700) });
+  }
+  return radarPoiCache.list;
+}
+
 // ===== Taxi (ADR-0029): X – hívás, E – úti cél, $5; az út rövid elsötétítéssel „átugorható” (a pálya végtelen) =====
 const TAXI_FARE = 5, TAXI_WAIT = 30, TAXI_TRIP = 2.5, TAXI_COME = 45;   // ha 45 mp alatt nem ér oda, lemond
 const TAXI_MODEL = { type: 'taxicab', color: ['#f2c230', '#c09010'], len: 74, wid: 36, accel: 450, maxRoad: 620, maxSand: 380, sandDrag: 0.9, fuelUse: 1 };
@@ -1455,6 +1528,9 @@ function taxiDestinations() {
     const hs = nearestHouseOf(pred); if (hs) { const d = doorOf(hs); out.push({ label, x: d.x, y: d.y }); }
   }
   if (race.state === 'idle' && race.offer) out.push({ label: '🏁 Verseny rajt', x: race.offer.x, y: race.offer.y });
+  progress.pins.map((pn, i) => ({ label: `📍 ${i + 1}. jelölt pont`, x: pn.x, y: pn.y }))
+    .sort((a, b) => Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y))
+    .slice(0, TAXI_PINS).forEach(d => out.push(d));
   return out.map(o => ({ ...o, km: (Math.hypot(o.x - player.x, o.y - player.y) / 10000).toFixed(1) }));
 }
 function openTaxiMenu() { Object.assign(taxiMenu, { open: true, items: taxiDestinations(), sel: 0 }); for (const k in keys) keys[k] = false; mouse.down = false; }
@@ -2838,7 +2914,7 @@ function drawHud(w, h) {
   if (tornado && tornado.power > 0.3) drawEdgeArrow(tornado.x, tornado.y, '#ff6a3a', `🌪 ${Math.round(dist(tornado, player) / 10)} m`, w, h);
   ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 176);
   ctx.fillText('Space: kézifék (drift = pénz) · Bal klikk / F: lövés', 20, 196);
-  ctx.fillText(`H: vihar · T: gyors idő (${timeScale}x) · X: taxi · Esc: menü / autóbolt`, 20, 216);
+  ctx.fillText(`H: vihar · T: idő (${timeScale}x) · X: taxi · K: térkép · Esc: menü`, 20, 216);
   ctx.fillStyle = '#bbb'; ctx.font = '12px sans-serif';
   ctx.fillText(`Az úton ${SPEED_LIMIT} km/h felett jön a rendőrség · tankolni a ⛽ kutaknál lehet`, 20, 238);
 
@@ -2865,6 +2941,10 @@ function drawHud(w, h) {
     ctx.fillStyle = '#7df'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
     ctx.fillText(`🏁 ${racePosition()}. hely · ellenőrzőpont ${race.cp + 1}/${race.route.length} · ${fmt(race.time)}`, w / 2, 70);
     ctx.textAlign = 'left';
+  }
+  if (mapView.cats.pin && progress.pins.length) {                      // nyíl a legközelebbi saját jelöléshez
+    const pn = progress.pins.reduce((a, b) => (Math.hypot(a.x - player.x, a.y - player.y) <= Math.hypot(b.x - player.x, b.y - player.y) ? a : b));
+    drawEdgeArrow(pn.x, pn.y, '#f6c', `📍 ${Math.round(Math.hypot(pn.x - player.x, pn.y - player.y) / 10)} m`, w, h);
   }
   if (mission.active) drawEdgeArrow(mission.tx, mission.ty, '#ffd23a', `${Math.round(Math.hypot(player.x - mission.tx, player.y - mission.ty) / 10)} m`, w, h);
   if (player.inCar && car.fuel < 25) {
@@ -2926,6 +3006,13 @@ function drawMinimap(w) {
     ctx.fillRect(px((st.rect.x0 + st.rect.x1) / 2) - 4, py((st.rect.y0 + st.rect.y1) / 2) - 4, 8, 8);
   }
   if (tornado) { ctx.fillStyle = '#ff6a3a'; ctx.beginPath(); ctx.arc(clamp(px(tornado.x), x0 + 5, x0 + S - 5), clamp(py(tornado.y), y0 + 5, y0 + S - 5), 6, 0, Math.PI * 2); ctx.fill(); }
+  for (const pt of radarPois()) {                       // nevezetes helyek a radaron
+    if (!mapView.cats[pt.type]) continue;
+    ctx.fillStyle = POI_TYPES[pt.type].color; ctx.beginPath(); ctx.arc(px(pt.x), py(pt.y), 3, 0, Math.PI * 2); ctx.fill();
+  }
+  if (mapView.cats.pin) for (const pn of progress.pins) {
+    ctx.fillStyle = '#f6c'; ctx.beginPath(); ctx.arc(clamp(px(pn.x), x0 + 4, x0 + S - 4), clamp(py(pn.y), y0 + 4, y0 + S - 4), 4.5, 0, Math.PI * 2); ctx.fill();
+  }
   const raceTarget = race.state === 'idle' ? race.offer : race.route[race.cp];
   if (raceTarget) {
     ctx.fillStyle = '#7df';
@@ -2952,6 +3039,39 @@ function drawHomeless(p) {
   ctx.fillText('SEGÍTS', p.x - fy * 22, p.y + fx * 22 + 2.5);
   if (clock < (p.thanksUntil || 0)) { ctx.fillStyle = '#7f7'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('Köszönöm! ❤', p.x, p.y - 26); }
   ctx.textAlign = 'left';
+}
+
+function drawBigMap(w, h) {
+  const L = mapView.layout = mapLayout(w, h), c = mapView.center;
+  ctx.fillStyle = 'rgba(0,0,0,0.82)'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = '#c9a964'; ctx.fillRect(L.x0, L.y0, L.S, L.S);
+  ctx.save(); ctx.beginPath(); ctx.rect(L.x0, L.y0, L.S, L.S); ctx.clip();
+  ctx.fillStyle = '#555';
+  for (const r of roadsIn(c.y - MAP_RADIUS, c.y + MAP_RADIUS)) ctx.fillRect(L.x0, worldToMap(L, 0, r).y - 1.5, L.S, 3);
+  for (const r of roadsIn(c.x - MAP_RADIUS, c.x + MAP_RADIUS)) ctx.fillRect(worldToMap(L, r, 0).x - 1.5, L.y0, 3, L.S);
+  ctx.textAlign = 'center'; ctx.font = '13px sans-serif';
+  for (const pt of visiblePois()) { const m = worldToMap(L, pt.x, pt.y); ctx.fillText(POI_TYPES[pt.type].icon, m.x, m.y + 5); }
+  if (mapView.cats.pin) { ctx.font = '18px sans-serif'; for (const pn of progress.pins) { const m = worldToMap(L, pn.x, pn.y); ctx.fillText('📍', m.x, m.y + 2); } }
+  const mc = worldToMap(L, car.x, car.y); ctx.fillStyle = '#d42020'; ctx.fillRect(mc.x - 4, mc.y - 4, 8, 8);
+  const mp = worldToMap(L, player.x, player.y); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mp.x, mp.y, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = '#e2c27d'; ctx.lineWidth = 3; ctx.strokeRect(L.x0, L.y0, L.S, L.S);
+  // jelmagyarázat: kattintható kategóriák
+  mapView.hits = [];
+  const lx = L.x0 + L.S + 24;
+  ctx.textAlign = 'left'; ctx.fillStyle = '#e2c27d'; ctx.font = 'bold 22px sans-serif'; ctx.fillText('🗺 Térkép', lx, L.y0 + 24);
+  Object.entries(POI_TYPES).forEach(([type, t], i) => {
+    const y = L.y0 + 50 + i * 40, on = mapView.cats[type];
+    ctx.fillStyle = on ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.03)'; ctx.fillRect(lx, y, 220, 32);
+    ctx.strokeStyle = on ? t.color : '#555'; ctx.lineWidth = 2; ctx.strokeRect(lx, y, 220, 32);
+    ctx.fillStyle = on ? '#fff' : '#777'; ctx.font = 'bold 15px sans-serif';
+    ctx.fillText(`${i + 1}: ${t.icon} ${t.name}`, lx + 10, y + 21);
+    mapView.hits.push({ cat: type, x: lx, y, w: 220, h: 32 });
+  });
+  ctx.fillStyle = '#ccc'; ctx.font = '13px sans-serif';
+  const tips = ['Kattints a térképre: pont jelölése', 'Kattints egy 📍-re: törlés', `Legfeljebb ${PIN_MAX} jelölés`, 'A jelölések a radaron és', 'taxi célként is látszanak', 'Delete: minden jelölés törlése', 'K / Esc: bezárás'];
+  tips.forEach((t, i) => ctx.fillText(t, lx, L.y0 + 270 + i * 20));
 }
 
 function drawTaxiMenu(w, h) {
@@ -3122,6 +3242,10 @@ function render() {
   const stations = stationsIn(view.x0, view.y0, view.x1, view.y1);
   for (const st of stations) drawStation(st, n);
   drawMissionMarker();
+  if (mapView.cats.pin) for (const pn of progress.pins) {               // saját jelölés a világban
+    ctx.strokeStyle = '#f6c'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(pn.x, pn.y, 40 + 4 * Math.sin(clock * 5), 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#f6c'; ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('📍', pn.x, pn.y + 8); ctx.textAlign = 'left';
+  }
   drawRaceMarkers();
   for (const hs of destroyedHouses.values()) if (hs.x1 > view.x0 && hs.x0 < view.x1 && hs.y1 > view.y0 && hs.y0 < view.y1) drawRubble(hs);
   for (const hs of housesIn(view.x0, view.y0, view.x1, view.y1)) drawHouse(hs, n);
@@ -3171,6 +3295,7 @@ function render() {
   if (donate.open) drawDonate(w, h);
   if (bank.open) drawBank(w, h);
   if (taxiMenu.open) drawTaxiMenu(w, h);
+  if (mapView.open) drawBigMap(w, h);
   if (taxiTrip) {                                    // utazás: elsötétül, felirat
     ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = '#f2c230'; ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center';
@@ -3183,7 +3308,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (!menu.open && !donate.open && !bank.open && !taxiMenu.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
+  if (!menu.open && !donate.open && !bank.open && !taxiMenu.open && !mapView.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
     time = (time + dt * timeScale) % CYCLE;
     clock += dt;
     update(dt);

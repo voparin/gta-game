@@ -20,6 +20,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 | H | homokvihar be/ki |
 | X | taxi hívása ($5 bárhova) |
 | B | bomba lerakása (3 mp múlva robban) |
+| K | térkép (pontok jelölése kattintással) |
 | T | gyorsított idő (60x) |
 | Esc | menü: szünet, szkin- és autóváltás, szkin- és autóbolt (a választás megmarad) |
 
@@ -86,5 +87,10 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Legfeljebb 5 bombád lehet, percenként kapsz egy újat (a HUD-on: 💣 3/5).
 
 ## Taxi
-- **X**: hívsz egy taxit, pár másodperc alatt odajön. Mellette **E**: választhatsz úti célt (kezdőhely, az autód, a legközelebbi benzinkút / bank / kocsma / gyár, verseny rajt) – **$5**-ért bárhova elvisz.
+- **X**: hívsz egy taxit, pár másodperc alatt odajön. Mellette **E**: választhatsz úti célt (kezdőhely, az autód, a legközelebbi benzinkút / bank / kocsma / gyár, verseny rajt, saját 📍 jelölés) – **$5**-ért bárhova elvisz.
 - Ha beülsz az autódba, vagy a taxi 45 mp alatt nem ér oda, lemond. A tönkrement taxi nem visz. A szállítási célpontra nem visz el (a szállítást vezetned kell).
+
+## Térkép
+- **K**: megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák. Az **1–5** gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
+- **Kattints a térképre:** saját pontot jelölsz 📍 (legfeljebb 10, megmaradnak). Egy jelölésre kattintva törlöd, a **Delete** gomb mindet törli.
+- A jelölések a radaron és a világban is látszanak, a képernyő szélén nyíl mutat a legközelebbire, és a **taxi** is elvisz oda (a 3 legközelebbihez).

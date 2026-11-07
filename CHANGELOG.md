@@ -5,6 +5,11 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.20.0 – 2026-11-07
+- Térkép: K – nagy térkép a benzinkutakkal ⛽, gyárakkal 🏭, bankokkal 🏦 és kocsmákkal 🍺 (kategóriánként ki-be kapcsolható: 1–5); kattintással saját pontokat jelölhetsz 📍 (max. 10, megmaradnak), újra kattintva törlöd, Delete: mindet törli (ADR-0030)
+- A jelölt pontok a radaron és a világban is látszanak, nyíl mutat a legközelebbire, és a taxi is elvisz oda (a taxi-listában a 3 legközelebbi)
+- A radaron a közeli nevezetes helyek színes pöttyként látszanak
+
 ## 0.19.0 – 2026-11-07
 - Taxi: X – hívás (pár mp alatt odajön), E – úti cél (kezdőhely, autód, legközelebbi benzinkút / bank / kocsma / gyár, verseny rajt), $5 bárhova (ADR-0029); házból és buszról nem hívható be, autóba ülve lemondod, 45 mp után lemond, ha nem ért oda, a tönkrement taxi nem visz
 - Javítva: ha bérautó és csöves is a közelben volt, az E nem azt csinálta, amit a felirat mutatott

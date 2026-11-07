@@ -42,7 +42,7 @@ eval(src + `
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
-  get clock(){return clock} };`);
+  mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
 const key = (code, down) => listeners[down ? 'keydown' : 'keyup']({ code, repeat: false });
@@ -1430,6 +1430,68 @@ G.npcs.length = 0; G.aiCars.length = 0;
   check('AI sosem vezet buszt', G.aiCars.every(c => c.type !== 'bus' && c.color !== bus.color));
   G.aiCars.length = 0;
   G.selectCar(prev);
+}
+
+// --- térkép (ADR-0030): nevezetes helyek, kategóriák, saját jelölések ---
+{
+  Object.assign(G.player, { x: G.C + 3000, y: G.C, inCar: false, inHouse: null, riding: null });
+  G.progress.pins = [];
+  press('KeyK'); step(1);
+  check('K: megnyílik a térkép', G.mapView.open && !!G.mapView.layout);
+  const pt0 = { x: G.player.x, y: G.player.y }; key('KeyD', true); step(30); key('KeyD', false);
+  check('nyitott térképnél áll a játék', G.player.x === pt0.x && G.player.y === pt0.y);
+  const types = new Set(G.mapView.pois.map(p => p.type));
+  check('a térképen benzinkutak, gyárak, bankok és kocsmák is vannak', ['station', 'factory', 'bank', 'pub'].every(t => types.has(t)));
+  const st = G.mapView.pois.find(p => p.type === 'station'), nst = G.nearestStation(st.x, st.y);
+  check('a benzinkút ikonja a valódi kútnál van', nst.d < 1);
+  const bk = G.mapView.pois.find(p => p.type === 'bank');
+  check('a bank ikonja egy bank háznál van', G.housesIn(bk.x - 1, bk.y - 1, bk.x + 1, bk.y + 1).some(h => h.bank && h.x === bk.x && h.y === bk.y));
+  press('Digit1');
+  check('1: a benzinkutak elrejthetők', !G.mapView.cats.station);
+  const hit = G.mapView.hits.find(h => h.cat === 'station');
+  listeners.mousedown({ button: 0, clientX: hit.x + 5, clientY: hit.y + 5 });
+  check('a jelmagyarázatra kattintva újra látszanak', G.mapView.cats.station);
+  const L = G.mapView.layout, target = { x: G.player.x + 4000, y: G.player.y - 2500 }, m = G.worldToMap(L, target.x, target.y);
+  listeners.mousedown({ button: 0, clientX: m.x, clientY: m.y });
+  check('kattintással pont jelölhető, a valódi világbeli helyen', G.progress.pins.length === 1 && Math.hypot(G.progress.pins[0].x - target.x, G.progress.pins[0].y - target.y) < 1);
+  check('a jelölt pont taxi-úti cél', G.taxiDestinations().some(d => d.label.includes('jelölt pont') && d.x === G.progress.pins[0].x));
+  check('a jelölés mentésre kerül', G.sanitizeProgress(JSON.parse(JSON.stringify(G.progress))).pins.length === 1);
+  listeners.mousedown({ button: 0, clientX: m.x + 3, clientY: m.y - 3 });
+  check('a jelölésre kattintva törlődik', G.progress.pins.length === 0);
+  listeners.mousedown({ button: 0, clientX: L.x0 - 10, clientY: L.y0 + 10 });
+  check('a térképen kívül kattintva nem lesz jelölés', G.progress.pins.length === 0);
+  for (let i = 0; i < G.PIN_MAX + 3; i++) listeners.mousedown({ button: 0, clientX: L.x0 + 30 + i * 30, clientY: L.y0 + 40 });
+  check(`legfeljebb ${G.PIN_MAX} jelölés lehet`, G.progress.pins.length === G.PIN_MAX);
+  check('a taxi-listában csak a 3 legközelebbi jelölés van (nem lóg ki a képernyőről)', G.taxiDestinations().filter(d => d.label.includes('jelölt pont')).length === 3
+    && G.taxiDestinations().length <= 10);
+  G.progress.pins.push({ x: G.player.x + 1e6, y: G.player.y });   // a térképen kívül (pl. egy taxiút után)
+  G.progress.pins.splice(0, 1);
+  press('Delete');
+  check('Delete: minden jelölés törlődik (a térképen kívüliek is)', G.progress.pins.length === 0);
+  const bad = G.sanitizeProgress({ pins: [{ x: 1, y: 2 }, { x: 'a', y: 3 }, null, { x: 5 }, ...Array(20).fill({ x: 0, y: 0 })] }).pins;
+  check('a hibás mentett jelölések kiszűrődnek, legfeljebb 10 marad', bad.length === 10 && bad[0].x === 1 && bad.every(p => Number.isFinite(p.x) && Number.isFinite(p.y)));
+  check('régi mentésben (jelölések nélkül) üres a lista', Array.isArray(G.sanitizeProgress({}).pins) && G.sanitizeProgress({}).pins.length === 0);
+  press('KeyK');
+  check('K újra: bezárul a térkép', !G.mapView.open);
+  key('KeyD', true); step(10); key('KeyD', false);
+  check('bezárás után megy tovább a játék', G.player.x !== pt0.x);
+  const near = G.radarPois();   // a gyorsítótár 600 px elmozdulásonként frissül, ezért 4200 + 600
+  check('a radar a közeli nevezetes helyeket mutatja', near.length > 0 && near.every(p => Math.abs(p.x - G.player.x) <= 4800 && Math.abs(p.y - G.player.y) <= 4800));
+  press('Escape'); press('KeyK');
+  check('menüből nem nyílik a térkép', !G.mapView.open);
+  press('Escape');
+  check('a radar a széléig mutatja a helyeket (gyorsítótár: 4000 + 600 px)', /poisIn\(player\.x - 4700/.test(src));
+  {
+    const hsT = G.housesIn(G.player.x - 3000, G.player.y - 3000, G.player.x + 3000, G.player.y + 3000)[0];
+    Object.assign(G.player, G.doorOf(hsT), { inCar: false, inHouse: null });
+    press('KeyX'); for (let i = 0; i < 60 * 20 && (!G.taxi || G.taxi.state !== 'waiting'); i++) step(1); step(60);
+    G.progress.money += 10; press('KeyE'); press('Enter');
+    check('taxiút indul', !!G.taxiTrip);
+    press('KeyK');
+    check('taxiút közben nem nyílik a térkép', !G.mapView.open);
+    step(60 * 4); G.aiCars.length = 0;
+  }
+  G.progress.pins = [];
 }
 
 // --- telepítés: a böngésző ne a régi, tárolt game.js-t futtassa ---
