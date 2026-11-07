@@ -1332,6 +1332,19 @@ G.npcs.length = 0; G.aiCars.length = 0;
   press('KeyB'); step(Math.round(60 * G.BOMB_FUSE) + 5);
   check('közelről téged is megsebez a robbanás', G.player.health < 100 || G.player.dead > 0);
   step(220); G.clearWanted();
+  // a saját bombád öl meg: a halál üzenete marad, és nincs körözés
+  Object.assign(G.player, { x: bx + 6000, y: by, health: 10, dead: 0, lastHit: G.clock });
+  press('KeyB'); step(Math.round(60 * G.BOMB_FUSE) + 2);
+  check('a saját bombád megöl: „FELROBBANTÁL!”, és halottként nincs körözés', G.player.dead > 0 && G.message.text === 'FELROBBANTÁL!' && G.wanted.level === 0);
+  // a házzal együtt: a ház-specifikus üzenet marad
+  step(220); G.clearWanted();
+  const hsX = G.housesIn(G.C + 61000, G.C - 400, G.C + 63000, G.C)[0];
+  Object.assign(G.player, G.doorOf(hsX), { health: 100, dead: 0 });
+  G.bombInv.count = 2; press('KeyB');                // az ajtó előtt
+  press('KeyE');                                     // gyorsan be a házba
+  step(Math.round(60 * G.BOMB_FUSE) + 2);
+  check('a házzal együtt felrobbanva: „FELROBBANTÁL A HÁZZAL!”', G.player.dead > 0 && G.message.text === 'FELROBBANTÁL A HÁZZAL!' && G.wanted.level === 0);
+  step(220); G.clearWanted();
   // nincs bomba, utánpótlás
   Object.assign(G.player, { x: 50000, y: G.C - G.WALK_OFF, health: 100, dead: 0, inCar: false });
   G.bombInv.count = 0; const nb0 = G.bombs.length;

@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.18.1 – 2026-11-07
+- Javítva: ha a saját bombád ölt meg, a rendőrségi üzenet eltakarta a „FELROBBANTÁL!” feliratot (és halottként is körözést kaptál); a házzal együtt felrobbanva az általános felirat jelent meg
+
 ## 0.18.0 – 2026-11-07
 - Bomba: B – lerakod (autóból hátra ejted), 3 mp múlva robban: roncs lesz a közeli autókból, ledönti a házakat, elsodorja az embereket, téged is megsebez; ★★ körözés; legfeljebb 5 bombád lehet, percenként kapsz egy újat
 

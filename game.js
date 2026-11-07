@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.18.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.18.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -1958,18 +1958,19 @@ function explode(x, y) {
     if (c !== car) { c.health = 0; c.wrecked = true; }
   }
   for (const p of npcs) if (!p.dead && Math.hypot(p.x - x, p.y - y) < BOMB_RADIUS) killNpc(p, true);
+  const wasInside = !!player.inHouse;               // a ház ledőlése előtt kell megjegyezni (az kiveszi belőle a játékost)
   for (const hs of housesIn(x - BOMB_RADIUS, y - BOMB_RADIUS, x + BOMB_RADIUS, y + BOMB_RADIUS)) {
     const cx = clamp(x, hs.x0, hs.x1), cy = clamp(y, hs.y0, hs.y1);
     if (Math.hypot(cx - x, cy - y) < BOMB_RADIUS * 0.6) destroyHouse(hs, 'FELROBBANTÁL A HÁZZAL!');
   }
-  if (!player.inHouse) {                            // a játékost is megsebzi (autóban kevésbé)
+  if (!wasInside && !player.dead) {                 // a játékost is megsebzi (autóban kevésbé)
     const t = player.inCar ? car : player, d = Math.hypot(t.x - x, t.y - y);
     if (d < BOMB_RADIUS) {
       damagePlayer(Math.round((player.inCar ? 60 : 120) * fall(d)));
       if (player.dead) message = { text: 'FELROBBANTÁL!', until: clock + 3, color: '#ff6a3a' };
     }
   }
-  raiseWanted(2, 'ROBBANTOTTÁL! ★★ ÜLDÖZ A RENDŐRSÉG!');
+  if (!player.dead) raiseWanted(2, 'ROBBANTOTTÁL! ★★ ÜLDÖZ A RENDŐRSÉG!');   // halottként nem kap körözést (és a halál üzenete marad)
 }
 
 function updateBombs(dt) {
