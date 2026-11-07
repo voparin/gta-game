@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.12.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.12.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -665,10 +665,10 @@ function interactionPrompt() {
   if (player.inHouse) return { text: atInnerDoor() ? '🚪 E: kimenés' : 'Menj az ajtóhoz (lent) a kimenéshez', color: '#7df' };
   if (player.inCar) return null;
   if (dist(player, car) < 75) return { text: 'Nyomd meg az E-t a beszálláshoz', color: '#fff' };
+  if (nearestBoardableBus()) return { text: `🚌 E: felszállás a buszra ($${BUS_FARE})`, color: '#f28c1e' };   // a toggleCar-ban a busz megelőzi a többit
   if (nearestDoor()) return { text: '🏠 E: bemenés a házba', color: '#7df' };
   if (nearestRentable()) return { text: `🔑 E: autóbérlés ($${RENT_PRICE})`, color: '#7f7' };
   if (nearestHomeless()) return { text: `🤲 E: adományozás ($${DONATE_MIN}–$${DONATE_MAX})`, color: '#7f7' };
-  if (nearestBoardableBus()) return { text: `🚌 E: felszállás a buszra ($${BUS_FARE})`, color: '#f28c1e' };
   return null;
 }
 

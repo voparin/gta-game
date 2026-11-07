@@ -907,6 +907,25 @@ G.npcs.length = 0; G.aiCars.length = 0;
   G.aiCars.length = 0;
 }
 
+// --- a felirat és az E gomb ugyanazt csinálja: egy álló busz megelőzi az ajtót ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0;
+  const hsB = G.housesIn(G.C + 41000, G.C - 400, G.C + 43000, G.C).find(h => h.side === -1);
+  const dB = G.doorOf(hsB);
+  Object.assign(G.player, { x: dB.x, y: dB.y, inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0 });
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  const busB = G.spawnCityBus('h', 1, G.C, dB.x);
+  Object.assign(busB, { x: dB.x, y: dB.y + busB.r + 30, vx: 0, vy: 0, dwellUntil: G.clock + 99 });
+  G.progress.money = 50;
+  const shown = G.interactionPrompt().text;
+  press('KeyE');
+  const did = G.player.riding ? 'bus' : G.player.inHouse ? 'house' : 'none';
+  check('a felirat azt mutatja, amit az E csinál (busz az ajtónál)', (did === 'bus' && /busz/.test(shown)) || (did === 'house' && /ház/.test(shown)));
+  if (G.player.riding) { Object.assign(busB, { vx: 0, vy: 0 }); press('KeyE'); }
+  if (G.player.inHouse) G.exitHouse();
+  G.aiCars.length = 0;
+}
+
 // --- Pókhős szkin ($900) ---
 {
   const spi = G.SKINS.findIndex(k => k.name === 'Pókhős');

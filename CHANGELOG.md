@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.12.1 – 2026-11-07
+- Javítva: ha egy busz állt melletted egy ajtó / bérautó / csöves közelében, a felirat mást mutatott, mint amit az E csinált (felszállt a buszra)
+
 ## 0.12.0 – 2026-11-07
 - Tornádók erős homokviharban: beszívják és megpörgetik a közelben lévőket, a közepükön felszippantják a házakat (rom marad), az autókat és az embereket – a játékost is (ADR-0024)
 - Be lehet menni a házakba: az ajtónál E, bútorozott szoba; bent nem talál meg a rendőrség, nem érnek el a banditák, gyorsabban gyógyulsz (ADR-0025)
