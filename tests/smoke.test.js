@@ -42,7 +42,7 @@ eval(src + `
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
-  school, makeQuestion, TEACHER_HOME, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
+  school, makeQuestion, TEACHER_HOME, SHOUT, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
 const key = (code, down) => listeners[down ? 'keydown' : 'keyup']({ code, repeat: false });
@@ -1629,15 +1629,18 @@ G.npcs.length = 0; G.aiCars.length = 0;
   G.school.nextAt = 0; G.progress.money = 10; press('KeyE');
   step(60 * (G.QUESTION_TIME + 1));
   check('a tanár siettet: ha lejár az idő, rossz válasznak számít (büntetéssel)', G.school.open && G.school.n === 1 && !G.school.feedback.ok && G.progress.money === 10 - G.WRONG_FINE && /csiga/.test(G.school.taunt));
-  G.progress.money = 1; press('Digit' + (wrong() + 1));
+  G.progress.money = 1; const tones0 = audio.tones; press('Digit' + (wrong() + 1));
   check('a büntetés nem visz mínuszba', G.progress.money === 0);
+  check('rossz válasznál a tanár azt ordítja: „IDIÓTA VAGY!” (felirat és hang)', G.SHOUT === 'IDIÓTA VAGY!' && G.school.taunt.startsWith(G.SHOUT) && audio.tones > tones0);
   press('Escape');
   const H = G.player.inHouse;
   Object.assign(Tc, { x: 380, y: 112, chase: 0 }); H.ix = 300; H.iy = 112;
   key('KeyD', true); step(20); key('KeyD', false); step(30);
   check('ha sétálsz, a tanár nem bánt (nem üldöz)', G.player.inHouse === H && !Tc.chase);
   G.progress.money = 20; H.ix = 140; H.iy = 250; Object.assign(Tc, { x: 380, y: 112 });
+  const tones1 = audio.tones;
   key('ShiftLeft', true); key('KeyD', true); step(5); key('KeyD', false); key('ShiftLeft', false);
+  check('ha rohansz, a tanár ordít (hang)', audio.tones > tones1);
   check('ha rohansz, a tanár üldözni kezd', Tc.chase > 0 && G.player.inHouse === H);
   { const inF = () => H.furniture.some(f => Tc.x > f.x + 2 && Tc.x < f.x + f.w - 2 && Tc.y > f.y + 2 && Tc.y < f.y + f.h - 2);
     let ok = true; const sv = { x: Tc.x, y: Tc.y, chase: Tc.chase, ix: H.ix, iy: H.iy };

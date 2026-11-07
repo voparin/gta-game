@@ -100,7 +100,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 ## Iskolák
 - A házak egy része **iskola** (sárga tető, „ISKOLA” tábla) – be lehet menni. A táblánál **E**: **matekóra**, 5 feladat (összeadás, kivonás, szorzás).
 - **1–3** gombbal vagy kattintással válaszolsz. Jó válaszonként **$5**, hibátlan óráért **+$25** jár. Óra után **60 mp szünet** van.
-- 👩‍🏫 **Vigyázz a gonosz tanárral!** Ha rohangálsz (Shift), üldözni kezd – ha elkap, kidob és elkoboz **$5**-t. Az órán siettet (**10 mp** feladatonként), és rossz vagy késő válaszért **$2** büntetést ad és leszól.
+- 👩‍🏫 **Vigyázz a gonosz tanárral!** Ha rohangálsz (Shift), üldözni kezd – ha elkap, kidob és elkoboz **$5**-t. Az órán siettet (**10 mp** feladatonként), és rossz vagy késő válaszért **$2** büntetést ad, és azt ordítja: **„IDIÓTA VAGY!”**
 
 ## Bomba
 - **B**: lerakod (autóból hátra ejted), **3 mp** múlva felrobban: a közeli autókból roncs lesz, a házak ledőlnek, az emberek meghalnak – és téged is megsebez, ha túl közel vagy. Robbantásért ★★ körözés jár.

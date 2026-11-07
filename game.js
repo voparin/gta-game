@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.23.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.23.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -459,6 +459,18 @@ const SCHOOL_FURNITURE = [
 const LESSON_LEN = 5, ANSWER_PAY = 5, LESSON_BONUS = 25, LESSON_BREAK = 60;
 // a gonosz tanár: rossz válaszért büntet és leszól, siettet (QUESTION_TIME mp / feladat), a rohangálót üldözi és kidobja
 const WRONG_FINE = 2, QUESTION_TIME = 10, RUN_FINE = 5, TEACHER_HOME = { x: 495, y: 112 }, TEACHER_CHASE = 170, TEACHER_WALK = 80;
+const SHOUT = 'IDIÓTA VAGY!';                     // amit a tanár ordít
+// ordítás hangja: rövid, recsegő, lefelé csúszó kiabálás (Web Audio, hangfájl nélkül, ADR-0026)
+function teacherShout() {
+  const ac = audioOut(); if (!ac) return;
+  const t = ac.currentTime;
+  for (const [f0, dl] of [[320, 0], [260, 0.22]]) {   // „idi-óta!” – két szótag
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(f0, t + dl); o.frequency.exponentialRampToValueAtTime(f0 * 0.55, t + dl + 0.3);
+    g.gain.setValueAtTime(0.5, t + dl); g.gain.exponentialRampToValueAtTime(0.001, t + dl + 0.32);
+    o.connect(g); g.connect(radio.out); o.start(t + dl); o.stop(t + dl + 0.34);
+  }
+}
 const TAUNTS = ['Ezt még egy óvodás is tudja!', 'Egyes! Ülj le!', 'Hát te semmit sem tanultál?', 'Pfuj, de buta vagy!', 'Majd a szüleidnek is elmondom!'];
 const fine = n => { const f = Math.min(Math.max(0, Math.floor(progress.money) || 0), n); progress.money -= f; saveProgress(); return f; };   // sosem megy mínuszba
 function newTeacher() { return { x: TEACHER_HOME.x, y: TEACHER_HOME.y, angle: Math.PI / 2, walk: 0, chase: 0 }; }
@@ -466,7 +478,7 @@ function updateTeacher(dt) {
   const H = player.inHouse, T = H.teacher;
   const moving = keys.KeyW || keys.KeyS || keys.KeyA || keys.KeyD || keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight;
   if (moving && (keys.ShiftLeft || keys.ShiftRight)) {
-    if (!T.chase) popup('👩‍🏫 „NE ROHANGÁLJ!” – a gonosz tanár üldöz!', '#f66');
+    if (!T.chase) { popup(`👩‍🏫 „${SHOUT} NE ROHANGÁLJ!” – a gonosz tanár üldöz!`, '#f66'); teacherShout(); }
     T.chase = 2;                                       // a rohanás után még 2 mp-ig üldöz
   } else T.chase = Math.max(0, T.chase - dt);
   const tx = T.chase ? H.ix : TEACHER_HOME.x, ty = T.chase ? H.iy : TEACHER_HOME.y, d = Math.hypot(tx - T.x, ty - T.y);
@@ -481,7 +493,8 @@ function updateTeacher(dt) {
     const f = fine(RUN_FINE);
     exitHouse();
     school.nextAt = clock + LESSON_BREAK;
-    popup(`👩‍🏫 A gonosz tanár kidobott, mert rohangáltál!${f ? ` (elkobzott $${f})` : ''}`, '#f66');
+    teacherShout();
+    popup(`👩‍🏫 „${SHOUT}” – a gonosz tanár kidobott, mert rohangáltál!${f ? ` (elkobzott $${f})` : ''}`, '#f66');
   }
 }   // óra után 60 mp szünet (ne lehessen végtelenül pénzt gyűjteni)
 const atBlackboard = () => player.inHouse && player.inHouse.hs.school && player.inHouse.iy < 140 && player.inHouse.ix > 120 && player.inHouse.ix < 440;
@@ -514,7 +527,8 @@ function resolveAnswer(ok, next = Math.random, late = false) {
   if (ok) { school.correct++; earn(ANSWER_PAY, 'jó válasz ✏️'); school.taunt = null; }
   else {                                               // a gonosz tanár büntet és leszól
     const f = fine(WRONG_FINE);
-    school.taunt = (late ? 'Lassú vagy, mint a csiga! ' : '') + TAUNTS[school.n % TAUNTS.length];
+    school.taunt = `${SHOUT} ` + (late ? 'Lassú vagy, mint a csiga! ' : '') + TAUNTS[school.n % TAUNTS.length];
+    teacherShout();
     popup(`👩‍🏫 ${late ? 'Lejárt az idő' : 'Rossz válasz'}!${f ? ` Büntetés: -$${f}` : ''} (helyesen: ${school.q.ans})`, '#f66');
   }
   school.feedback = { ok, ans: school.q.ans };
@@ -2741,8 +2755,8 @@ function drawInterior(w, h) {
     ctx.fillStyle = '#999'; ctx.beginPath(); ctx.arc(-4, 0, 3.5, 0, Math.PI * 2); ctx.fill();                      // konty
     ctx.strokeStyle = '#111'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(5, -2.6, 1.8, 0, Math.PI * 2); ctx.moveTo(6.8, 2.6); ctx.arc(5, 2.6, 1.8, 0, Math.PI * 2); ctx.stroke();   // szemüveg
     ctx.restore();
-    ctx.fillStyle = T.chase ? '#f44' : '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(T.chase ? '😠 ÁLLJ MEG!' : '😒', T.x, T.y - 20); ctx.textAlign = 'left';
+    ctx.fillStyle = T.chase ? '#f22' : '#fff'; ctx.font = T.chase ? 'bold 18px sans-serif' : 'bold 13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(T.chase ? `😡 ${SHOUT}` : '😒', T.x, T.y - 22); ctx.textAlign = 'left';
   }
   if (H.factory) for (const b of H.factory.bags) { ctx.fillStyle = b.color; ctx.fillRect(b.x - 8, BELT.y + 8, 16, 24); ctx.fillStyle = '#fff'; ctx.fillRect(b.x - 5, BELT.y + 16, 10, 4); }
   const sk = SKINS[activeSkin];
@@ -3309,6 +3323,9 @@ function drawSchool(w, h) {
   ctx.fillText(`🏫 Matekóra – ${school.n + 1}. feladat / ${LESSON_LEN}`, w / 2, py + 40);
   ctx.fillStyle = '#ccc'; ctx.font = '14px sans-serif'; ctx.fillText(`jó válaszok: ${school.correct}`, w / 2, py + 64);
   ctx.fillStyle = '#fff'; ctx.font = 'bold 44px sans-serif'; ctx.fillText(q.text, w / 2, py + 130);
+  if (school.feedback && !school.feedback.ok) {                                  // a tanár ordít: nagy piros felirat a tábla fölött
+    ctx.fillStyle = '#f22'; ctx.font = 'bold 34px sans-serif'; ctx.fillText(`👩‍🏫 ${SHOUT}`, w / 2, Math.max(36, py - 14));
+  }
   school.hits = [];
   q.opts.forEach((o, i) => {
     const bw = 120, x = w / 2 - 1.5 * bw - 20 + i * (bw + 20), y = py + 170;
