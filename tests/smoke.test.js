@@ -38,7 +38,7 @@ eval(src + `
   set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, set police(v){policeEnabled=v}, wanted, clearWanted,
   SPEED_LIMIT, KMH, START_X, START_Y, progress, mission, drift, stationFor, nearPump, earn, levelOf,
   set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
-  set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, bank, LOAN_MIN, LOAN_MAX, LOAN_FEE, FACTORY_WAGE, WAGE_PERIOD, BOX_SIZE, BELT, stationCache, STATION_CACHE_MAX, raiseWanted,
+  set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, bank, LOAN_MIN, LOAN_MAX, LOAN_FEE, FACTORY_WAGE, WAGE_PERIOD, BOX_SIZE, BELT, bombs, bombInv, BOMB_FUSE, BOMB_RADIUS, BOMB_MAX, BOMB_REGEN, stationCache, STATION_CACHE_MAX, raiseWanted,
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
@@ -1299,6 +1299,55 @@ G.npcs.length = 0; G.aiCars.length = 0;
   H.ix = G.ROOM_W / 2; H.iy = G.ROOM_H - 30; press('KeyE');
   press('Space');
   check('a gyáron kívül a Space nem pakol', !G.player.inHouse);
+}
+
+// --- bomba ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null; G.police = false;
+  const hsB = G.housesIn(G.C + 51000, G.C - 400, G.C + 53000, G.C)[0];
+  const bx = hsB.along, by = G.C - G.WALK_OFF;          // a ház előtti járdán
+  Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 });
+  Object.assign(G.player, { x: bx, y: by, inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0, health: 100, lastHit: -99 });
+  G.bombInv.count = 3;
+  const victimCar = G.spawnAiCar('h', 1, G.C, bx + 80); Object.assign(victimCar, { x: bx + 80, y: G.C - 40, vx: 0, vy: 0 });
+  const farCar = G.spawnAiCar('h', 1, G.C, bx + 900); Object.assign(farCar, { x: bx + 900, y: G.C - 40, vx: 0, vy: 0 }); farCar.ai.speed = 0;
+  victimCar.ai.speed = 0;
+  const victim = G.spawnNpc('ped', bx - 60, by); Object.assign(victim, { moving: false, wanderT: 99 });
+  press('KeyB');
+  check('B-vel bombát raksz le', G.bombs.length === 1 && G.bombInv.count === 2);
+  Object.assign(G.player, { x: bx + 1500, y: by });   // elfutunk
+  step(Math.round(60 * (G.BOMB_FUSE - 0.5)));
+  check('a bomba nem robban azonnal', G.bombs.length === 1 && !victimCar.wrecked);
+  step(60);
+  check(`${G.BOMB_FUSE} mp múlva felrobban`, G.bombs.length === 0);
+  check('a robbanás roncsot csinál a közeli autóból', victimCar.wrecked);
+  check('a robbanás elsodorja a közeli embert', victim.dead > 0);
+  check('a robbanás ledönti a közeli házat', G.destroyedHouses.has(hsB.id));
+  check('a távoli autó megmarad', !farCar.wrecked);
+  check('messze állva nem sebződsz', G.player.health === 100);
+  check('robbantásért ★★ körözés', G.wanted.level === 2);
+  G.clearWanted();
+  // közelről téged is megsebez / megöl
+  Object.assign(G.player, { x: bx + 3000, y: by, health: 100 });
+  press('KeyB'); step(Math.round(60 * G.BOMB_FUSE) + 5);
+  check('közelről téged is megsebez a robbanás', G.player.health < 100 || G.player.dead > 0);
+  step(220); G.clearWanted();
+  // nincs bomba, utánpótlás
+  Object.assign(G.player, { x: 50000, y: G.C - G.WALK_OFF, health: 100, dead: 0, inCar: false });
+  G.bombInv.count = 0; const nb0 = G.bombs.length;
+  press('KeyB');
+  check('bomba nélkül nem lehet robbantani', G.bombs.length === nb0);
+  G.bombInv.regen = 1; step(70);
+  check('percenként kapsz egy új bombát', G.bombInv.count === 1);
+  G.bombInv.count = G.BOMB_MAX; G.bombInv.regen = 1; step(70);
+  check(`legfeljebb ${G.BOMB_MAX} bombád lehet`, G.bombInv.count === G.BOMB_MAX);
+  // házban nem lehet bombát rakni
+  const hsIn = G.housesIn(G.C + 56000, G.C - 400, G.C + 58000, G.C)[0];
+  Object.assign(G.player, G.doorOf(hsIn)); press('KeyE');
+  const nb1 = G.bombs.length; press('KeyB');
+  check('házban nem lehet bombát rakni', G.player.inHouse && G.bombs.length === nb1);
+  G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
+  G.aiCars.length = 0; G.npcs.length = 0; G.clearWanted();
 }
 
 // --- zöld busz: csak a játékosé ---

@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.17.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.18.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -47,6 +47,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyE') toggleCar();
   if (e.code === 'KeyT') timeScale = timeScale === 1 ? 60 : 1;
   if (e.code === 'KeyH') toggleStorm();
+  if (e.code === 'KeyB') dropBomb();
   if (e.code === 'KeyR' && player.inHouse) startRadio();                            // következő szám
   if (e.code === 'Space' && player.inHouse && player.inHouse.factory) factoryAction();
   if (e.code === 'Digit1' || e.code === 'Numpad1') buyDrink('beer');
@@ -626,9 +627,12 @@ function updateInterior(dt) {
 
 // A tornádó által lerombolt házak (ADR-0024): a játékmenet idejére megmaradnak, a helyükön rom van.
 const destroyedHouses = new Map();   // id → ház (a romok rajzolásához)
-function destroyHouse(hs) {
+function destroyHouse(hs, killMsg = 'ELVITT A TORNÁDÓ!') {
   destroyedHouses.set(hs.id, hs);
-  if (player.inHouse && player.inHouse.hs.id === hs.id) { player.inHouse = null; stopRadio(); tornadoKillsPlayer(); }   // a házzal együtt elvisz
+  if (player.inHouse && player.inHouse.hs.id === hs.id) {          // a házzal együtt téged is
+    player.inHouse = null; stopRadio();
+    damagePlayer(10000); message = { text: killMsg, until: clock + 3, color: '#ff6a3a' };
+  }
   const ch = chunkCache.get(Math.floor(hs.x / CHUNK) + ',' + Math.floor(hs.y / CHUNK));   // a már legenerált chunkból is kivesszük
   if (ch) ch.obstacles = ch.obstacles.filter(o => !(o.type === 'house' && o.x === hs.x && o.y === hs.y));
 }
@@ -1923,6 +1927,79 @@ function spawnTornado(x, y) {
 
 function flyAway(kind, data, x, y) { tornado.flying.push({ kind, data, ang: Math.atan2(y - tornado.y, x - tornado.x), t: 0 }); }
 
+// ===== Bomba: B – lerakod, 3 mp múlva robban (autók, emberek, házak; téged is megsebez) =====
+const BOMB_FUSE = 3, BOMB_RADIUS = 220, BOMB_MAX = 5, BOMB_REGEN = 60;
+const bombs = [];                                  // { x, y, fuse }
+const explosions = [];                             // { x, y, born } – a robbanás látványa
+const bombInv = { count: 3, regen: BOMB_REGEN };
+
+function dropBomb() {
+  if (!controllable() || player.inHouse || player.riding) return false;
+  if (bombInv.count <= 0) { popup(`Nincs bombád – percenként kapsz egyet (max ${BOMB_MAX})`, '#f66'); return false; }
+  const src = player.inCar ? car : player;
+  const bx = player.inCar ? car.x - Math.cos(car.angle) * (car.len / 2 + 20) : player.x;   // autóból hátra ejted
+  const by = player.inCar ? car.y - Math.sin(car.angle) * (car.len / 2 + 20) : player.y;
+  bombs.push({ x: bx, y: by, fuse: BOMB_FUSE });
+  bombInv.count--;
+  popup(`💣 Bomba lerakva – ${BOMB_FUSE} mp! Fuss!`, '#ff6a3a');
+  return src;
+}
+
+function explode(x, y) {
+  explosions.push({ x, y, born: clock });
+  flashes.push({ x, y, until: clock + 0.25 });
+  for (let i = 0; i < 24; i++) addSmoke(x + (rand() - 0.5) * 120, y + (rand() - 0.5) * 120, (rand() - 0.5) * 200, (rand() - 0.5) * 200, true);
+  const fall = d => 1 - d / BOMB_RADIUS;            // közel erősebb
+  for (const c of [car, ...aiCars]) {               // autók: roncs és lökés
+    const d = Math.hypot(c.x - x, c.y - y);
+    if (d >= BOMB_RADIUS) continue;
+    const nx = d > 1 ? (c.x - x) / d : 1, ny = d > 1 ? (c.y - y) / d : 0;
+    c.vx += nx * 900 * fall(d); c.vy += ny * 900 * fall(d);
+    if (c !== car) { c.health = 0; c.wrecked = true; }
+  }
+  for (const p of npcs) if (!p.dead && Math.hypot(p.x - x, p.y - y) < BOMB_RADIUS) killNpc(p, true);
+  for (const hs of housesIn(x - BOMB_RADIUS, y - BOMB_RADIUS, x + BOMB_RADIUS, y + BOMB_RADIUS)) {
+    const cx = clamp(x, hs.x0, hs.x1), cy = clamp(y, hs.y0, hs.y1);
+    if (Math.hypot(cx - x, cy - y) < BOMB_RADIUS * 0.6) destroyHouse(hs, 'FELROBBANTÁL A HÁZZAL!');
+  }
+  if (!player.inHouse) {                            // a játékost is megsebzi (autóban kevésbé)
+    const t = player.inCar ? car : player, d = Math.hypot(t.x - x, t.y - y);
+    if (d < BOMB_RADIUS) {
+      damagePlayer(Math.round((player.inCar ? 60 : 120) * fall(d)));
+      if (player.dead) message = { text: 'FELROBBANTÁL!', until: clock + 3, color: '#ff6a3a' };
+    }
+  }
+  raiseWanted(2, 'ROBBANTOTTÁL! ★★ ÜLDÖZ A RENDŐRSÉG!');
+}
+
+function updateBombs(dt) {
+  for (let i = bombs.length - 1; i >= 0; i--) {
+    bombs[i].fuse -= dt;
+    if (bombs[i].fuse <= 0) { const b = bombs.splice(i, 1)[0]; explode(b.x, b.y); }
+  }
+  for (let i = explosions.length - 1; i >= 0; i--) if (clock - explosions[i].born > 0.8) explosions.splice(i, 1);
+  if (bombInv.count < BOMB_MAX) {                   // percenként egy új bomba
+    bombInv.regen -= dt;
+    if (bombInv.regen <= 0) { bombInv.count++; bombInv.regen = BOMB_REGEN; }
+  } else bombInv.regen = BOMB_REGEN;
+}
+
+function drawBombs() {
+  for (const b of bombs) {
+    ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(b.x, b.y, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = Math.floor(clock * (b.fuse < 1 ? 12 : 5)) % 2 ? '#ff3a1a' : '#ffd23a';   // villogó gyújtózsinór
+    ctx.beginPath(); ctx.arc(b.x + 8, b.y - 8, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(String(Math.ceil(b.fuse)), b.x, b.y + 4); ctx.textAlign = 'left';
+  }
+  for (const e of explosions) {
+    const t = (clock - e.born) / 0.8, r = BOMB_RADIUS * (0.3 + t * 0.8);
+    const g = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, r);
+    g.addColorStop(0, `rgba(255,240,180,${0.9 * (1 - t)})`); g.addColorStop(0.4, `rgba(255,140,40,${0.8 * (1 - t)})`); g.addColorStop(1, 'rgba(120,40,10,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(e.x, e.y, r, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
 function tornadoKillsPlayer() {
   damagePlayer(10000);
   message = { text: 'ELVITT A TORNÁDÓ!', until: clock + 3, color: '#ff6a3a' };
@@ -2004,6 +2081,7 @@ function update(dt) {
   updateStorm(dt);
   if (player.drunk > 0 && !(player.passedOut > 0)) player.drunk = Math.max(0, player.drunk - DRUNK_DECAY * dt);   // józanodás
   updateTornado(dt);
+  updateBombs(dt);
   if (player.dead > 0) {
     player.dead -= dt;
     if (player.dead <= 0) respawn();
@@ -2677,6 +2755,8 @@ function drawHud(w, h) {
   }
   ctx.fillStyle = '#fff';
   if (storm.level > 0.3) { ctx.fillStyle = '#ffb040'; ctx.fillText(tornado ? '🌪 TORNÁDÓ!' : '⚠ Homokvihar!', 300, 80); ctx.fillStyle = '#fff'; }
+  ctx.fillStyle = '#ff9a6a'; ctx.font = 'bold 12px sans-serif';                     // bombák
+  ctx.fillText(`💣 ${bombInv.count}/${BOMB_MAX} (B)`, 335, 58); ctx.font = '14px sans-serif'; ctx.fillStyle = '#fff';
   if (tornado && tornado.power > 0.3) drawEdgeArrow(tornado.x, tornado.y, '#ff6a3a', `🌪 ${Math.round(dist(tornado, player) / 10)} m`, w, h);
   ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 176);
   ctx.fillText('Space: kézifék (drift = pénz) · Bal klikk / F: lövés', 20, 196);
@@ -2976,6 +3056,7 @@ function render() {
   for (const f of flashes) { ctx.beginPath(); ctx.arc(f.x, f.y, 7, 0, Math.PI * 2); ctx.fill(); }
   drawSmoke();
   drawTornado();
+  drawBombs();
   for (const l of lamps) drawLamp(l, n);
   ctx.restore();
 

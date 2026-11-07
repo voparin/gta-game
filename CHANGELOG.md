@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.18.0 – 2026-11-07
+- Bomba: B – lerakod (autóból hátra ejted), 3 mp múlva robban: roncs lesz a közeli autókból, ledönti a házakat, elsodorja az embereket, téged is megsebez; ★★ körözés; legfeljebb 5 bombád lehet, percenként kapsz egy újat
+
 ## 0.17.0 – 2026-11-07
 - Bankok (a házak ~6%-a): a pultnál E – hitel $100–$2000 (20% díj, egyszerre egy), törlesztés; amíg tartozol, minden kereset 25%-a automatikusan törleszt (ADR-0028)
 - Gyárak (a házak ~6%-a): futószalagon jönnek a sós zacskók, Space: felveszed, Space: berakod egy dobozba; fizetés $500 percenként, ha abban a percben dolgoztál

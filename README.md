@@ -18,6 +18,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 | Space | kézifék (drift, féknyom, füst) |
 | Bal klikk / F | lövés (egérrel célzás) |
 | H | homokvihar be/ki |
+| B | bomba lerakása (3 mp múlva robban) |
 | T | gyorsított idő (60x) |
 | Esc | menü: szünet, szkin- és autóváltás, szkin- és autóbolt (a választás megmarad) |
 
@@ -78,3 +79,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 ## Gyárak
 - A házak egy része **gyár** (szürke tető, „GYÁR” tábla). Bent futószalagon jönnek a sós zacskók: **Space**: felveszed, **Space** egy doboz mellett: berakod.
 - **Fizetés: $500 percenként** – ha abban a percben legalább egy zacskót bepakoltál. A le nem szedett zacskók a szalag végén leesnek.
+
+## Bomba
+- **B**: lerakod (autóból hátra ejted), **3 mp** múlva felrobban: a közeli autókból roncs lesz, a házak ledőlnek, az emberek meghalnak – és téged is megsebez, ha túl közel vagy. Robbantásért ★★ körözés jár.
+- Legfeljebb 5 bombád lehet, percenként kapsz egy újat (a HUD-on: 💣 3/5).
