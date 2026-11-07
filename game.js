@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.9.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.9.2';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 const OLD_WORLD = 10000;
@@ -161,10 +161,13 @@ function generateChunk(cx, cy) {
 function getChunk(cx, cy) {
   const key = cx + ',' + cy;
   let ch = chunkCache.get(key);
-  if (!ch) {
+  if (ch) {
+    chunkCache.delete(key);          // használatkor a sor végére kerül → a legrégebben HASZNÁLT esik ki
+    chunkCache.set(key, ch);
+  } else {
     ch = generateChunk(cx, cy);
     chunkCache.set(key, ch);
-    if (chunkCache.size > 600) chunkCache.delete(chunkCache.keys().next().value);  // a legrégebbit eldobjuk
+    if (chunkCache.size > 600) chunkCache.delete(chunkCache.keys().next().value);
   }
   return ch;
 }
@@ -303,13 +306,21 @@ function saveChoice(key, v) { try { window.localStorage.setItem(key, String(v));
 
 // Előrehaladás (pénz, XP, megvett autók, rekordok) – a böngésző megjegyzi
 const PROGRESS_KEY = 'gta.progress';
+// a sérült vagy más verzióból származó mentést érvényes állapotra javítja
+function sanitizeProgress(p) {
+  const num = v => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0);
+  const valid = i => Number.isInteger(i) && i >= 0 && i < CAR_MODELS.length;
+  const src = p && typeof p === 'object' ? p : {};
+  const owned = [0, ...(Array.isArray(src.owned) ? src.owned.filter(valid) : [])].filter((v, i, a) => a.indexOf(v) === i);
+  return {
+    money: num(src.money), xp: num(src.xp), owned,
+    activeCar: owned.includes(src.activeCar) ? src.activeCar : 0,
+    bestDrift: num(src.bestDrift), bestStreak: num(src.bestStreak), missions: num(src.missions),
+  };
+}
 function loadProgress() {
-  const def = { money: 0, xp: 0, owned: [0], activeCar: 0, bestDrift: 0, bestStreak: 0, missions: 0 };
-  try {
-    const p = JSON.parse(window.localStorage.getItem(PROGRESS_KEY));
-    if (p && typeof p.money === 'number') return { ...def, ...p };
-  } catch (e) { /* nincs mentés */ }
-  return def;
+  try { return sanitizeProgress(JSON.parse(window.localStorage.getItem(PROGRESS_KEY))); }
+  catch (e) { return sanitizeProgress(null); }   // nincs mentés / nincs tárhely
 }
 const progress = loadProgress();
 function saveProgress() { try { window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (e) { /* nincs tárhely */ } }
@@ -1026,7 +1037,8 @@ function earn(amount, label) {
   popup(`+$${amount} ${label}`, '#7f7');
   const after = levelOf(progress.xp);
   if (after > before) {
-    const bonus = after * 50;
+    let bonus = 0;
+    for (let l = before + 1; l <= after; l++) bonus += l * 50;   // minden átlépett szintért jár bónusz
     progress.money += bonus;
     message = { text: `SZINTLÉPÉS! ${after}. szint`, until: clock + 2.5, color: '#ffd23a' };
     popup(`+$${bonus} szintbónusz`, '#ffd23a');
@@ -1036,8 +1048,9 @@ function earn(amount, label) {
 
 // ===== Benzin =====
 function updateFuel(dt, input) {
+  const wasRefueling = car.refueling;
   car.refueling = false;
-  if (!player.inCar) return;
+  if (!player.inCar) { if (wasRefueling) saveProgress(); return; }
   const moving = Math.hypot(car.vx, car.vy) > 20;     // álló autó (alapjárat) nem fogyaszt
   car.fuel = Math.max(0, car.fuel - (input.up ? 0.45 * car.fuelUse : moving ? 0.03 : 0) * dt);
   if (car.fuel <= 0 && !car.emptyWarned) {
@@ -1049,12 +1062,18 @@ function updateFuel(dt, input) {
   if (car.fuel > 30) car.lowWarned = false;
   // tankolás: állj meg egy kút mellett
   if (car.fuel < 99.9 && nearPump(car.x, car.y) && Math.hypot(car.vx, car.vy) < 100) {
-    car.refueling = true;
-    const add = Math.min(100 - car.fuel, 30 * dt);
-    car.fuel += add;
-    progress.money = Math.max(0, progress.money - add * FUEL_PRICE);
-    if (car.fuel >= 99.9) { car.fuel = 100; popup('Tele a tank!', '#7f7'); saveProgress(); }
-  }
+    const add = Math.min(100 - car.fuel, 30 * dt, progress.money / FUEL_PRICE);   // csak annyit, amennyit ki tudsz fizetni
+    if (add > 0) {
+      car.refueling = true;
+      car.fuel += add;
+      progress.money = Math.max(0, progress.money - add * FUEL_PRICE);
+      if (car.fuel >= 99.9) { car.fuel = 100; popup('Tele a tank!', '#7f7'); }
+    } else if (!car.brokeWarned) {
+      car.brokeWarned = true;
+      popup('Nincs pénzed tankolni – szerezz pénzt (szállítás, drift)!', '#f66');
+    }
+  } else car.brokeWarned = false;
+  if (wasRefueling && !car.refueling) saveProgress();   // a tankolás végén (félbehagyva is) mentünk
 }
 
 // ===== Drift-kombó: minél tovább driftelsz ütközés nélkül, annál nagyobb a szorzó =====
@@ -1561,7 +1580,8 @@ function drawHud(w, h) {
   }
   if (player.inCar && !car.refueling && car.fuel < 100 && nearPump(car.x, car.y)) {
     ctx.fillStyle = '#ff8a1f'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText('Állj meg a tankoláshoz', w / 2, h - 40); ctx.textAlign = 'left';
+    ctx.fillText(progress.money > 0 ? 'Állj meg a tankoláshoz' : 'Nincs pénzed tankolni – szerezz pénzt (szállítás, drift)!', w / 2, h - 40);
+    ctx.textAlign = 'left';
   }
 
   ctx.fillStyle = '#fff';

@@ -21,3 +21,5 @@ Itt van naplózva minden architekturális döntés: mit, miért és milyen alter
 | [0014](0014-mertekegysegek-1-km-h-4-px.md) | Mértékegységek: 1 km/h = 4 px/s, 10 px = 1 m | Elfogadva | 2026-11-07 |
 | [0015](0015-verziozas-version-allando-changelog-git-cimkek.md) | Verziózás: VERSION állandó + CHANGELOG + git-címkék, teszttel kikényszerítve | Elfogadva | 2026-11-07 |
 | [0016](0016-jutalmazasi-rendszer-szerencsejatek-elemek-nelkul.md) | Jutalmazási rendszer szerencsejáték-elemek nélkül | Elfogadva | 2026-11-07 |
+| [0017](0017-architekturalis-dontesek-naplozasa-adr-ekben.md) | Architekturális döntések naplózása ADR-ekben, teszttel ellenőrizve | Elfogadva | 2026-11-07 |
+| [0018](0018-kodatnezes-es-refaktoralas-a-fejlesztesi-folyamatban.md) | Kódátnézés és refaktorálás a fejlesztési folyamatban | Elfogadva | 2026-11-07 |

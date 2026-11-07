@@ -60,12 +60,14 @@ Szabályok:
    node --check game.js && node tests/smoke.test.js
    ```
    Csak akkor „működik”, ha mindkettő 0-s kilépési kóddal fut le és minden sor `✓`.
-4. **Kipróbálás** – `open index.html`, hogy a felhasználó a böngészőben is lássa.
-5. **Verzióléptetés** – minden kiadás előtt:
+4. **Kódátnézés (code review)** – minden kiadás előtt nézd át a saját változtatásodat (`git diff`) a `code-review` skill-lel (vagy egy független reviewer subagenttel), legalább ezekre: logikai hibák, határesetek (0, üres, nagyon nagy érték, NaN), elfelejtett régi kódhívások, teljesítmény (soha ne járd be az egész világot, ADR-0006), meglévő ADR-ek megsértése. A megerősített hibákat javítsd, és írj rájuk tesztet; utána újra a 3. lépés.
+5. **Refaktorálás** – ha a kódátnézés vagy a fejlesztés közben ismétlődő, túl hosszú vagy nehezen érthető kód derül ki, refaktoráld (lásd lent a „Refaktorálás” szakaszt).
+6. **Kipróbálás** – `open index.html`, hogy a felhasználó a böngészőben is lássa.
+7. **Verzióléptetés** – minden kiadás előtt:
    - új funkció → a középső szám nő (0.8.0 → 0.9.0); hibajavítás / beállítás → az utolsó (0.8.0 → 0.8.1)
    - írd át a `VERSION` állandót a `game.js` elején, és tegyél a `CHANGELOG.md` tetejére egy új bejegyzést (verzió, dátum, változások magyarul)
    - a teszt ellenőrzi, hogy a kettő egyezik
-6. **Publikálás (automatikus)** – ha a 3. lépés sikeres, kérdezés nélkül:
+8. **Publikálás (automatikus)** – ha a 3. és 4. lépés sikeres, kérdezés nélkül:
    ```bash
    git add -A
    git commit -m "v<verzió>: <rövid, magyar leírás a változásról>"
@@ -77,7 +79,15 @@ Szabályok:
    gh run watch --exit-status $(gh run list --limit 1 --json databaseId --jq '.[0].databaseId')
    ```
    Ha a CI elbukik, javítsd és pushold újra – ne hagyd piros állapotban.
-7. **Jelentés** – írd meg a felhasználónak magyarul: mi változott, az új verziószám, a tesztek eredménye, és az élő link.
+9. **Jelentés** – írd meg a felhasználónak magyarul: mi változott, mit talált a kódátnézés és mit javítottál, az új verziószám, a tesztek eredménye, és az élő link.
+
+## Refaktorálás
+
+- A refaktorálás **nem változtat a játék viselkedésén**: előtte és utána is minden tesztnek zöldnek kell lennie, és nem írhatsz át meglévő `check(...)` elvárást azért, hogy átmenjen.
+- Külön commitban (és külön verzióban, JAVÍTÁS szám) legyen, ne keverd új funkcióval – így ha valami elromlik, könnyű visszakeresni.
+- Tipikus esetek: ismétlődő kód közös függvénybe (pl. sáv/járda koordináták, billentyű-bemenet), mágikus számok elnevezett állandóba, túl hosszú függvény szétbontása, halott kód törlése.
+- Ha a refaktorálás szerkezeti döntés (pl. a `game.js` több fájlra bontása, ADR-0002), előbb ADR kell.
+- Nagyobb refaktorálás után a kódátnézést is futtasd újra.
 
 ## Szabályok
 

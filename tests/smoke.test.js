@@ -28,7 +28,7 @@ eval(src + `
   get time(){return time}, set time(v){time=v}, get timeScale(){return timeScale},
   set spawn(v){spawnEnabled=v}, set slime(v){slimeEnabled=v}, set police(v){policeEnabled=v}, wanted, clearWanted,
   SPEED_LIMIT, KMH, START_X, START_Y, progress, mission, drift, stationFor, allStations, nearPump, earn, levelOf,
-  set missions(v){missionsEnabled=v}, VERSION, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
+  set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
@@ -250,7 +250,7 @@ Object.assign(G.car, { x: 30000, y: G.C, angle: 0, vx: 0, vy: 0, spin: 0 });
 const speedKmh = () => Math.hypot(G.car.vx, G.car.vy) / G.KMH;
 key('KeyW', true);
 let maxSlow = 0;
-while (speedKmh() < G.SPEED_LIMIT - 8) { step(1); maxSlow = Math.max(maxSlow, speedKmh()); }
+for (let i = 0; i < 600 && speedKmh() < G.SPEED_LIMIT - 8; i++) { step(1); maxSlow = Math.max(maxSlow, speedKmh()); }
 key('KeyW', false); step(30);
 check(`${G.SPEED_LIMIT} km/h alatt nincs körözés`, G.wanted.level === 0 && maxSlow < G.SPEED_LIMIT);
 key('KeyW', true); step(60); key('KeyW', false);
@@ -430,6 +430,47 @@ key('KeyT', true); key('KeyT', false);
 const t0 = G.time; step(60);
 check('T gomb gyorsítja az időt (60x)', G.timeScale === 60 && Math.abs((G.time - t0) - 60) < 2);
 
+// --- kódátnézés: javított hibák ---
+// pénz nélkül nem lehet tankolni
+G.npcs.length = 0; G.aiCars.length = 0;
+{
+  const stx = G.stationFor(5, 5), q0 = stx.pumps[0], q1 = stx.pumps[1];
+  Object.assign(G.car, { x: (q0.x + q1.x) / 2, y: q0.y, angle: 0, vx: 0, vy: 0, fuel: 10 });
+  Object.assign(G.player, { x: G.car.x, y: G.car.y, inCar: true, dead: 0, arrested: 0 });
+  G.progress.money = 0;
+  step(60);
+  check('pénz nélkül nem lehet tankolni', G.car.fuel < 10.5 && !G.car.refueling);
+  G.progress.money = 5;
+  step(60);
+  check('kevés pénzből csak annyi benzin jár, amennyit kifizetsz', Math.abs(G.car.fuel - (10 + 5 / G.FUEL_PRICE)) < 1 && G.progress.money < 0.01);
+  key('KeyE', true); key('KeyE', false);
+}
+// több szint egyszerre: minden szint bónusza jár
+{
+  G.progress.xp = 0; G.progress.money = 0;
+  G.earn(5000, 'teszt');               // 1. → 6. szint
+  const lv = G.levelOf(5000);
+  let expected = 5000;
+  for (let l = 2; l <= lv; l++) expected += l * 50;
+  check('több szint átlépésekor minden szint bónusza jár', lv === 6 && G.progress.money === expected);
+}
+// sérült / régi mentés
+{
+  const p1 = G.sanitizeProgress({ money: 0, owned: [0, 7], activeCar: 7 });
+  const p2 = G.sanitizeProgress({ money: 'x', owned: null, xp: -5 });
+  const p3 = G.sanitizeProgress(null);
+  check('érvénytelen autó-index a mentésben nem omlasztja össze a játékot', p1.activeCar === 0 && !p1.owned.includes(7));
+  check('hibás típusú mentés alapértékre javul', p2.money === 0 && p2.xp === 0 && Array.isArray(p2.owned) && p2.owned[0] === 0);
+  check('üres mentés alapállapot', p3.money === 0 && p3.owned.length === 1 && p3.activeCar === 0);
+}
+// a pályadarab-tárolóból a legrégebben HASZNÁLT darab esik ki
+{
+  G.chunkCache.clear();
+  const first = G.getChunk(0, 0);
+  for (let i = 1; i < 700; i++) { G.getChunk(i % 50, 1 + Math.floor(i / 50)); G.getChunk(0, 0); }
+  check('a folyamatosan használt pályadarab nem esik ki a tárolóból', G.getChunk(0, 0) === first);
+}
+
 // --- verzió ---
 const changelog = fs.readFileSync(path.join(__dirname, '..', 'CHANGELOG.md'), 'utf8');
 const topEntry = (changelog.match(/^## (\d+\.\d+\.\d+)/m) || [])[1];
@@ -442,11 +483,19 @@ const adrIndex = fs.readFileSync(path.join(adrDir, 'README.md'), 'utf8');
 const adrFiles = fs.readdirSync(adrDir).filter(f => /^\d{4}-.+\.md$/.test(f)).sort();
 check('vannak ADR-ek', adrFiles.length > 0);
 check('minden ADR szerepel az ADR-listában', adrFiles.every(f => adrIndex.includes(`](${f})`)));
+const indexRows = [...adrIndex.matchAll(/^\| \[(\d{4})\]\(([^)]+)\) \| [^|]+ \| ([^|]+) \|/gm)];
+check('az ADR-lista minden sora létező fájlra mutat', indexRows.length === adrFiles.length && indexRows.every(r => adrFiles.includes(r[2])));
+const fileStatus = f => (fs.readFileSync(path.join(adrDir, f), 'utf8').match(/\*\*Státusz:\*\* ([^\n]+)/) || [])[1];
+check('a listában ugyanaz a státusz, mint az ADR-ben', indexRows.every(r => (fileStatus(r[2]) || '').trim().startsWith(r[3].trim().split(':')[0])));
 check('az ADR-ek sorszáma folytonos', adrFiles.every((f, i) => f.startsWith(String(i + 1).padStart(4, '0') + '-')));
 check('minden ADR-ben van státusz, kontextus, döntés, alternatívák és következmények', adrFiles.every(f => {
   const t = fs.readFileSync(path.join(adrDir, f), 'utf8');
-  return /\*\*Státusz:\*\* (Javasolt|Elfogadva|Elvetve|Felváltva)/.test(t)
+  return /\*\*Státusz:\*\* (Javasolt|Elfogadva|Elvetve|Felváltva)[^|\n]*$/m.test(t)
     && ['## Kontextus', '## Döntés', '## Elvetett alternatívák', '## Következmények'].every(h => t.includes(h));
+}));
+check('nincs kitöltetlen ADR (a minta szövegével)', adrFiles.every(f => {
+  const t = fs.readFileSync(path.join(adrDir, f), 'utf8');
+  return !/ADR-NNNN|ÉÉÉÉ-HH-NN|<rövid cím|^- <alternatíva>/m.test(t);
 }));
 
 console.log(failed ? `\n${failed} teszt elbukott` : '\nMinden teszt sikeres');

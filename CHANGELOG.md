@@ -5,6 +5,15 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.9.2 – 2026-11-07
+- Kódátnézés és refaktorálás bekerült a fejlesztési folyamatba (CLAUDE.md, ADR-0017, ADR-0018)
+- Javítva: pénz nélkül ingyen lehetett tankolni; most csak annyi benzin jár, amennyit ki tudsz fizetni
+- Javítva: több szint egyszerre átlépésekor elveszett a köztes szintek bónusza
+- Javítva: félbehagyott tankolásnál a levont pénz nem mentődött
+- Javítva: sérült vagy régi mentés miatt nem indult el a játék
+- Javítva: a pályadarab-tárolóból a játékos alatti darab is kieshetett (most a legrégebben használt esik ki)
+- Tesztek: szigorúbb ADR-ellenőrzés, nem akadhat végtelen ciklusba a rendőrös teszt
+
 ## 0.9.1 – 2026-11-07
 - Architekturális döntések naplója (`docs/adr/`, 16 ADR), a CLAUDE.md szabályaival
 
