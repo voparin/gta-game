@@ -28,7 +28,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 | H | homokvihar be/ki |
 | X | taxi hívása ($5 bárhova) |
 | B | bomba lerakása (3 mp múlva robban) |
-| M | térkép (pontok jelölése kattintással; a K is jó) |
+| M | térkép (pontok jelölése kattintással) |
 | T | gyorsított idő (60x) |
 | Q | háború indítása (azonnal, a környéken) |
 | P | telefon (ha van): csetelés Robival |
@@ -219,6 +219,6 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Ha beülsz az autódba, vagy a taxi 45 mp alatt nem ér oda, lemond. A tönkrement taxi nem visz. A szállítási célpontra nem visz el (a szállítást vezetned kell).
 
 ## Térkép
-- **M** (vagy K): megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák, 🛒 boltok, 🏫 iskolák, 🍽 éttermek, 🔧 autószerelők, 🚆 vasútállomások, 📱 telefonboltok. Az **1–9** és **0** (a saját jelölések: **P**) gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
+- **M**: megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák, 🛒 boltok, 🏫 iskolák, 🍽 éttermek, 🔧 autószerelők, 🚆 vasútállomások, 📱 telefonboltok. Az **1–9** és **0** (a saját jelölések: **P**) gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
 - **Kattints a térképre:** saját pontot jelölsz 📍 (legfeljebb 10, megmaradnak). Egy jelölésre kattintva törlöd, a **Delete** gomb mindet törli.
 - A jelölések a radaron és a világban is látszanak, a képernyő szélén nyíl mutat a legközelebbire, és a **taxi** is elvisz oda (a 3 legközelebbihez).

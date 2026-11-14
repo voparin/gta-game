@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.38.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.38.2';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -62,7 +62,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyH') toggleStorm();
   if (e.code === 'KeyB') dropBomb();
   if (e.code === 'KeyX') callTaxi();
-  if ((e.code === 'KeyM' && !player.inHouse || e.code === 'KeyK') && !taxiTrip) openMap();   // M (a régi K is) – térkép; házban az M a rádió
+  if (e.code === 'KeyM' && !player.inHouse && !taxiTrip) openMap();   // M – térkép (házban az M a rádió)
   if (e.code === 'KeyQ' && !e.repeat) callWar();
   if (e.code === 'KeyP' && !e.repeat) openPhone();
   if (e.code === 'KeyO' && !e.repeat) dropPhone();
@@ -2419,7 +2419,7 @@ function mapClick(sx, sy) {
   saveProgress();
 }
 function mapKey(code) {
-  if (code === 'Escape' || code === 'KeyK' || code === 'KeyM') closeMap();
+  if (code === 'Escape' || code === 'KeyM') closeMap();
   if ((code === 'Delete' || code === 'Backspace') && progress.pins.length) {   // a térképen kívülre esett jelölések is törölhetők
     progress.pins = []; saveProgress(); popup('📍 Minden jelölés törölve', '#f6c');
   }

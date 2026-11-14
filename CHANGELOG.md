@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.38.2 – 2026-11-14
+- A térkép csak az **M** gombbal nyílik (a K-val már nem)
+
 ## 0.38.1 – 2026-11-14
 - A térkép mostantól az **M** gombbal nyílik (és zárul); a régi K is működik. Házban az M továbbra is a rádiót kapcsolja
 
