@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.41.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.42.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -56,6 +56,7 @@ window.addEventListener('keydown', e => {
   if (mapView.open) { if (!e.repeat) mapKey(e.code); return; }
   if (e.code === 'Escape') { if (!e.repeat) toggleMenu(); return; }
   if (menu.open) { if (!e.repeat) menuKey(e.code); return; }
+  if (e.code === 'Tab') { if (e.preventDefault) e.preventDefault(); }   // Tab (nyomva tartva): az aktív játékosok listája
   keys[e.code] = true;
   if (e.repeat) return;
   if (e.code === 'KeyE') toggleCar();
@@ -5479,6 +5480,40 @@ function drawHud(w, h) {
   }
 }
 
+// ===== Aktív játékosok (Tab) =====
+function onlinePlayers() {                          // tiszta: a saját játékos + a többiek, név szerint (a többjátékos állapotból)
+  const me = { name: account.user || net.name || 'Te', me: true, car: !!player.inCar, dist: 0 };
+  const list = [];
+  for (const o of net.others.values()) list.push({ name: String(o.name || '?'), me: false, car: !!o.car, dist: Math.hypot(o.x - player.x, o.y - player.y) });
+  list.sort((a, b) => a.name.localeCompare(b.name));
+  return [me, ...list];
+}
+function drawOnlineCount(w) {                       // kis jelzés a radar alatt: hányan játszanak
+  if (!net.online) return;
+  ctx.save(); ctx.font = '12px sans-serif'; ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText(`👥 ${1 + net.others.size} játékos online · Tab: lista`, w - 14, 12 + 170 + 22);
+  ctx.restore();
+}
+function drawPlayerList(w, h) {
+  const list = onlinePlayers(), shown = list.slice(0, 14), rowH = 26, pw = 380, ph = 70 + shown.length * rowH + (list.length > shown.length ? 24 : 0);
+  const x = (w - pw) / 2, y = Math.max(20, (h - ph) / 2);
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,10,20,0.88)'; ctx.fillRect(x, y, pw, ph);
+  ctx.strokeStyle = '#8fd0ff'; ctx.lineWidth = 2; ctx.strokeRect(x, y, pw, ph);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = 'bold 20px sans-serif';
+  ctx.fillText(net.online ? `🌐 Aktív játékosok (${list.length})` : '🌐 Nincs kapcsolat a szerverrel', w / 2, y + 32);
+  ctx.font = '15px sans-serif'; ctx.textAlign = 'left';
+  shown.forEach((p, i) => {
+    const ry = y + 62 + i * rowH;
+    ctx.fillStyle = p.me ? '#ffd23a' : '#fff';
+    ctx.fillText(`${p.car ? '🚗' : '🚶'} ${p.name}${p.me ? ' (te)' : ''}`, x + 20, ry);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#9ab';
+    ctx.fillText(p.me ? '' : p.dist < 1000 ? `${Math.round(p.dist)} px` : `${(p.dist / 1000).toFixed(1)} km`, x + pw - 20, ry); ctx.textAlign = 'left';
+  });
+  if (list.length > shown.length) { ctx.fillStyle = '#9ab'; ctx.fillText(`… és még ${list.length - shown.length} játékos`, x + 20, y + 62 + shown.length * rowH); }
+  ctx.restore();
+}
+
 function drawMinimap(w) {
   // radar: a játékos körüli 8000 × 8000 px-es terület
   const S = 170, RAD = 4000, k = S / (2 * RAD), x0 = w - S - 12, y0 = 12;
@@ -5966,6 +6001,8 @@ function render() {
   else if (drunkK() > 0) { ctx.fillStyle = `rgba(160,60,140,${0.12 * drunkK()})`; ctx.fillRect(0, 0, w, h); }
   drawHud(w, h);
   drawMinimap(w);
+  drawOnlineCount(w);
+  if (keys.Tab && !account.open && !menu.open) drawPlayerList(w, h);
   if (menu.open) drawMenu(w, h);
   if (donate.open) drawDonate(w, h);
   if (bank.open) drawBank(w, h);

@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.42.0 – 2026-11-14
+- Új: aktív játékosok listája – Tab nyomva tartva megjelenik, kik játszanak éppen (név, gyalog / autóban, távolság). A radar alatt mindig látszik, hányan vannak online.
+
 ## 0.41.1 – 2026-11-14
 - Javítás: menüben és ablakokban (profil, bolt, telefon, térkép…) újra látszik az egérmutató.
 
