@@ -35,6 +35,10 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 | Ctrl+S | csalókód: +$10 000 |
 | Esc | menü: szünet, szkin- és autóváltás, szkin- és autóbolt (a választás megmarad) |
 
+## Tenger 🌊
+- A pálya közepén, a **kezdőhelytől délre** (kb. 11 km-re) egy nagy **tenger** van, hullámos parttal és homokos stranddal. A nagy térképen (K) kéken látszik.
+- Az utak és a vasút **hidakon** kelnek át rajta. A vízben **úszni** lehet (lassabban), az autó alig halad – a hídon viszont rendesen mehetsz.
+
 ## Rendőrség
 - Az utakon (és járdán) **145 km/h** a sebességkorlát – a táblák is jelzik. Ha túlléped, körözni kezdenek (★), rendőrre lövésért ★★.
 - **Lerázás:** ha 12 másodpercig egy rendőrautó sincs a közeledben, leszállnak rólad.

@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.36.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.37.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -136,6 +136,16 @@ function chunkSeed(cx, cy) {
   return (Math.imul(cx + 1, 73856093) ^ Math.imul(cy + 1, 19349663) ^ 0x5bd1e995) | 0;
 }
 
+// ===== Tenger (ADR-0045): a pálya közepén (a kezdőhelytől délre) egy nagy, hullámos partú tenger; az utak hidakon kelnek át =====
+const SEA_X = C, SEA_Y = C + 22000, SEA_R = 8500, BEACH = 260;
+const seaRadius = th => SEA_R * (1 + 0.12 * Math.sin(3 * th + 1) + 0.07 * Math.sin(7 * th + 2) + 0.04 * Math.sin(13 * th + 4));   // a part íve (öblök, félszigetek)
+function inSea(x, y, pad = 0) {                   // a pont a vízben van-e (pad > 0: a part közelében is)
+  const dx = x - SEA_X, dy = y - SEA_Y, d = Math.hypot(dx, dy);
+  if (d > SEA_R * 1.25 + pad) return false;
+  return d < seaRadius(Math.atan2(dy, dx)) + pad;
+}
+const inWater = (x, y) => inSea(x, y) && !onRoad(x, y, SIDEWALK_W);   // víz, nem híd
+
 function generateChunk(cx, cy) {
   const r = rng(chunkSeed(cx, cy));
   const x0 = cx * CHUNK, y0 = cy * CHUNK;
@@ -175,6 +185,7 @@ function generateChunk(cx, cy) {
       const x = x0 + r() * CHUNK, y = y0 + r() * CHUNK, rad = rMin + r() * (rMax - rMin);
       const rot = r() * Math.PI * 2, seed = r();
       if (onRoad(x, y, rad + 40 + SIDEWALK_W)) continue;   // úton és járdán nincs akadály
+      if (inSea(x, y, rad + 20)) continue;                 // a vízben és a parton sem
       if (Math.hypot(x - START_X, y - START_Y) < 250) continue;
       if (insideStation(x, y, rad + 20) || insideLot(x, y, rad + 20) || insideHouse(x, y, rad + 30)) continue;   // a ház mellett egy gyalogos (24 px) is elfér
       ch.obstacles.push({ x, y, r: rad, type, rot, seed });
@@ -186,6 +197,7 @@ function generateChunk(cx, cy) {
   for (let i = 0; i < 16; i++) {
     ch.dunes.push({ x: x0 + r() * CHUNK, y: y0 + r() * CHUNK, rx: 80 + r() * 220, ry: 30 + r() * 80, rot: r() * Math.PI });
   }
+  ch.dunes = ch.dunes.filter(d => !inSea(d.x, d.y, 300));
 
   return ch;
 }
@@ -239,7 +251,7 @@ function stationFor(i, j) {
   const center = X === C && Y === C;          // a kezdőhely melletti kereszteződésben mindig van
   const h = rng(chunkSeed(i + 1000, j + 1000));
   let st = null;
-  if (center || h() < 0.45) {
+  if ((center || h() < 0.45) && !inSea(X, Y, 800)) {   // a tengerben / parton nincs kút
     const qx = center ? 1 : (h() < 0.5 ? -1 : 1), qy = center ? -1 : (h() < 0.5 ? -1 : 1);
     const ox = X + qx * (EDGE + 10), oy = Y + qy * (EDGE + 10);
     const L = (a, b) => ({ x: ox + qx * a, y: oy + qy * b });   // a: távolság a függőleges úttól, b: a vízszintestől
@@ -319,7 +331,7 @@ function trolleyStopsIn(xa, ya, xb, yb) {          // csak a trolivonalakon (ví
       for (const side of [-1, 1]) out.push({ axis: 'h', road: R, along: a, side, dir: side, x: a, y: R + side * (EDGE - 12), trolley: true });
     }
   }
-  return out;
+  return out.filter(bs => !inSea(bs.x, bs.y, 300));
 }
 function nearestTrolleyStop(x, y) {
   let best = null, bd = Infinity;
@@ -383,7 +395,7 @@ function busStopsIn(xa, ya, xb, yb) {
   for (const R of roadsIn(xa - EDGE, xb + EDGE)) for (const a of alongs(ya, yb)) for (const side of [-1, 1]) {
     out.push({ axis: 'v', road: R, along: a, side, dir: -side, x: R + side * (EDGE - 12), y: a });
   }
-  return out;
+  return out.filter(bs => !inSea(bs.x, bs.y, 520));   // a hídon nincs megálló (és parkoló)
 }
 
 // ===== Házak az utak mentén (analitikusan, mint az utak és a megállók) =====
@@ -425,7 +437,7 @@ function housesIn(xa, ya, xb, yb) {
   };
   for (const R of roadsIn(ya - 400, yb + 400)) forRoad('h', R, xa - 200, xb + 200);
   for (const R of roadsIn(xa - 400, xb + 400)) forRoad('v', R, ya - 200, yb + 200);
-  return out.filter(o => o.x1 >= xa && o.x0 <= xb && o.y1 >= ya && o.y0 <= yb && !destroyedHouses.has(o.id));
+  return out.filter(o => o.x1 >= xa && o.x0 <= xb && o.y1 >= ya && o.y0 <= yb && !destroyedHouses.has(o.id) && !inSea(o.x, o.y, 220));
 }
 
 // belváros: a 20 000 px-es cellák kb. harmadában sok a felhőkarcoló (ADR-0039)
@@ -1370,7 +1382,7 @@ function horsesIn(xa, ya, xb, yb) {
       const h = rng(chunkSeed(cx * 7 + 3, cy * 11 + 5));
       if (h() >= HORSE_CHANCE) continue;
       const x = (cx + 0.15 + h() * 0.7) * HORSE_CELL, y = (cy + 0.15 + h() * 0.7) * HORSE_CELL, angle = h() * Math.PI * 2, coat = HORSE_COATS[(h() * HORSE_COATS.length) | 0];
-      if (onRoad(x, y, 160) || insideHouse(x, y, 60)) continue;
+      if (onRoad(x, y, 160) || insideHouse(x, y, 60) || inSea(x, y, 80)) continue;
       if (x >= xa && x <= xb && y >= ya && y <= yb) out.push({ id, x, y, angle, coat });
     }
   }
@@ -2019,7 +2031,7 @@ function updatePlayer(dt) {
   if (keys.KeyD || keys.ArrowRight) mx += 1;
   if (mx || my) {
     const len = Math.hypot(mx, my);
-    const sp = (keys.ShiftLeft || keys.ShiftRight ? 260 : 140) * (1 - 0.3 * storm.level);
+    const sp = (keys.ShiftLeft || keys.ShiftRight ? 260 : 140) * (1 - 0.3 * storm.level) * (inWater(player.x, player.y) ? 0.45 : 1);   // a vízben úszik (lassan)
     const sway = Math.sin(clock * 3.1) * 70 * drunkK();                          // részegen imbolyog
     player.x += ((mx / len) * sp + (-my / len) * sway) * dt;
     player.y += ((my / len) * sp + (mx / len) * sway) * dt;
@@ -2130,7 +2142,7 @@ function updateHorse(c, dt) {
     if (keys.KeyA || keys.ArrowLeft) mx -= 1;
     if (keys.KeyD || keys.ArrowRight) mx += 1;
   }
-  const len = Math.hypot(mx, my), sp = keys.ShiftLeft || keys.ShiftRight ? HORSE_GALLOP : HORSE_TROT;
+  const len = Math.hypot(mx, my), sp = (keys.ShiftLeft || keys.ShiftRight ? HORSE_GALLOP : HORSE_TROT) * (inWater(c.x, c.y) ? 0.4 : 1);   // a ló is úszik
   const sway = ride && len ? Math.sin(clock * 3.1) * 70 * drunkK() : 0;           // részegen imbolyog
   const tx = len ? mx / len * sp + (-my / len) * sway : 0, ty = len ? my / len * sp + (mx / len) * sway : 0;
   const k = 1 - Math.exp(-HORSE_ACCEL * dt);
@@ -2149,6 +2161,7 @@ function updateCarPhysics(c, input, dt) {
   if (c.plane && c === car) { updatePlane(c, dt); return; }
   const { up, down, steer, handbrake } = input;
   const sandy = !onRoad(c.x, c.y, SIDEWALK_W);   // a járda is szilárd burkolat
+  const water = sandy && inSea(c.x, c.y);        // vízben az autó alig halad (csak a hídon jó)
 
   // először fordul az autó, a sebesség viszont nem fordul vele azonnal → oldalirányú csúszás
   const fwd0 = c.vx * Math.cos(c.angle) + c.vy * Math.sin(c.angle);
@@ -2168,9 +2181,9 @@ function updateCarPhysics(c, input, dt) {
   if (up) fwd += (empty ? 120 : c.accel + (c.nitroOn ? nc.accel : 0)) * dt;
   if (down) fwd -= (fwd > 20 ? 700 : 300) * dt;
   if (handbrake) fwd *= Math.exp(-1.5 * dt);
-  fwd *= Math.exp(-(sandy ? c.sandDrag : 0.4) * dt);    // homokban lassabb
+  fwd *= Math.exp(-(water ? 3 : sandy ? c.sandDrag : 0.4) * dt);    // homokban lassabb, vízben nagyon lassú
   if (!up && !down && Math.abs(fwd) < 5) fwd = 0;
-  const cap = empty ? 60 : c.nitroOn ? (sandy ? c.maxSand + 120 : nc.max) : sandy ? c.maxSand : c.maxRoad;
+  const cap = water ? 70 : empty ? 60 : c.nitroOn ? (sandy ? c.maxSand + 120 : nc.max) : sandy ? c.maxSand : c.maxRoad;
   // a végsebességnél megáll a gyorsulás; ha fölötte volt (pl. nitró után, homokba érve), fokozatosan lassul vissza
   if (fwd > cap) fwd = fwdBefore > cap ? Math.max(cap, Math.min(fwd, fwdBefore) - 400 * dt) : cap;
   fwd = Math.max(-180, fwd);
@@ -3275,7 +3288,7 @@ function railStopsIn(xa, ya, xb, yb) {
   for (let k = Math.ceil((ya - RAIL_Y0 - PLATFORM.dy1) / RAIL_SPACE); k <= Math.floor((yb - RAIL_Y0) / RAIL_SPACE); k++) {
     for (let n = Math.ceil((xa - STOP_X0) / STOP_SPACE); n <= Math.floor((xb - STOP_X0) / STOP_SPACE); n++) out.push({ x: n * STOP_SPACE + STOP_X0, y: RAIL_Y0 + k * RAIL_SPACE + (PLATFORM.dy0 + PLATFORM.dy1) / 2, k, n });
   }
-  return out.filter(o => o.y >= ya && o.y <= yb);
+  return out.filter(o => o.y >= ya && o.y <= yb && !inSea(o.x, o.y, 350));   // a tengeren a vonat hídon megy át, állomás nincs
 }
 const onPlatform = (x, y) => railStopsIn(x - PLATFORM.half, y - 80, x + PLATFORM.half, y + 80).find(st => Math.abs(x - st.x) <= PLATFORM.half && Math.abs(y - st.y) <= (PLATFORM.dy1 - PLATFORM.dy0) / 2 + 10);
 function nearestBoardableTrain() {
@@ -3609,7 +3622,9 @@ function spawnSoldier(side, dist, tank = false) {   // a sereg oldalán, a csata
 }
 function dropWarMissiles() { for (let i = missiles.length - 1; i >= 0; i--) if (missiles[i].side !== 'P') missiles.splice(i, 1); }   // a játékos rakétái a háború végén is tovább repülnek
 function startWar() {
-  const a = rand() * Math.PI * 2, d = 1500 + rand() * 700, cx = player.x + Math.cos(a) * d, cy = player.y + Math.sin(a) * d;
+  let a = rand() * Math.PI * 2, d = 1500 + rand() * 700, cx = player.x + Math.cos(a) * d, cy = player.y + Math.sin(a) * d;
+  for (let k = 0; k < 8 && inSea(cx, cy, 600); k++) { a += Math.PI / 4; cx = player.x + Math.cos(a) * d; cy = player.y + Math.sin(a) * d; }   // a csatatér a szárazföldön
+  if (inSea(cx, cy, 600)) { warClock.left = 30; popup('⚔ A nyílt vízen nincs háború – a parton próbáld újra', '#ffb040'); return false; }
   const axis = rand() * Math.PI * 2;
   war = { x: cx, y: cy, t: 0, shellT: 2, alertT: 0, missileT: 14, bomberT: 18, axis, reinT: { A: 0, B: 0, P: 0 }, tankT: { A: 0, B: 0 }, lost: { A: 0, B: 0, P: 0 }, nukeArmed: false, army: false };
   soldiers.length = 0; warShells.length = 0; dropWarMissiles();
@@ -4336,6 +4351,36 @@ function drawLamp(l, n) {
   ctx.beginPath(); ctx.arc(l.hx, l.hy, 6, 0, Math.PI * 2); ctx.fill();
 }
 
+function drawSea(view) {
+  const ext = SEA_R * 1.25 + BEACH;
+  if (SEA_X + ext < view.x0 || SEA_X - ext > view.x1 || SEA_Y + ext < view.y0 || SEA_Y - ext > view.y1) return;
+  const ring = (add, n = 240) => { ctx.beginPath(); for (let i = 0; i <= n; i++) { const th = i / n * Math.PI * 2, r = seaRadius(th) + add; const x = SEA_X + Math.cos(th) * r, y = SEA_Y + Math.sin(th) * r; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); } ctx.closePath(); };
+  ctx.fillStyle = '#ead9a2'; ring(BEACH); ctx.fill();                                            // homokos part
+  const g = ctx.createRadialGradient(SEA_X, SEA_Y, SEA_R * 0.2, SEA_X, SEA_Y, SEA_R * 1.2);
+  g.addColorStop(0, '#1d5f9e'); g.addColorStop(0.8, '#2d84c4'); g.addColorStop(1, '#4fb0d8');
+  ctx.fillStyle = g; ring(0); ctx.fill();                                                        // víz: középen mélyebb
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 6; ring(-30 + 12 * Math.sin(clock * 1.6), 180); ctx.stroke();   // hullámtörés a parton
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 3;
+  for (let k = 1; k <= 3; k++) { ring(-160 * k + 30 * Math.sin(clock * 0.9 + k), 120); ctx.stroke(); }
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';                                                      // csillogó hullámtaréjak
+  for (let i = 0; i < 60; i++) {
+    const x = view.x0 + ((i * 397 + clock * 20) % (view.x1 - view.x0)), y = view.y0 + ((i * 251) % (view.y1 - view.y0));
+    if (inWater(x, y)) ctx.fillRect(x, y + Math.sin(clock * 2 + i) * 3, 14, 2);
+  }
+}
+function drawBridges(view) {                       // ahol az út a vízen megy át: korlát mindkét oldalon
+  ctx.fillStyle = '#7a6a58';
+  for (const R of roadsIn(view.y0 - EDGE, view.y1 + EDGE)) for (let x = Math.floor(view.x0 / 40) * 40; x < view.x1; x += 40) {
+    if ((inSea(x, R + EDGE + 6) || inSea(x, R - EDGE - 6)) && Math.abs(x + 20 - nearestRoad(x + 20)) > EDGE + 30) { ctx.fillRect(x, R - EDGE - 8, 40, 6); ctx.fillRect(x, R + EDGE + 2, 40, 6); }   // a kereszteződésben nincs korlát
+  }
+  for (let k = Math.ceil((view.y0 - RAIL_Y0 - 200) / RAIL_SPACE); k <= Math.floor((view.y1 - RAIL_Y0 + 50) / RAIL_SPACE); k++) {   // vasúti híd: korlát a két sín mellett
+    const ty = RAIL_Y0 + k * RAIL_SPACE;
+    for (let x = Math.floor(view.x0 / 40) * 40; x < view.x1; x += 40) if (inSea(x, ty + RAIL_GAP / 2)) { ctx.fillRect(x, ty - 30, 40, 5); ctx.fillRect(x, ty + RAIL_GAP + 25, 40, 5); }
+  }
+  for (const R of roadsIn(view.x0 - EDGE, view.x1 + EDGE)) for (let y = Math.floor(view.y0 / 40) * 40; y < view.y1; y += 40) {
+    if ((inSea(R + EDGE + 6, y) || inSea(R - EDGE - 6, y)) && Math.abs(y + 20 - nearestRoad(y + 20)) > EDGE + 30) { ctx.fillRect(R - EDGE - 8, y, 6, 40); ctx.fillRect(R + EDGE + 2, y, 6, 40); }
+  }
+}
 function drawRoads(view) {
   const xa = view.x0, xb = view.x1, ya = view.y0, yb = view.y1;
   const hRoads = roadsIn(view.y0 - EDGE, view.y1 + EDGE), vRoads = roadsIn(view.x0 - EDGE, view.x1 + EDGE);
@@ -5212,6 +5257,9 @@ function drawBigMap(w, h) {
   ctx.fillStyle = 'rgba(0,0,0,0.82)'; ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = '#c9a964'; ctx.fillRect(L.x0, L.y0, L.S, L.S);
   ctx.save(); ctx.beginPath(); ctx.rect(L.x0, L.y0, L.S, L.S); ctx.clip();
+  ctx.fillStyle = '#3a8fd0'; ctx.beginPath();                                   // a tenger a térképen
+  for (let i = 0; i <= 120; i++) { const th = i / 120 * Math.PI * 2, r = seaRadius(th), m = worldToMap(L, SEA_X + Math.cos(th) * r, SEA_Y + Math.sin(th) * r); if (i) ctx.lineTo(m.x, m.y); else ctx.moveTo(m.x, m.y); }
+  ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#555';
   for (const r of roadsIn(c.y - MAP_RADIUS, c.y + MAP_RADIUS)) ctx.fillRect(L.x0, worldToMap(L, 0, r).y - 1.5, L.S, 3);
   for (const r of roadsIn(c.x - MAP_RADIUS, c.x + MAP_RADIUS)) ctx.fillRect(worldToMap(L, r, 0).x - 1.5, L.y0, 3, L.S);
@@ -5530,6 +5578,7 @@ function render() {
 
   ctx.fillStyle = sandPattern;
   ctx.fillRect(view.x0, view.y0, view.x1 - view.x0, view.y1 - view.y0);
+  drawSea(view);
   ctx.fillStyle = 'rgba(190,150,85,0.25)';
   for (const ch of chunks) {
     for (const d of ch.dunes) {
@@ -5538,6 +5587,7 @@ function render() {
     }
   }
   drawRoads(view);
+  drawBridges(view);
   drawRail(view);
   const stations = stationsIn(view.x0, view.y0, view.x1, view.y1);
   for (const st of stations) drawStation(st, n);
@@ -5591,6 +5641,9 @@ function render() {
   const sk = SKINS[activeSkin];
   if (player.dead) drawCorpse(player.x, player.y, player.angle, sk.shirt, sk.head);
   else if (!player.inCar && !player.riding && !player.inHouse && !player.abduct) drawPerson(player.x, player.y, player.angle, player.walk, sk.shirt, sk.head, true, sk.legs, sk.hat, sk.pattern);
+  if (!player.inCar && !player.dead && !player.inHouse && !player.riding && inWater(player.x, player.y)) {   // úszik: hullámgyűrű körülötte
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(player.x, player.y, 16 + 3 * Math.sin(clock * 6), 0, Math.PI * 2); ctx.stroke();
+  }
   if (clock < (player.shieldUntil || 0) && !player.dead && !player.inHouse) { ctx.strokeStyle = `rgba(120,220,255,${0.5 + 0.4 * Math.sin(clock * 14)})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(player.x, player.y, 26, 0, Math.PI * 2); ctx.stroke(); }   // védőgyűrű újraéledés után
   drawOthers(inView);                                // a többi játékos (többjátékos módban)
   for (const c of cars) drawCar(c, n);

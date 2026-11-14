@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.37.0 – 2026-11-14
+- **Tenger** 🌊 (ADR-0045): a pálya közepén, a kezdőhelytől délre (kb. 11 km-re) egy nagy, kb. 17 km széles tenger hullámos parttal, homokos stranddal, hullámzó vízzel. Az utak és a vasút **hidakon** kelnek át (korláttal). A vízben **úszni** lehet (lassan), az autó alig halad, a ló is úszik. A vízben nincsenek házak, kutak, megállók, sziklák. A nagy térképen (K) is látszik
+
 ## 0.36.0 – 2026-11-14
 - **Többjátékos mód** 🌐 (ADR-0044): új `server.js` – a `node server.js` paranccsal elindul a játék saját szervere (függőség nélkül), és a böngészőben a `http://localhost:8080` címen játszható; a hálózat többi gépe a `http://<a géped IP-címe>:8080` címen csatlakozhat. A játékosok egy világban látják egymást (gyalog vagy járműben, a szkinjükkel, „🌐 Játékos 123” névtáblával), simán mozognak
 - Megszakadt kapcsolatnál a játék magától újracsatlakozik; menü, telefon vagy háttérbe tett lap alatt is küld életjelet, így a szerver nem dob ki. A szerver csak a saját oldaláról enged csatlakozni, és a lassú / nem olvasó klienst kidobja

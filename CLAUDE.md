@@ -22,6 +22,7 @@ Fontos állandók a `game.js` elején: `WORLD` (pályaméret, a régi 10 000 px-
 
 Felépítés a `game.js`-en belül:
 - **Világ chunkokban**: a pálya 1000×1000 px-es darabokból áll (`getChunk`), amelyek menet közben, determinisztikusan generálódnak (akadályok, villanyoszlopok, dűnék). Ütközésnél és rajzolásnál mindig csak a közeli chunkokat nézd (`chunksAround`, `chunksIn`) – soha ne járd be az egész világot.
+- **Tenger** (ADR-0045): `inSea(x, y, pad)` / `inWater` (víz és nem híd) tiszta függvények, `seaRadius`, `SEA_X/Y/R`; a generálók (házak, kutak, megállók, troli, ló, állomás, kaktusz, dűne) szűrnek – a sorsolás UTÁN, hogy a többi változatlan maradjon; az utak hidakon kelnek át (`drawBridges`). Új generált dolgot a vízből szűrj ki.
 - **Utak**: rácsban, `ROAD_SPACING` távolságra (`nearestRoad`, `onRoad`, `roadsIn`).
 - **Autók**: egy közös fizika (`updateCarPhysics`) a játékos és az AI autók számára; az AI a `aiCarInput`-ban dönt (sáv követése, kereszteződésben fordulás).
 - **Szereplők**: `npcs` (gyalogos / csöves), `aiCars`, `bullets`; a játékostól messze lévőket a `spawnAround` eltünteti, a közelben újakat hoz létre.
