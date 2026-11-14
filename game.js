@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.42.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.43.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -40,6 +40,8 @@ const CHEAT_MONEY = 10000;                       // Ctrl+S (Mac: Cmd+S): pénz-c
 window.addEventListener('keydown', e => {
   unlockAudio();
   if (account.open) { accountKey(e); return; }                    // a profil-ablak (név, jelszó) minden mást megelőz (a csalókódot is)
+  if (e.code === 'F1') { if (e.preventDefault) e.preventDefault(); if (!e.repeat) toggleHelp(); return; }
+  if (help.open) { if (!e.repeat) helpKey(e.code); return; }
   if (e.code === 'KeyE' && player.moon && !player.moon.horror && !e.repeat) { if (nearEscape()) enterHorror(); return; }   // szökés a Holdról
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') {
     if (e.preventDefault) e.preventDefault();
@@ -83,6 +85,7 @@ window.addEventListener('mousedown', e => {
   unlockAudio();
   mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
   if (account.open) { if (e.button === 0) accountClick(e.clientX, e.clientY); return; }
+  if (help.open) { if (e.button === 0) helpClick(e.clientX, e.clientY); return; }
   if (donate.open) { if (e.button === 0) donateClick(e.clientX, e.clientY); return; }
   if (bank.open) { if (e.button === 0) bankClick(e.clientX, e.clientY); return; }
   if (shop.open) { if (e.button === 0) shopClick(e.clientX, e.clientY); return; }
@@ -97,7 +100,7 @@ window.addEventListener('mousedown', e => {
 window.addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
 let wheelAcc = 0;
 window.addEventListener('wheel', e => {             // görgő: fegyverváltás (ha nincs nyitott ablak); a kis (touchpad-)elmozdulásokat összegyűjti
-  if (menu.open || donate.open || bank.open || shop.open || school.open || tv.open || phone.open || taxiMenu.open || mapView.open || !controllable()) return;
+  if (help.open || menu.open || donate.open || bank.open || shop.open || school.open || tv.open || phone.open || taxiMenu.open || mapView.open || !controllable()) return;
   if (!e.deltaY) return;
   wheelAcc += e.deltaY;
   if (Math.abs(wheelAcc) < 60) return;
@@ -5322,7 +5325,7 @@ function drawHud(w, h) {
   const left = isDay ? HALF_CYCLE - time : CYCLE - time;
   const speed = Math.round(Math.hypot(car.vx, car.vy) / 4);
   ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.fillRect(10, 10, 400, 238);
+  ctx.fillRect(10, 10, 570, 238);
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 16px sans-serif';
   ctx.fillText(`${isDay ? '☀ Nappal' : '☾ Éjszaka'} – ${isDay ? 'éjszakáig' : 'nappalig'}: ${fmt(left / timeScale)}`, 20, 34);
@@ -5399,8 +5402,8 @@ function drawHud(w, h) {
   ctx.font = '14px sans-serif'; ctx.fillStyle = '#fff';
   if (tornado && tornado.power > 0.3) drawEdgeArrow(tornado.x, tornado.y, '#ff6a3a', `🌪 ${Math.round(dist(tornado, player) / 10)} m`, w, h);
   ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 176);
-  ctx.fillText('Space: kézifék (drift = pénz) · Bal klikk / F: lövés · G / görgő: fegyver · J: saját bombázó', 20, 196);
-  ctx.fillText(`H: vihar · T: idő (${timeScale}x) · X: taxi · M: térkép · Q: háború · P: telefon · O: eldob · Esc: menü`, 20, 216);
+  ctx.fillText('Space: kézifék (drift = pénz) · Bal klikk / F: lövés · G / görgő: fegyver · B: bomba', 20, 196);
+  ctx.fillText(`T: idő (${timeScale}x) · X: taxi · M: térkép · P: telefon · Tab: játékosok · F1: súgó · Esc: menü`, 20, 216);
   ctx.fillStyle = '#bbb'; ctx.font = '12px sans-serif';
   ctx.fillText(`Az úton ${SPEED_LIMIT} km/h felett jön a rendőrség · tankolni a ⛽ kutaknál lehet`, 20, 238);
 
@@ -5478,6 +5481,105 @@ function drawHud(w, h) {
     ctx.moveTo(mouse.x + 4, mouse.y); ctx.lineTo(mouse.x + 14, mouse.y);
     ctx.stroke();
   }
+}
+
+// ===== Súgó (F1): minden irányítás és szabály röviden =====
+const help = { open: false, page: 0 };
+const HELP_PAGES = [
+  { title: '🎮 Alapok', lines: [
+    ['WASD / nyilak', 'mozgás; autóban gáz, fék, kormány'],
+    ['Shift', 'futás (gyalog)'],
+    ['Space', 'kézifék – a drift pénzt hoz (kombó)'],
+    ['E', 'autóba ülés / kiszállás, ajtó, ló, busz, vonat, taxi, pult – a képernyő alján kiírja, mit tehetsz'],
+    ['Esc', 'menü: autó- és szkinválasztás, vásárlás, L: be- / kijelentkezés'],
+    ['M', 'térkép (kattintással jelölő pont; házban az M a rádió)'],
+    ['T', 'idő gyorsítása (1x ↔ 60x)'],
+    ['H', 'homokvihar be / ki'],
+    ['Tab (nyomva)', 'aktív játékosok listája'],
+    ['F1', 'ez a súgó'],
+    ['Ctrl+S', 'csalókód: +$10 000'],
+  ] },
+  { title: '🔫 Harc és fegyverek', lines: [
+    ['Bal klikk / F', 'lövés'],
+    ['G / görgő', 'fegyverváltás: pisztoly, sörétes, gépfegyver, rakétavető (10), ballisztikus rakéta (3), atombomba (1)'],
+    ['B', 'bomba lerakása (max 5, idővel pótlódik); repülőből: bombázás'],
+    ['J', 'saját bombázó hívása (30 mp várakozás)'],
+    ['V', 'repülőben: fegyverváltás (bomba / rakéta / atombomba)'],
+    ['Q', 'háború indítása (4 perc, tankok, a végén atombomba)'],
+    ['Háborúban', 'a környékén egyszer saját sereg érkezik; ha meghalsz, újraélsz'],
+    ['Rendőrség', 'üldöz: 145 km/h felett az úton, ittas vezetésért, robbantásért, rendőrre lövésért; lerázhatod, vagy letartóztatnak'],
+    ['Tornádó', 'a játékost üldözi – menekülj, a házakat lerombolja'],
+    ['Cápák', 'a tengerben úszót támadják; lőhetők (pénz jár érte)'],
+  ] },
+  { title: '💰 Pénz és munka', lines: [
+    ['Szállítás', 'automatikus küldetés: vidd a csomagot a jelölt helyre, a sorozat szorzót ad'],
+    ['Gyár', 'házban a Space: zacskó felvétele, dobozba rakása; percenként $500 fizetés, ha dolgoztál'],
+    ['Bank', 'hitel $100–$2000 (+20% díj), a bevétel 25%-a automatikusan törleszt'],
+    ['Iskola', 'E a táblánál: matekóra, jó válaszonként pénz; a gonosz tanár a rohanót elkapja (bírság)'],
+    ['Csövesek', 'E: adományozás ($1–$200)'],
+    ['Taxi', 'X: hívás, $5; E: úti cél választása'],
+    ['Busz / troli / vonat', 'megállóban E: $2 / $3 / $4 a jegy'],
+    ['Bérlés', 'parkolóban E: autóbérlés $15; Esc menü: saját autók, vásárlás'],
+    ['Szint', 'a pénz és a feladatok XP-t adnak; új autók, szkinek, tuning a szinttel és pénzzel'],
+  ] },
+  { title: '🏠 Házak és szolgáltatások', lines: [
+    ['Ház', 'ajtónál E: bemenés; lent az ajtónál E: kimenés'],
+    ['Bolt', 'pultnál E: étel, elsősegély, benzin, bomba, sorsjegy'],
+    ['Étterem', 'pultnál E: kóla, leves, gulyás, pizza… életet és kijózanodást ad'],
+    ['Kocsma', '1 / 2: sör / bor; részegen imbolyogsz, a vezetés elromlik, elájulhatsz'],
+    ['Szerelő', 'autóval a műhely előtt, pultnál E: tuning, fényezés, nitró'],
+    ['Telefonbolt', 'egyszerű $60, okostelefon $200'],
+    ['Tévé / rádió', 'E: tévé; házban R: következő rádiószám, M: be / ki'],
+    ['Benzin', 'a ⛽ kutaknál állj meg és tankolj; a lóhoz és biciklihez nem kell'],
+    ['Felhőkarcoló', 'a belvárosban magas házak; repülővel nekimehetsz'],
+  ] },
+  { title: '📱 Telefon (P)', lines: [
+    ['P', 'telefon megnyitása; számgombok (1–9): app választása; Esc: vissza / bezárás'],
+    ['Robi', 'csevegő (Enter: küldés): kulcsszavakra válaszol, jelölhet a térképen, taxit hívhat'],
+    ['Játékok', 'kígyó (nyilak / WASD), flappy (Space); a rekordokat menti'],
+    ['Videók, hírek', 'rövid videók és a játék eseményeinek híre'],
+    ['O', 'telefon eldobása – a kijelzője összetörik; E: felvétel; javítás a telefonboltban'],
+  ] },
+  { title: '👽 Különleges események', lines: [
+    ['Űrlények', '3 percenként üldöznek; ha elkapnak, a Hold-börtönbe visznek'],
+    ['Szökés', 'a Holdon a résnél E: Fordított Világ; ott lőj le 3 démogorgont (életcsíkjuk van)'],
+    ['Lovak', 'E: lovaglás (ingyen, benzin nélkül; nem úgy kormányozható, mint az autó)'],
+    ['Repülő', 'leparkolt gépnél E: felszállás; S: lassítás, E: leszállás vagy kiugrás'],
+    ['Tenger', 'a pálya közepén; hidak az utakon, úszás közben cápák és halak'],
+    ['Többjátékos', 'profil (név + jelszó vagy Google); a mentésed a szerveren van, L: kijelentkezés'],
+  ] },
+];
+function toggleHelp() { help.open = !help.open; help.page = 0; for (const k in keys) keys[k] = false; mouse.down = false; }
+function helpKey(code) {
+  if (code === 'Escape') help.open = false;
+  else if (code === 'ArrowRight' || code === 'KeyD' || code === 'Space' || code === 'Enter') help.page = (help.page + 1) % HELP_PAGES.length;
+  else if (code === 'ArrowLeft' || code === 'KeyA') help.page = (help.page + HELP_PAGES.length - 1) % HELP_PAGES.length;
+}
+function helpClick(x, y) {                          // jobb fele: következő oldal, bal fele: előző
+  help.page = (help.page + (x > window.innerWidth / 2 ? 1 : HELP_PAGES.length - 1)) % HELP_PAGES.length;
+}
+function drawHelp(w, h) {
+  const pg = HELP_PAGES[help.page], pw = Math.min(w - 20, 820), ph = 110 + pg.lines.length * 30;
+  const x = (w - pw) / 2, y = Math.max(10, (h - ph) / 2);
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(14,16,28,0.96)'; ctx.fillRect(x, y, pw, ph);
+  ctx.strokeStyle = '#ffd23a'; ctx.lineWidth = 2; ctx.strokeRect(x, y, pw, ph);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 22px sans-serif';
+  ctx.fillText(`${pg.title}  (${help.page + 1}/${HELP_PAGES.length})`, w / 2, y + 36);
+  ctx.textAlign = 'left'; ctx.font = '14px sans-serif';
+  const kw = 150;
+  pg.lines.forEach(([k, t], i) => {
+    const ry = y + 72 + i * 30;
+    ctx.fillStyle = '#7df'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(k, x + 22, ry);
+    ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif';
+    let line = '', ly = ry;                         // a hosszú sort két sorba töri
+    for (const word of t.split(' ')) { if (ctx.measureText(line + word).width > pw - kw - 50 && line) { ctx.fillText(line, x + kw + 22, ly); line = ''; ly += 16; } line += word + ' '; }
+    ctx.fillText(line, x + kw + 22, ly);
+  });
+  ctx.textAlign = 'center'; ctx.fillStyle = '#9ab'; ctx.font = '12px sans-serif';
+  ctx.fillText('◀ ▶ / kattintás: oldalváltás · F1 vagy Esc: bezárás', w / 2, y + ph - 16);
+  ctx.restore();
 }
 
 // ===== Aktív játékosok (Tab) =====
@@ -6011,8 +6113,9 @@ function render() {
   if (tv.open) drawTv(w, h);
   if (phone.open) drawPhone(w, h);
   if (account.open) drawAccount(w, h);
+  if (help.open) drawHelp(w, h);
   syncGoogleButton();                               // a Google-gomb (DOM) a profil-ablakkal együtt látszik / tűnik el
-  if (canvas.style) canvas.style.cursor = account.open || menu.open || donate.open || bank.open || shop.open || school.open || tv.open || phone.open || taxiMenu.open || mapView.open ? 'default' : 'none';   // ablakban a szokásos egérmutató látszik (a célkereszt a játékban)
+  if (canvas.style) canvas.style.cursor = help.open || account.open || menu.open || donate.open || bank.open || shop.open || school.open || tv.open || phone.open || taxiMenu.open || mapView.open ? 'default' : 'none';   // ablakban a szokásos egérmutató látszik (a célkereszt a játékban)
   if (taxiMenu.open) drawTaxiMenu(w, h);
   if (mapView.open) drawBigMap(w, h);
   if (taxiTrip) {                                    // utazás: elsötétül, felirat
@@ -6028,7 +6131,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   netInterp(dt);                                    // a többi játékos akkor is mozog, ha nálunk menü / telefon van nyitva
-  if (!account.open && !menu.open && !donate.open && !bank.open && !shop.open && !school.open && !tv.open && !phone.open && !taxiMenu.open && !mapView.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
+  if (!help.open && !account.open && !menu.open && !donate.open && !bank.open && !shop.open && !school.open && !tv.open && !phone.open && !taxiMenu.open && !mapView.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
     time = (time + dt * timeScale) % CYCLE;
     clock += dt;
     update(dt);
