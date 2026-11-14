@@ -5,6 +5,10 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.34.0 – 2026-11-14
+- **Fegyvertár** (ADR-0042): **G** vagy egérgörgő – fegyverváltás, bal klikk / F – tűz. Hat fegyver: 🔫 pisztoly, 💥 sörétes puska (6 sörét legyezőben), 🔥 gépfegyver (nagyon gyors), 🎯 rakétavető (10 rakéta, becsapódáskor felrobban), 🚀 **ballisztikus rakéta** (3 db, oda csapódik be, ahová az egérrel célzol, max. 2500 px), ☢ **atombomba** (1 db: lerakod, 15 mp múlva felrobban – menekülj legalább 1000 px-re!). A nehézfegyverek lőszere idővel visszatöltődik (rakétavető 15 mp, rakéta 60 mp, atombomba 5 perc). A ballisztikus rakéta és az atombomba ★★, a rakétavető ★ körözést hoz; a saját rakétavető-lövés közelről legfeljebb 30 életet visz el. Ha meghalsz, a lerakott atombombát hatástalanítják. A HUD-on látszik a kiválasztott fegyver és a lőszer
+- **Saját bombázó**: **J** – a saját bombázó repülőgéped melléd száll (tele: 30 bomba, 6 rakéta, 1 atombomba), 30 mp-enként hívható; E-vel felszállsz, B-vel bombázol, V-vel vált a fegyverek között
+
 ## 0.33.0 – 2026-11-14
 - **Saját sereg** 🪖 (ADR-0036): amint a háború 900 px-es körzetébe érsz, azonnal megjelenik körülötted a saját seregeid (piros egyenruha): 14 katona és 1 tank. Követnek, minden ellenséget lőnek (a zöld és a kék sereg is rájuk lő), erősítést kapnak (5 mp-enként egy katona). A saját sereg golyója és tanklövedéke téged és a polgárokat nem bánt, a te lövésed és bombád őket nem. A HUD-on látszik a létszámuk. A háború végén hazamennek
 - **Telefon-appok** (ADR-0041): a telefon főképernyővel indul, 4 appal: 💬 Robi (a csevegés), 🎮 **Játékok** (🐍 Kígyó – nyilak / WASD, 🛩 Repülő – Space / kattintás; rekordok a mentésben), 📺 **Videók** (6 rövid klip: híradó, Peppa a sárban, gólgála, nagydíj, tornádó-felvétel, atomgomba), 📰 **Hírek** (élő állapotsorok és a játék legfrissebb eseményei: háború, atombomba, megszállás, tornádó, homokvihar, űrlények, rakéta, repülőbaleset, szintlépés). Esc: egy szint vissza

@@ -40,7 +40,7 @@ eval(src + `
   set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
   set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, bank, LOAN_MIN, LOAN_MAX, LOAN_FEE, FACTORY_WAGE, WAGE_PERIOD, BOX_SIZE, BELT, bombs, bombInv, BOMB_FUSE, BOMB_RADIUS, BOMB_MAX, BOMB_REGEN, get taxi(){return taxi}, get taxiTrip(){return taxiTrip}, taxiMenu, TAXI_FARE, taxiDestinations, nearestStation, stationCache, STATION_CACHE_MAX, raiseWanted,
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
-  get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, TORNADO_CHASE, horsesIn, nearestHorse, usedHorses, droppedHorses, dropPhone, pickUpPhone, nearestDroppedPhone, crackText, DROPPED_PHONE_MAX, explode, phoneBack, openApp, phoneClick, snakeNew, snakeStep, snakeSteer, snakeFood, SNAKE_N, SNAKE_STEP, flappyNew, flappyFlap, flappyStep, FLAP_H, FLAP_GAP, FLAP_SPACE, FLAP_BIRD_X, PHONE_APPS, PHONE_VIDEOS, newsLog, addNews, newsLive, downtown, planeCrash, callArmy, ARMY_JOIN, ARMY_SIZE, ARMY_TANKS, ARMY_REINFORCE, ARMY_FOLLOW, RESPAWN_SHIELD, WAR_RESPAWN_DIST, WAR_RESPAWN_RANGE, PLANE_MISSILES, PLANE_ATOMS, ATOM_FALL, PLAYER_MISSILE_RANGE, PLANE_WEAPONS, cyclePlaneWeapon, dropWarMissiles, planes, bombers, airBombs, spawnParkedPlane, sendBomber, mountPlane, leavePlane, nearestPlane, PLANE_MIN, PLANE_MAX, PLANE_LAND, PLANE_AMMO, BOMBER_EVERY, AIRBOMB_FALL, AIRBOMB_RADIUS, phone, robiReply, openPhone, closePhone, sendPhone, tickPhone, norm, compass, PHONE_ITEMS, missiles, garrison, get occupation(){return occupation}, launchMissile, missileImpact, startOccupation, endOccupation, updateOccupation, MISSILE_EVERY, MISSILE_FLIGHT, MISSILE_RADIUS, MISSILE_HOUSES, OCCUPY_TIME, GARRISON, LIBERATE_BOUNTY, OCCUPY_RADIUS, callWar, WAR_REINFORCE, WAR_TANKS, TANK_HP, TANK_BOUNTY, TANK_RELOAD, NUKE_WARN, NUKE_KILL, NUKE_RADIUS, NUKE_HOUSES, warShells, craters, get nukeFx(){return nukeFx}, set nukeFx(v){nukeFx=v}, nuke, spawnSoldier, callWar, get war(){return war}, soldiers, fallen, warClock, startWar, endWar, shell, killSoldier, set warsOn(v){warsEnabled=v}, WAR_FIRST, WAR_LIFE, WAR_SOLDIERS, SOLDIER_HP, SOLDIER_BOUNTY, WAR_GAP_MIN, indoor, pickErrand, houseService, updateIndoor, set errands(v){errandsEnabled=v}, AI_REFUEL_BELOW, AI_FUEL_FLOOR, AI_FUEL_USE, ERRAND_EVERY, ERRAND_TIMEOUT, stationsIn, trainPose, nextTrainIn, getTrain, trainsIn, railStopsIn, onPlatform, TRAIN_FARE, TRAIN_DWELL, TRAIN_PERIOD, STOP_SPACE, STOP_X0, RAIL_Y0, RAIL_SPACE, RAIL_GAP, TRAIN_LEN, PLATFORM, set trainShift(v){trainShift=v}, hpFraction, ESCAPE_SPOT, HORROR_KILLS, DEMO_HIT, DEMO_HP, MAX_DEMOS, aliens, alienClock, spawnAliens, shootAlien, set aliensOn(v){aliensEnabled=v}, ALIEN_INTERVAL, ALIEN_COUNT, ALIEN_SPEED, ALIEN_CHASE_TIME, ALIEN_BOUNTY, ABDUCT_TIME, MOON_TERM, CHEAT_MONEY, HORSE_CELL, HORSE_TROT, HORSE_GALLOP, skidMarks, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
+  get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, TORNADO_CHASE, horsesIn, nearestHorse, usedHorses, droppedHorses, WEAPONS, arsenal, cycleWeapon, fireWeapon, nukeDevices, callOwnPlane, curWeapon, NUKE_FUSE, MISSILE_MAX_RANGE, OWN_PLANE_CD, dropPhone, pickUpPhone, nearestDroppedPhone, crackText, DROPPED_PHONE_MAX, explode, phoneBack, openApp, phoneClick, snakeNew, snakeStep, snakeSteer, snakeFood, SNAKE_N, SNAKE_STEP, flappyNew, flappyFlap, flappyStep, FLAP_H, FLAP_GAP, FLAP_SPACE, FLAP_BIRD_X, PHONE_APPS, PHONE_VIDEOS, newsLog, addNews, newsLive, downtown, planeCrash, callArmy, ARMY_JOIN, ARMY_SIZE, ARMY_TANKS, ARMY_REINFORCE, ARMY_FOLLOW, RESPAWN_SHIELD, WAR_RESPAWN_DIST, WAR_RESPAWN_RANGE, PLANE_MISSILES, PLANE_ATOMS, ATOM_FALL, PLAYER_MISSILE_RANGE, PLANE_WEAPONS, cyclePlaneWeapon, dropWarMissiles, planes, bombers, airBombs, spawnParkedPlane, sendBomber, mountPlane, leavePlane, nearestPlane, PLANE_MIN, PLANE_MAX, PLANE_LAND, PLANE_AMMO, BOMBER_EVERY, AIRBOMB_FALL, AIRBOMB_RADIUS, phone, robiReply, openPhone, closePhone, sendPhone, tickPhone, norm, compass, PHONE_ITEMS, missiles, garrison, get occupation(){return occupation}, launchMissile, missileImpact, startOccupation, endOccupation, updateOccupation, MISSILE_EVERY, MISSILE_FLIGHT, MISSILE_RADIUS, MISSILE_HOUSES, OCCUPY_TIME, GARRISON, LIBERATE_BOUNTY, OCCUPY_RADIUS, callWar, WAR_REINFORCE, WAR_TANKS, TANK_HP, TANK_BOUNTY, TANK_RELOAD, NUKE_WARN, NUKE_KILL, NUKE_RADIUS, NUKE_HOUSES, warShells, craters, get nukeFx(){return nukeFx}, set nukeFx(v){nukeFx=v}, nuke, spawnSoldier, callWar, get war(){return war}, soldiers, fallen, warClock, startWar, endWar, shell, killSoldier, set warsOn(v){warsEnabled=v}, WAR_FIRST, WAR_LIFE, WAR_SOLDIERS, SOLDIER_HP, SOLDIER_BOUNTY, WAR_GAP_MIN, indoor, pickErrand, houseService, updateIndoor, set errands(v){errandsEnabled=v}, AI_REFUEL_BELOW, AI_FUEL_FLOOR, AI_FUEL_USE, ERRAND_EVERY, ERRAND_TIMEOUT, stationsIn, trainPose, nextTrainIn, getTrain, trainsIn, railStopsIn, onPlatform, TRAIN_FARE, TRAIN_DWELL, TRAIN_PERIOD, STOP_SPACE, STOP_X0, RAIL_Y0, RAIL_SPACE, RAIL_GAP, TRAIN_LEN, PLATFORM, set trainShift(v){trainShift=v}, hpFraction, ESCAPE_SPOT, HORROR_KILLS, DEMO_HIT, DEMO_HP, MAX_DEMOS, aliens, alienClock, spawnAliens, shootAlien, set aliensOn(v){aliensEnabled=v}, ALIEN_INTERVAL, ALIEN_COUNT, ALIEN_SPEED, ALIEN_CHASE_TIME, ALIEN_BOUNTY, ABDUCT_TIME, MOON_TERM, CHEAT_MONEY, HORSE_CELL, HORSE_TROT, HORSE_GALLOP, skidMarks, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   school, makeQuestion, TEACHER_HOME, SHOUT, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, nearestAlex, talkToAlex, ALEX_LINES, selectCar, tv, TV_CHANNELS, atTv, RESTAURANT_ITEMS, MECHANIC_ITEMS, TUNE_MAX, TUNE_SPEED, PAINTS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
@@ -1926,6 +1926,99 @@ G.npcs.length = 0; G.aiCars.length = 0;
   G.aliensOn = false; reset();
 }
 
+// --- fegyvertár: többféle fegyver, ballisztikus rakéta, atombomba, saját bombázó ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false; G.errands = false; G.warsOn = false;
+  const home = { x: G.C + 300000, y: G.C + 300 };
+  const rst = () => { G.bullets.length = 0; G.missiles.length = 0; G.nukeDevices.length = 0; G.craters.length = 0; G.nukeFx = null; G.planes.length = 0; G.clearWanted(); G.arsenal.sel = 0; G.arsenal.latch = false;
+    for (const w of G.WEAPONS) if (w.max) { G.arsenal.ammo[w.id] = w.max; G.arsenal.regen[w.id] = w.regen; }
+    Object.assign(G.player, { ...home, angle: 0, inCar: false, inHouse: null, riding: null, dead: 0, arrested: 0, passedOut: 0, health: 100, abduct: null, moon: null, cooldown: 0, shieldUntil: 0 }); Object.assign(G.car, { x: home.x - 20000, y: home.y, vx: 0, vy: 0 }); };
+  rst();
+  check('6 fegyver van: pisztoly, sörétes, gépfegyver, rakétavető, ballisztikus rakéta, atombomba', G.WEAPONS.map(w => w.id).join() === 'pistol,shotgun,mg,rpg,missile,nuke' && G.curWeapon().id === 'pistol');
+  press('KeyG'); check('G: következő fegyver', G.curWeapon().id === 'shotgun');
+  listeners.wheel({ deltaY: -100 }); check('a görgő is vált (visszafelé)', G.curWeapon().id === 'pistol');
+  listeners.wheel({ deltaY: -100 }); check('körbe forog (a pisztoly előtt az atombomba)', G.curWeapon().id === 'nuke');
+  const s0 = G.arsenal.sel; listeners.wheel({ deltaY: 0 }); listeners.wheel({ deltaY: 20 });
+  check('a vízszintes görgetés és a kis (touchpad-)mozdulat még nem vált', G.arsenal.sel === s0);
+  listeners.wheel({ deltaY: 45 }); check('az összegyűlt elmozdulás vált', G.arsenal.sel === (s0 + 1) % G.WEAPONS.length);
+  rst(); G.arsenal.sel = 3; key('KeyF', true); press('KeyG'); step(2); key('KeyF', false);
+  check('nyomva tartott tűzgombbal a rakétára váltva nem sül el rögtön', G.curWeapon().id === 'missile' && G.arsenal.ammo.missile === 3);
+  // sörétes
+  rst(); G.arsenal.sel = 1; key('KeyF', true); step(1); key('KeyF', false);
+  check('a sörétes egyszerre 6 sörétet lő, rövid hatótávval', G.bullets.length === 6 && G.bullets.every(b => b.life <= 0.35));
+  // gépfegyver gyorsabban lő, mint a pisztoly
+  const count = sel => { rst(); G.arsenal.sel = sel; key('KeyF', true); let n = 0; for (let i = 0; i < 60; i++) { const before = G.bullets.length; step(1); n += Math.max(0, G.bullets.length - before); } key('KeyF', false); return n; };
+  const pistolN = count(0), mgN = count(2);
+  check('a gépfegyver jóval gyorsabban lő, mint a pisztoly', mgN >= pistolN * 2 && pistolN >= 5);
+  // rakétavető
+  rst(); G.arsenal.sel = 3; const ammo0 = G.arsenal.ammo.rpg;
+  key('KeyF', true); step(1); key('KeyF', false);
+  check('a rakétavető rakétát lő (lassabb lövedék), fogy a lőszere', G.bullets.length === 1 && G.bullets[0].rocket && G.arsenal.ammo.rpg === ammo0 - 1);
+  const ac = G.spawnAiCar('h', 1, G.C, 0); Object.assign(ac, { x: G.player.x + 400, y: G.player.y, vx: 0, vy: 0 });
+  step(60);
+  check('a rakéta becsapódáskor felrobban (az autó roncs lesz), ★ körözés jár', G.bullets.length === 0 && ac.wrecked && G.wanted.level === 1);
+  G.aiCars.length = 0;
+  // közvetlen közelről lőve a rakéta legfeljebb 30 életet visz el (nem öl meg egy lövéssel)
+  G.aiCars.length = 0; G.player.health = 100; G.player.cooldown = 0; const wallP = { x: G.player.x + 30, y: G.player.y };
+  G.bullets.push({ x: wallP.x, y: wallP.y, vx: 0, vy: 0, life: 0.001, from: 'player', rocket: true }); step(2);
+  check('a saját rakéta közvetlen közelről legfeljebb 30 életet visz el', G.player.health >= 70 && !G.player.dead);
+  G.player.health = 100;
+  G.arsenal.ammo.rpg = 0; G.player.cooldown = 0; const pops0 = G.popups ? G.popups.length : 0; key('KeyF', true); step(30); key('KeyF', false);
+  check('üres tárral nem lő', G.bullets.length === 0);
+  check('üres tárnál a figyelmeztetés nem ismétlődik minden képkockában', G.player.cooldown > 0.3);
+  G.arsenal.regen.rpg = 0.05; step(10);
+  check('a lőszer idővel visszatöltődik', G.arsenal.ammo.rpg === 1);
+  // ballisztikus rakéta: oda csapódik, ahová célzol
+  rst(); G.arsenal.sel = 4; G.clearWanted();
+  G.canvas.width = 1280; G.canvas.height = 720; step(1);
+  listeners.mousedown({ button: 0, clientX: 1280 / 2 + 900, clientY: 720 / 2 + 300 }); step(1); listeners.mouseup({ button: 0 });
+  const ms = G.missiles.find(m => m.side === 'P');
+  check('a ballisztikus rakéta az egérrel megjelölt pontra indul (célkör)', !!ms && Math.abs(ms.tx - (G.player.x + 900)) < 30 && Math.abs(ms.ty - (G.player.y + 300)) < 30 && G.arsenal.ammo.missile === 2 && G.wanted.level === 2);
+  step(1); key('KeyF', true); step(140);
+  check('a rakétához újra meg kell nyomni (nyomva tartva nem ürül ki a tár)', G.arsenal.ammo.missile === 1);
+  key('KeyF', false); step(130); key('KeyF', true); step(1); key('KeyF', false);   // a 2 mp-es újratöltés után
+  check('F-fel előre lő (ha nem az egérrel célzol)', G.arsenal.ammo.missile === 0);
+  const far = G.missiles.filter(m => m.side === 'P').every(m => Math.hypot(m.tx - G.player.x, m.ty - G.player.y) <= G.MISSILE_MAX_RANGE + 1);
+  check('a hatótáv legfeljebb ' + G.MISSILE_MAX_RANGE + ' px', far);
+  step(60 * 5);
+  check('a rakéták becsapódnak (a lövőt nem sebzik, ha messze célzott)', G.missiles.filter(m => m.side === 'P').length === 0 && G.player.health === 100);
+  // atombomba: lerakod, 15 mp, aztán igazi atombomba
+  rst(); G.arsenal.sel = 5;
+  key('KeyF', true); step(1); key('KeyF', false);
+  check('az atombomba élesítve: lerakod, 15 mp-es visszaszámlálás, ★★', G.nukeDevices.length === 1 && G.nukeDevices[0].fuse > G.NUKE_FUSE - 0.2 && G.arsenal.ammo.nuke === 0 && G.wanted.level === 2);
+  key('KeyF', true); step(1); key('KeyF', false);
+  check('csak egy atombombád van (a következő 5 perc múlva)', G.nukeDevices.length === 1);
+  const nx = G.nukeDevices[0].x; key('ShiftLeft', true); key('KeyD', true); step(60 * (G.NUKE_FUSE + 0.5)); key('KeyD', false); key('ShiftLeft', false);
+  check('a visszaszámlálás után az atombomba felrobban (kráter), futva el lehet menekülni', G.nukeDevices.length === 0 && G.craters.length === 1 && !G.player.dead && G.player.x - nx > 1000);
+  rst(); G.arsenal.sel = 5; key('KeyF', true); step(1); key('KeyF', false); step(60 * (G.NUKE_FUSE + 0.5));
+  check('ha nem menekülsz el, az atombomba téged is megöl', G.player.dead > 0);
+  step(240 + 60 * 6);
+  // saját bombázó
+  rst(); press('KeyJ');
+  const own = G.planes.find(p => p.own);
+  check('J: a saját bombázód melléd száll, tele lőszerrel', !!own && Math.hypot(own.x - G.player.x, own.y - G.player.y) < 200 && own.ammo.bomb === 30 && own.ammo.missile === 6 && own.ammo.atom === 1);
+  press('KeyJ');
+  check('30 mp-ig nem hívható újra (egyszerre egy gép)', G.planes.filter(p => p.own).length === 1);
+  Object.assign(G.player, { x: own.x + 30, y: own.y }); press('KeyE');
+  check('fel lehet szállni rá, és a gépen ott a három fegyver', G.car.plane && G.car.planeAmmo === 30 && G.car.planeMissiles === 6 && G.car.planeAtoms === 1);
+  press('KeyJ'); check('repülés közben nem hívhatsz másik gépet', G.planes.filter(p => p.own).length === 0);
+  G.car.planeWeapon = 0; G.selectCar(0);
+  G.planes.length = 0; G.player.x += 3000; step(60 * (G.OWN_PLANE_CD + 1)); press('KeyJ');
+  check('30 mp után újra hívható (a régi saját gép eltűnik)', G.planes.filter(p => p.own).length === 1);
+  check('az atombomba csak 5 percenként jár a saját gépbe', G.planes.find(p => p.own).ammo.atom === 0);
+  // leszállás után a gép továbbra is a tiéd: az újrahívás lecseréli (nem lesz kettő)
+  const ow = G.planes.find(p => p.own); Object.assign(G.player, { x: ow.x + 30, y: ow.y }); press('KeyE'); Object.assign(G.car, { vx: 150, vy: 0 }); step(1); Object.assign(G.car, { vx: 150, vy: 0 }); press('KeyE');
+  check('leszállás után is a saját géped marad', G.planes.filter(p => p.own).length === 1 && !G.car.plane);
+  G.player.x += 3000; step(60 * (G.OWN_PLANE_CD + 1)); press('KeyJ');
+  check('az újrahívás lecseréli (nem lesz kettő)', G.planes.filter(p => p.own).length === 1);
+  // újraéledéskor a lerakott atombomba hatástalan
+  rst(); G.arsenal.sel = 5; key('KeyF', true); step(1); key('KeyF', false); G.damagePlayer(10000); step(240 + 60 * 5);
+  check('ha meghalsz, a lerakott atombombát hatástalanítják', G.nukeDevices.length === 0 && G.player.dead === 0);
+  rst(); G.player.inHouse = { hs: {}, ix: 0, iy: 0, furniture: [] }; G.player.cooldown = 0; G.arsenal.sel = 5; key('KeyF', true); step(1); key('KeyF', false);
+  check('házban nem lehet lőni / atombombát élesíteni', G.nukeDevices.length === 0); G.player.inHouse = null;
+  rst(); G.arsenal.sel = 0; G.planes.length = 0; Object.assign(G.player, { x: G.C + 30000, y: G.C });
+}
+
 // --- eldobható telefon: a földre esve összetörik a kijelzője ---
 {
   G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false; G.errands = false; G.warsOn = false;
@@ -2429,8 +2522,8 @@ G.npcs.length = 0; G.aiCars.length = 0;
   const a_foe = G.soldiers.find(s2 => s2.side === 'A' && !s2.tank), a_fhp = a_foe.hp; Object.assign(a_foe, { x: G.player.x + 600, y: G.player.y + 900, cd: 99 });
   G.bullets.push({ x: a_foe.x - 8, y: a_foe.y, vx: 1100, vy: 0, life: 0.9, from: 'warP' }); step(3);
   check('a saját sereg golyója az ellenséget sebzi', a_foe.hp === a_fhp - 1);
-  const a_me2 = a_army().find(s2 => !s2.tank), mhp = a_me2.hp; Object.assign(a_me2, { x: G.player.x + 700, y: G.player.y + 1200 });
-  G.bullets.push({ x: a_me2.x - 8, y: a_me2.y, vx: 1100, vy: 0, life: 0.9, from: 'warA' }); step(3);
+  const a_me2 = a_army().find(s2 => !s2.tank), mhp = a_me2.hp; Object.assign(a_me2, { x: G.player.x + 700, y: G.nearestRoad(G.player.y + 1200) + 20 });   // akadálymentes helyen (az úton)
+  G.bullets.push({ x: a_me2.x - 8, y: a_me2.y, vx: 1100, vy: 0, life: 0.9, from: 'warA' }); step(1);   // egy képkocka alatt találnia kell (a katona mozog)
   check('az ellenség golyója a saját sereget is sebzi', a_me2.hp === mhp - 1);
   // a te lövésed / bombád a saját seregedet nem bántja
   const a_my3 = a_army().find(s2 => !s2.tank && s2 !== a_me2), a_hp3 = a_my3.hp; Object.assign(a_my3, { x: G.player.x + 300, y: G.player.y });

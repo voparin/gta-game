@@ -17,6 +17,8 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 | E | be- / kiszállás |
 | Space | kézifék (drift, féknyom, füst) |
 | Bal klikk / F | lövés (egérrel célzás) |
+| G / egérgörgő | fegyverváltás (pisztoly, sörétes, gépfegyver, rakétavető, ballisztikus rakéta, atombomba) |
+| J | saját bombázó repülőgép hívása |
 | H | homokvihar be/ki |
 | X | taxi hívása ($5 bárhova) |
 | B | bomba lerakása (3 mp múlva robban) |
@@ -164,6 +166,15 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
   - **okostelefonon még**: „jelöld meg a bankot” (felteszi a térképre, K) és „hívj taxit”
 
 - **Eldobható telefon:** az **O** gombbal eldobhatod a telefont (előre esik, gyalog), és **a földre esve összetörik a kijelzője** 💥. **E**-vel felveheted (a hely a mentésben is megmarad). A repedt telefon használható, de Robi válaszainak egy része nem látszik (▒), és repedés látszik a kijelzőn. A telefonbolt **$30**-ért megjavítja; az új telefon ép.
+
+## Fegyverek
+- **G** vagy az **egérgörgő**: fegyverváltás; **bal klikk / F**: tűz. A kiválasztott fegyver és a lőszere a képernyő tetején látszik.
+  - 🔫 **Pisztoly**, 💥 **sörétes puska** (6 sörét, közelre), 🔥 **gépfegyver** (nagyon gyors) – korlátlan lőszer
+  - 🎯 **Rakétavető** – 10 rakéta, becsapódáskor felrobban (15 mp-enként +1)
+  - 🚀 **Ballisztikus rakéta** – 3 db, oda csapódik be, ahová az egérrel célzol (max. 2500 px), piros célkör jelzi (60 mp-enként +1)
+  - ☢ **Atombomba** – 1 db: lerakod, **15 mp** múlva felrobban – **menekülj legalább 1000 px-re!** (5 percenként +1)
+  - A ballisztikus rakéta és az atombomba ★★, a rakétavető ★ körözést hoz. A saját rakétád közelről legfeljebb 30 életet visz el.
+- **J**: a **saját bombázód** melléd száll, tele bombával, rakétával és egy atombombával (30 mp-enként hívható). E: felszállás, B: bomba, V: fegyverváltás.
 
 ## Saját sereg
 - Amint a **háború 900 pixeles körzetébe érsz**, azonnal megjelenik körülötted a **saját sereged** (piros egyenruha): **14 katona és 1 tank**. Követnek, minden ellenséget lőnek – a zöld és a kék sereg is rájuk lő –, és erősítést kapnak (5 mp-enként egy katona). A képernyő tetején látszik a létszámuk.

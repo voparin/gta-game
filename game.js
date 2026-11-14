@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.33.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.34.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -67,6 +67,8 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyP' && !e.repeat) openPhone();
   if (e.code === 'KeyO' && !e.repeat) dropPhone();
   if (e.code === 'KeyV' && !e.repeat && player.inCar && car.plane && controllable()) cyclePlaneWeapon();
+  if (e.code === 'KeyG') cycleWeapon(1);
+  if (e.code === 'KeyJ') callOwnPlane();
   if (e.code === 'KeyR' && player.inHouse) startRadio();                            // következő szám
   if (e.code === 'Space' && player.inHouse && player.inHouse.factory) factoryAction();
   if (e.code === 'Digit1' || e.code === 'Numpad1') buyDrink('beer');
@@ -90,6 +92,14 @@ window.addEventListener('mousedown', e => {
   if (e.button === 0) mouse.down = true;
 });
 window.addEventListener('mouseup', e => { if (e.button === 0) mouse.down = false; });
+let wheelAcc = 0;
+window.addEventListener('wheel', e => {             // görgő: fegyverváltás (ha nincs nyitott ablak); a kis (touchpad-)elmozdulásokat összegyűjti
+  if (menu.open || donate.open || bank.open || shop.open || school.open || tv.open || phone.open || taxiMenu.open || mapView.open || !controllable()) return;
+  if (!e.deltaY) return;
+  wheelAcc += e.deltaY;
+  if (Math.abs(wheelAcc) < 60) return;
+  cycleWeapon(wheelAcc > 0 ? 1 : -1); wheelAcc = 0;
+});
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; });
 
 // ===== Segédfüggvények =====
@@ -2389,6 +2399,7 @@ function respawn(fromDeath = false) {
   taxiTrip = null; if (taxi) { const i = aiCars.indexOf(taxi); if (i >= 0) aiCars.splice(i, 1); taxi = null; }
   leaveHorse(false);                                 // meghalt lovaglás közben: az autója visszakerül
   leavePlane(false);                                 // repülés közben: a gép lezuhan, az autó visszakerül
+  nukeDevices.length = 0;                            // a lerakott atombombát hatástalanítják (ne öljön meg újra a kezdőhelyen)
   stopRadio();
   clearWanted();
   for (let i = aiCars.length - 1; i >= 0; i--) if (aiCars[i].police) aiCars.splice(i, 1);
@@ -2630,19 +2641,108 @@ function alertPeds(x, y) {
   }
 }
 
+// ===== Fegyvertár (ADR-0042): G / egérgörgő – váltás; bal klikk / F – tűz. A nehézfegyverek lőszere idővel újratöltődik =====
+const WEAPONS = [
+  { id: 'pistol', icon: '🔫', name: 'Pisztoly', cd: 0.14 },
+  { id: 'shotgun', icon: '💥', name: 'Sörétes puska', cd: 0.75 },
+  { id: 'mg', icon: '🔥', name: 'Gépfegyver', cd: 0.06 },
+  { id: 'rpg', icon: '🎯', name: 'Rakétavető', cd: 1.1, max: 10, regen: 15 },
+  { id: 'missile', icon: '🚀', name: 'Ballisztikus rakéta', cd: 2, max: 3, regen: 60, special: true },
+  { id: 'nuke', icon: '☢', name: 'Atombomba', cd: 3, max: 1, regen: 300, special: true },
+];
+const RPG_SPEED = 700, MISSILE_MAX_RANGE = 2500, NUKE_FUSE = 15, OWN_PLANE_CD = 30;
+const arsenal = { sel: 0, ammo: {}, regen: {}, latch: false };
+for (const w of WEAPONS) if (w.max) { arsenal.ammo[w.id] = w.max; arsenal.regen[w.id] = w.regen; }
+const nukeDevices = [];                            // lerakott atombombák: { x, y, fuse }
+const curWeapon = () => WEAPONS[arsenal.sel];
+function cycleWeapon(d = 1) {
+  arsenal.sel = (arsenal.sel + d + WEAPONS.length) % WEAPONS.length;
+  if (mouse.down || keys.KeyF) arsenal.latch = true;                          // nyomva tartott gombbal a rakéta / atombomba ne süljön el rögtön
+  const w = curWeapon();
+  popup(`${w.icon} ${w.name}${w.max ? ` (${arsenal.ammo[w.id]}/${w.max})` : ''}`, '#ffd23a');
+}
+function updateArsenal(dt) {                        // a nehézfegyverek lőszere lassan visszatöltődik
+  for (const w of WEAPONS) {
+    if (!w.max) continue;
+    if (arsenal.ammo[w.id] >= w.max) { arsenal.regen[w.id] = w.regen; continue; }
+    arsenal.regen[w.id] -= dt;
+    if (arsenal.regen[w.id] <= 0) { arsenal.ammo[w.id]++; arsenal.regen[w.id] = w.regen; }
+  }
+  for (let i = nukeDevices.length - 1; i >= 0; i--) {                           // a lerakott atombomba visszaszámol, aztán robban
+    nukeDevices[i].fuse -= dt;
+    if (nukeDevices[i].fuse <= 0) { const n = nukeDevices.splice(i, 1)[0]; nuke(n.x, n.y); }
+  }
+}
+// egy lövés a kiválasztott fegyverrel; true, ha elsült
+function fireWeapon(src, ang, target) {
+  const w = curWeapon();
+  if (w.max && arsenal.ammo[w.id] <= 0) { popup(`${w.icon} Elfogyott: ${w.name} – ${Math.ceil(arsenal.regen[w.id])} mp múlva lesz újra (G: váltás)`, '#f66'); player.cooldown = 1; return false; }   // a figyelmeztetés ne ismétlődjön minden képkockában
+  const off = src.r + 8;
+  if (w.id === 'pistol') shoot(src.x, src.y, ang, 'player', off);
+  else if (w.id === 'mg') shoot(src.x, src.y, ang + (rand() - 0.5) * 0.12, 'player', off);
+  else if (w.id === 'shotgun') {                   // 6 sörét legyezőben, rövidebb hatótáv
+    for (let i = 0; i < 6; i++) { shoot(src.x, src.y, ang + (i - 2.5) * 0.09, 'player', off); bullets[bullets.length - 1].life = 0.35; }
+  } else if (w.id === 'rpg') {                     // lassabb rakéta, becsapódáskor felrobban
+    const cx = Math.cos(ang), cy = Math.sin(ang);
+    bullets.push({ x: src.x + cx * (off + 6), y: src.y + cy * (off + 6), vx: cx * RPG_SPEED, vy: cy * RPG_SPEED, life: 1.4, from: 'player', rocket: true });
+    flashes.push({ x: src.x + cx * off, y: src.y + cy * off, until: clock + 0.1 });
+    alertPeds(src.x, src.y);
+  } else if (w.id === 'missile') {                 // ballisztikus csapás oda, ahová célzol (egérrel), vagy előre
+    let tx = target ? target.x : src.x + Math.cos(ang) * PLAYER_MISSILE_RANGE, ty = target ? target.y : src.y + Math.sin(ang) * PLAYER_MISSILE_RANGE;
+    const d = Math.hypot(tx - src.x, ty - src.y);
+    if (d > MISSILE_MAX_RANGE) { tx = src.x + (tx - src.x) / d * MISSILE_MAX_RANGE; ty = src.y + (ty - src.y) / d * MISSILE_MAX_RANGE; }
+    missiles.push({ x0: src.x - Math.cos(ang) * 2400, y0: src.y - Math.sin(ang) * 2400, tx, ty, t: 0, side: 'P' });
+    raiseWanted(2, '🚀 BALLISZTIKUS RAKÉTÁT LŐTTÉL KI! ★★');
+    popup(`🚀 Ballisztikus rakéta úton – ${MISSILE_FLIGHT} mp múlva csapódik be (célkör)!`, '#ff6a3a');
+  } else if (w.id === 'nuke') {                    // atombomba: lerakod, 15 mp – menekülj legalább 1000 px-re!
+    nukeDevices.push({ x: src.x, y: src.y, fuse: NUKE_FUSE });
+    raiseWanted(2, '☢ ATOMBOMBÁT ÉLESÍTETTÉL! ★★');
+    message = { text: `☢ ATOMBOMBA – ${NUKE_FUSE} mp! MENEKÜLJ!`, until: clock + 3, color: '#ff3030' };
+    addNews('☢ Valaki atombombát élesített a sivatagban!');
+  }
+  if (w.max) arsenal.ammo[w.id]--;
+  player.cooldown = w.cd;
+  return true;
+}
 function updatePlayerShooting(dt) {
   player.cooldown -= dt;
   const byMouse = mouse.down, byKey = !!keys.KeyF;
+  if (!byMouse && !byKey) arsenal.latch = false;
   if (!controllable() || player.riding || player.inHouse || (!byMouse && !byKey) || player.cooldown > 0) return;
+  const w = car.plane && player.inCar ? WEAPONS[2] : curWeapon();           // a repülőből géppuska (a bombákat B dobja)
+  if (w.special && arsenal.latch) return;                                     // a rakétához / atombombához újra meg kell nyomni
   const src = player.inCar ? car : player;
-  let ang = player.inCar ? car.angle : player.angle;
+  let ang = player.inCar ? car.angle : player.angle, target = null;
   if (byMouse) {
     const wx = mouse.x - canvas.width / 2 + lastCam.x, wy = mouse.y - canvas.height / 2 + lastCam.y;
-    ang = Math.atan2(wy - src.y, wx - src.x);
+    ang = Math.atan2(wy - src.y, wx - src.x); target = { x: wx, y: wy };
     if (!player.inCar) player.angle = ang;
   }
-  shoot(src.x, src.y, ang, 'player', src.r + 8);
-  player.cooldown = 0.14;
+  if (car.plane && player.inCar) { shoot(src.x, src.y, ang + (rand() - 0.5) * 0.12, 'player', src.r + 8); player.cooldown = w.cd; return; }
+  if (fireWeapon(src, ang, target) && w.special) arsenal.latch = true;
+  else if (w.special) arsenal.latch = true;                                    // üres tárnál se ismételje a figyelmeztetést
+}
+// ===== Saját bombázó: J – a saját géped melléd száll (tele lőszerrel); egyszerre egy, 30 mp-enként hívható =====
+let ownPlaneAt = -1e9, ownAtomAt = -1e9;          // a saját gépbe 5 percenként jár új atombomba (mint gyalog)
+function callOwnPlane() {
+  if (!controllable() || player.inHouse || player.riding || (player.inCar && car.plane)) return false;
+  const left = Math.ceil(OWN_PLANE_CD - (clock - ownPlaneAt));
+  if (left > 0) { popup(`✈ A saját bombázód ${left} mp múlva hívható újra`, '#f66'); return false; }
+  for (let i = planes.length - 1; i >= 0; i--) if (planes[i].own) planes.splice(i, 1);   // a régi saját gép eltűnik
+  const src = player.inCar ? car : player;
+  let spot = null;
+  for (const da of [Math.PI / 2, -Math.PI / 2, Math.PI, 0]) {                   // szabad hely a közelben (ne házba / falba szálljon)
+    const a = player.angle + da, q = { x: src.x + Math.cos(a) * 130, y: src.y + Math.sin(a) * 130 };
+    if (!obstacleAt(q.x, q.y) && !obstacleAt(q.x + 40, q.y) && !obstacleAt(q.x - 40, q.y)) { spot = q; break; }
+  }
+  if (!spot) spot = { x: src.x, y: src.y };
+  const atom = clock - ownAtomAt >= WEAPONS.find(w => w.id === 'nuke').regen ? 1 : 0;
+  if (atom) ownAtomAt = clock;
+  spawnParkedPlane(spot.x, spot.y, player.angle, 'P', { bomb: PLANE_AMMO, missile: PLANE_MISSILES, atom });
+  planes[planes.length - 1].own = true;
+  ownPlaneAt = clock;
+  popup(`✈ Megérkezett a saját bombázód (bomba, rakéta${atom ? ', atombomba' : ''}) – állj mellé, E: felszállás`, '#ffb040');
+  return true;
 }
 
 function updateBullets(dt) {
@@ -2687,7 +2787,7 @@ function updateBullets(dt) {
       }
     }
     b.life -= dt;
-    if (hit || b.life <= 0) bullets.splice(i, 1);
+    if (hit || b.life <= 0) { bullets.splice(i, 1); if (b.rocket) explode(b.x, b.y, true); }   // a rakétavető lövedéke felrobban
   }
   for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].until < clock) flashes.splice(i, 1);
 }
@@ -3464,13 +3564,13 @@ function mountPlane(pl) {
   planes.splice(planes.indexOf(pl), 1);
   const snap = { ...car }, col = WAR_COLORS[pl.side] || WAR_COLORS.A;
   applyCarModel(car, { ...PLANE_MODEL, color: [col.hull, col.dark] });
-  Object.assign(car, { x: pl.x, y: pl.y, angle: pl.angle, vx: Math.cos(pl.angle) * 220, vy: Math.sin(pl.angle) * 220, fuel: 100, rental: true, plane: true, planeSnap: snap, planeAmmo: pl.ammo.bomb, planeMissiles: pl.ammo.missile, planeAtoms: pl.ammo.atom, planeWeapon: 0, planeSide: pl.side, bombCd: 0, lastWheels: null });
+  Object.assign(car, { x: pl.x, y: pl.y, angle: pl.angle, vx: Math.cos(pl.angle) * 220, vy: Math.sin(pl.angle) * 220, fuel: 100, rental: true, plane: true, planeSnap: snap, planeAmmo: pl.ammo.bomb, planeMissiles: pl.ammo.missile, planeAtoms: pl.ammo.atom, planeWeapon: 0, planeSide: pl.side, planeOwn: !!pl.own, bombCd: 0, lastWheels: null });
   player.inCar = true;
   popup('✈ Felszálltál a bombázóra! W/S: gáz/fék, A/D: kormány, B: tűz, V: fegyverváltás (bomba / rakéta / atombomba), E: leszállás vagy kiugrás', '#ffb040');
 }
 function leavePlane(park = true) {                  // leszállás: a gép ott marad; kiugrás: a gép lezuhan (nem marad)
   if (!car.plane) return;
-  if (park) spawnParkedPlane(car.x, car.y, car.angle, car.planeSide || 'A', { bomb: car.planeAmmo, missile: car.planeMissiles, atom: car.planeAtoms });
+  if (park) { spawnParkedPlane(car.x, car.y, car.angle, car.planeSide || 'A', { bomb: car.planeAmmo, missile: car.planeMissiles, atom: car.planeAtoms }); planes[planes.length - 1].own = !!car.planeOwn; }
   const snap = car.planeSnap;
   Object.assign(car, snap, { plane: false, planeSnap: null, vx: 0, vy: 0 });
 }
@@ -3842,7 +3942,7 @@ function dropBomb() {
   return src;
 }
 
-function explode(x, y) {
+function explode(x, y, rocket = false) {           // rocket: a rakétavető robbanása – a lövőt kevésbé sebzi, és csak ★ körözés jár
   explosions.push({ x, y, born: clock });
   flashes.push({ x, y, until: clock + 0.25 });
   for (let i = 0; i < 24; i++) addSmoke(x + (rand() - 0.5) * 120, y + (rand() - 0.5) * 120, (rand() - 0.5) * 200, (rand() - 0.5) * 200, true);
@@ -3865,11 +3965,12 @@ function explode(x, y) {
   if (!wasInside && !player.dead && !car.plane) {   // a játékost is megsebzi (autóban kevésbé; a magasan repülőt nem)
     const t = player.inCar ? car : player, d = Math.hypot(t.x - x, t.y - y);
     if (d < BOMB_RADIUS) {
-      damagePlayer(Math.round((player.inCar ? 60 : 120) * fall(d)));
+      const dmg = Math.round((player.inCar ? 60 : 120) * fall(d));
+      damagePlayer(rocket ? Math.min(30, dmg) : dmg);
       if (player.dead) message = { text: 'FELROBBANTÁL!', until: clock + 3, color: '#ff6a3a' };
     }
   }
-  if (!player.dead) raiseWanted(2, 'ROBBANTOTTÁL! ★★ ÜLDÖZ A RENDŐRSÉG!');   // halottként nem kap körözést (és a halál üzenete marad)
+  if (!player.dead) raiseWanted(rocket ? 1 : 2, rocket ? 'RAKÉTAVETŐ! ★ ÜLDÖZ A RENDŐRSÉG!' : 'ROBBANTOTTÁL! ★★ ÜLDÖZ A RENDŐRSÉG!');   // halottként nem kap körözést (és a halál üzenete marad)
 }
 
 function updateBombs(dt) {
@@ -3884,6 +3985,16 @@ function updateBombs(dt) {
   } else bombInv.regen = BOMB_REGEN;
 }
 
+function drawNukeDevices() {
+  for (const n of nukeDevices) {
+    ctx.strokeStyle = `rgba(255,40,40,${0.35 + 0.3 * Math.sin(clock * 8)})`; ctx.lineWidth = 6;           // a halálos kör
+    ctx.beginPath(); ctx.arc(n.x, n.y, NUKE_KILL, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#2a2a2a'; ctx.beginPath(); ctx.roundRect(n.x - 18, n.y - 12, 36, 24, 5); ctx.fill();
+    ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('☢', n.x - 6, n.y + 5);
+    ctx.fillStyle = Math.floor(clock * 6) % 2 ? '#ff3030' : '#ffd23a'; ctx.fillText(String(Math.ceil(n.fuse)), n.x + 8, n.y + 5);
+    ctx.font = 'bold 22px sans-serif'; ctx.fillStyle = '#ff3030'; ctx.fillText(`☢ ${Math.ceil(n.fuse)} mp`, n.x, n.y - 24); ctx.textAlign = 'left';
+  }
+}
 function drawBombs() {
   for (const b of bombs) {
     ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(b.x, b.y, 11, 0, Math.PI * 2); ctx.fill();
@@ -3984,6 +4095,7 @@ function update(dt) {
   if (player.drunk > 0 && !(player.passedOut > 0)) player.drunk = Math.max(0, player.drunk - DRUNK_DECAY * dt);   // józanodás
   updateTornado(dt);
   updateBombs(dt);
+  updateArsenal(dt);
   updateAliens(dt);
   updateWar(dt);
   updateAirforce(dt);
@@ -4799,10 +4911,12 @@ function drawHud(w, h) {
   ctx.fillStyle = '#fff';
   if (storm.level > 0.3) { ctx.fillStyle = '#ffb040'; ctx.fillText(tornado ? '🌪 TORNÁDÓ!' : '⚠ Homokvihar!', 300, 80); ctx.fillStyle = '#fff'; }
   ctx.fillStyle = '#ff9a6a'; ctx.font = 'bold 12px sans-serif';                     // bombák
-  ctx.fillText(`💣 ${bombInv.count}/${BOMB_MAX} (B)`, 335, 58); ctx.font = '14px sans-serif'; ctx.fillStyle = '#fff';
+  ctx.fillText(`💣 ${bombInv.count}/${BOMB_MAX} (B)`, 335, 58);
+  { const cw = curWeapon(); ctx.fillStyle = '#ffd23a'; ctx.fillText(`${cw.icon} ${cw.name}${cw.max ? ` ${arsenal.ammo[cw.id]}/${cw.max}` : ''} (G)`, 420, 58); }   // a kiválasztott fegyver
+  ctx.font = '14px sans-serif'; ctx.fillStyle = '#fff';
   if (tornado && tornado.power > 0.3) drawEdgeArrow(tornado.x, tornado.y, '#ff6a3a', `🌪 ${Math.round(dist(tornado, player) / 10)} m`, w, h);
   ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 176);
-  ctx.fillText('Space: kézifék (drift = pénz) · Bal klikk / F: lövés', 20, 196);
+  ctx.fillText('Space: kézifék (drift = pénz) · Bal klikk / F: lövés · G / görgő: fegyver · J: saját bombázó', 20, 196);
   ctx.fillText(`H: vihar · T: idő (${timeScale}x) · X: taxi · K: térkép · Q: háború · P: telefon · O: eldob · Esc: menü`, 20, 216);
   ctx.fillStyle = '#bbb'; ctx.font = '12px sans-serif';
   ctx.fillText(`Az úton ${SPEED_LIMIT} km/h felett jön a rendőrség · tankolni a ⛽ kutaknál lehet`, 20, 238);
@@ -5327,14 +5441,20 @@ function render() {
   viewHouses.filter(hs => hs.sky).sort((a, b) => Math.hypot(b.x - cam.x, b.y - cam.y) - Math.hypot(a.x - cam.x, a.y - cam.y)).forEach(drawSkyTop);   // a felhőkarcolók magas teste mindenek fölött (távolabbiak előbb)
   ctx.strokeStyle = '#ffe680'; ctx.lineWidth = 2;
   ctx.beginPath();
-  for (const b of bullets) { ctx.moveTo(b.x - b.vx * 0.02, b.y - b.vy * 0.02); ctx.lineTo(b.x, b.y); }
+  for (const b of bullets) if (!b.rocket) { ctx.moveTo(b.x - b.vx * 0.02, b.y - b.vy * 0.02); ctx.lineTo(b.x, b.y); }
   ctx.stroke();
+  for (const b of bullets) if (b.rocket) {                                         // rakétavető: kis rakéta lángcsóvával
+    const a = Math.atan2(b.vy, b.vx); ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(a);
+    ctx.fillStyle = '#ffb040'; ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(-18 - Math.random() * 6, -3); ctx.lineTo(-18 - Math.random() * 6, 3); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#556'; ctx.fillRect(-7, -3, 14, 6); ctx.fillStyle = '#c33'; ctx.fillRect(5, -3, 4, 6); ctx.restore();
+  }
   ctx.fillStyle = '#fff2a0';
   for (const f of flashes) { ctx.beginPath(); ctx.arc(f.x, f.y, 7, 0, Math.PI * 2); ctx.fill(); }
   drawSmoke();
   drawNukeFx(cam, w, h);
   drawTornado();
   drawBombs();
+  drawNukeDevices();
   for (const l of lamps) drawLamp(l, n);
   ctx.restore();
 
