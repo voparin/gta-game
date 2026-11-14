@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.39.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.40.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -39,6 +39,7 @@ function unlockAudio() { if (radio.ac && radio.ac.state === 'suspended') radio.a
 const CHEAT_MONEY = 10000;                       // Ctrl+S (Mac: Cmd+S): pénz-csalókód – a böngésző „mentés” ablakát is letiltja
 window.addEventListener('keydown', e => {
   unlockAudio();
+  if (account.open) { accountKey(e); return; }                    // a profil-ablak (név, jelszó) minden mást megelőz (a csalókódot is)
   if (e.code === 'KeyE' && player.moon && !player.moon.horror && !e.repeat) { if (nearEscape()) enterHorror(); return; }   // szökés a Holdról
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') {
     if (e.preventDefault) e.preventDefault();
@@ -80,6 +81,7 @@ window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.cli
 window.addEventListener('mousedown', e => {
   unlockAudio();
   mouse.x = e.clientX; mouse.y = e.clientY; mouse.active = true;
+  if (account.open) { if (e.button === 0) accountClick(e.clientX, e.clientY); return; }
   if (donate.open) { if (e.button === 0) donateClick(e.clientX, e.clientY); return; }
   if (bank.open) { if (e.button === 0) bankClick(e.clientX, e.clientY); return; }
   if (shop.open) { if (e.button === 0) shopClick(e.clientX, e.clientY); return; }
@@ -1600,6 +1602,9 @@ function sanitizeProgress(p) {
     activeCar: owned.includes(src.activeCar) ? src.activeCar : 0,
     bestDrift: num(src.bestDrift), bestStreak: num(src.bestStreak), missions: num(src.missions), raceWins: num(src.raceWins),
     donated: num(src.donated), debt: num(src.debt),
+    skin: Number.isInteger(src.skin) && src.skin >= 0 && src.skin < 64 ? src.skin : -1,   // a viselt szkin (a profillal együtt utazik); -1: a böngészőben választott
+    rev: Number.isInteger(src.rev) && src.rev >= 0 ? src.rev : 0,               // mentés-verzió (ADR-0047): a régebbi nem írja felül az újabbat
+    owner: typeof src.owner === 'string' ? src.owner.slice(0, 16) : '',         // kinek a profilja ez a helyi példány ('' = vendég)
     phone: [1, 2].includes(src.phone) ? src.phone : 0,                       // 0: nincs, 1: egyszerű, 2: okostelefon
     phoneScores: { snake: Math.max(0, Math.floor(num((src.phoneScores || {}).snake))), flappy: Math.max(0, Math.floor(num((src.phoneScores || {}).flappy))) },   // a telefonos játékok rekordjai
     phoneCracked: !!src.phoneCracked && [1, 2].includes(src.phone),          // összetört kijelző (eldobás után)
@@ -1617,7 +1622,11 @@ function loadProgress() {
   catch (e) { return sanitizeProgress(null); }   // nincs mentés / nincs tárhely
 }
 const progress = loadProgress();
-function saveProgress() { try { window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (e) { /* nincs tárhely */ } }
+function saveProgress() {
+  if (typeof account !== 'undefined' && account.user) { progress.rev = (progress.rev || 0) + 1; progress.owner = account.user; }   // belépve: új verzió
+  try { window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (e) { /* nincs tárhely */ }
+  if (typeof netSaveSoon === 'function') netSaveSoon();   // belépve a szerverre is (ADR-0047)
+}
 const levelOf = xp => Math.floor(Math.sqrt(xp / 150)) + 1;
 const xpForLevel = l => 150 * (l - 1) * (l - 1);
 const owns = i => progress.owned.includes(i);
@@ -1692,7 +1701,7 @@ function changeChoice(row, delta) {
   if (row === 1) {
     menu.skin = (menu.skin + delta + SKINS.length) % SKINS.length;
     menu.note = '';
-    if (ownsSkin(menu.skin)) { activeSkin = menu.skin; saveChoice('gta.skin', activeSkin); }
+    if (ownsSkin(menu.skin)) { activeSkin = menu.skin; saveChoice('gta.skin', activeSkin); progress.skin = activeSkin; saveProgress(); }
   } else if (row === 2) {
     menu.carModel = (menu.carModel + delta + CAR_MODELS.length) % CAR_MODELS.length;
     menu.note = '';
@@ -1706,7 +1715,7 @@ function buySkin(i) {
   if (progress.money < price) { menu.note = `Nincs elég pénzed! Még $${price - Math.floor(progress.money)} kell.`; return false; }
   progress.money -= price;
   progress.ownedSkins.push(i);
-  activeSkin = i; saveChoice('gta.skin', i);
+  activeSkin = i; saveChoice('gta.skin', i); progress.skin = i;
   saveProgress();
   menu.note = `Megvetted: ${SKINS[i].name}!`;
   popup(`Új szkin: ${SKINS[i].name}!`, '#7f7');
@@ -1736,6 +1745,8 @@ function buyCar(i) {
 }
 
 function menuKey(code) {
+  if (code === 'KeyL' && account.user) { toggleMenu(); logout(); return; }   // L: kijelentkezés
+  if (code === 'KeyL' && !account.user && net.online) { toggleMenu(); openAccount('login'); return; }   // vendégként: L – belépés / új profil
   if (code === 'ArrowUp' || code === 'KeyW') menu.sel = (menu.sel + MENU_ROWS.length - 1) % MENU_ROWS.length;
   else if (code === 'ArrowDown' || code === 'KeyS') menu.sel = (menu.sel + 1) % MENU_ROWS.length;
   else if (code === 'ArrowLeft' || code === 'KeyA') changeChoice(menu.sel, -1);
@@ -2812,6 +2823,100 @@ function netName() {
   try { window.localStorage.setItem('gta.name', n); } catch (e) { /* nincs tárhely */ }
   return n;
 }
+// ===== Játékosprofil (ADR-0047): első belépéskor név + jelszó; utána a saját profiljában játszik (a mentés a szerveren) =====
+const TOKEN_KEY = 'gta.token';
+const account = { open: false, mode: 'register', name: '', pass: '', field: 0, msg: '', busy: false, user: null, authed: false, guest: false, hits: [], saveT: null };
+const BACKUP_KEY = 'gta.progress.vendeg';           // a vendégként elért játékállás (belépéskor nem vész el)
+const nonTrivial = p => p && ((p.money || 0) > 0 || (p.xp || 0) > 0 || (p.owned || []).length > 1);
+const getToken = () => { try { return window.localStorage.getItem(TOKEN_KEY); } catch (e) { return null; } };
+const setToken = t => { try { if (t) window.localStorage.setItem(TOKEN_KEY, t); else window.localStorage.removeItem(TOKEN_KEY); } catch (e) { /* nincs tárhely */ } };
+function openAccount(mode = 'register', msg = '') { Object.assign(account, { open: true, mode, msg, busy: false, field: account.name ? 1 : 0, pass: '' }); for (const k in keys) keys[k] = false; mouse.down = false; }
+function netSendRaw(obj) { if (!net.online || !net.ws) return false; try { net.ws.send(JSON.stringify(obj)); return true; } catch (e) { return false; } }
+function submitAccount() {
+  if (account.busy) return false;
+  const name = account.name.trim();
+  if (name.length < 3) { account.msg = 'A név legalább 3 karakter legyen'; return false; }
+  if (account.pass.length < 6) { account.msg = 'A jelszó legalább 6 karakter legyen'; return false; }
+  if (!net.online) { account.msg = 'Még nincs kapcsolat a szerverrel – pár másodperc…'; return false; }
+  account.busy = true; account.msg = account.mode === 'register' ? 'Profil létrehozása…' : 'Belépés…';
+  netSendRaw(account.mode === 'register' ? { t: 'register', name, pass: account.pass, progress } : { t: 'login', name, pass: account.pass });   // regisztráláskor az eddigi (helyi) játékállás az új profilba kerül
+  return true;
+}
+function playAsGuest() { account.open = false; account.guest = true; popup('🌐 Vendégként játszol – a játékállás csak ebben a böngészőben marad meg', '#ffb040'); }
+function logout() {
+  netSaveNow();                                     // az utolsó állapot még felmegy
+  netSendRaw({ t: 'logout' }); setToken(null); account.user = null; account.authed = false; account.guest = false;
+  let back = null; try { back = JSON.parse(window.localStorage.getItem(BACKUP_KEY)); } catch (e) { /* nincs */ }
+  applyProfile(back);                               // a vendégként elért állás visszajön (vagy alaphelyzet)
+  openAccount('login', 'Kijelentkeztél.');
+}
+function applyProfile(p) {                          // a profil játékállása lép a helyi helyére
+  const sp = sanitizeProgress(p);
+  for (const k of Object.keys(progress)) delete progress[k];
+  Object.assign(progress, sp);
+  try { window.localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress)); } catch (e) { /* nincs tárhely */ }
+  if (progress.skin >= 0 && progress.skin < SKINS.length && ownsSkin(progress.skin)) activeSkin = progress.skin;
+  else if (!ownsSkin(activeSkin)) activeSkin = 0;
+  menu.skin = activeSkin; menu.carModel = owns(progress.activeCar) ? progress.activeCar : 0;
+  if (!car.horse && !car.plane) selectCar(menu.carModel);
+}
+function netSaveSoon() {                            // a mentés a szerverre: összevonva, legfeljebb 2 mp-enként (kapcsolat nélkül a helyi példány a frissebb, belépéskor felmegy)
+  if (!account.user || !account.authed || !net.online || account.saveT || typeof setTimeout !== 'function') return;
+  account.saveT = setTimeout(netSaveNow, 2000);
+}
+function netSaveNow() { if (account.saveT && typeof clearTimeout === 'function') clearTimeout(account.saveT); account.saveT = null; if (account.user && account.authed) netSendRaw({ t: 'save', progress }); }
+// belépéskor melyik játékállás legyen: a szerveré, vagy a helyi, ha ugyanehhez a profilhoz tartozik és frissebb (offline játék, bezárt lap)
+function chooseProgress(name, server, serverRev, local) {
+  if (local && local.owner === name && (local.rev || 0) > (serverRev || 0)) return { use: local, push: true };
+  if (!server && local && !local.owner && nonTrivial(local)) return { use: local, push: true };   // új profil helyi állással
+  return { use: server, push: false };
+}
+function accountKey(e) {
+  if (e.code === 'Escape') { playAsGuest(); return; }
+  if (e.code === 'Enter') { submitAccount(); return; }
+  if (e.code === 'Tab' || e.code === 'ArrowDown' || e.code === 'ArrowUp') { account.field = 1 - account.field; if (e.preventDefault) e.preventDefault(); return; }
+  const f = account.field ? 'pass' : 'name';
+  if (e.code === 'Backspace') { account[f] = account[f].slice(0, -1); return; }
+  if (e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey && account[f].length < (account.field ? 64 : 16)) account[f] += e.key;
+}
+function accountClick(x, y) {
+  const h = account.hits.find(q => x >= q.x && x <= q.x + q.w && y >= q.y && y <= q.y + q.h);
+  if (!h) return;
+  if (h.field !== undefined) account.field = h.field;
+  else if (h.mode) { account.mode = h.mode; account.msg = ''; }
+  else if (h.go) submitAccount();
+  else if (h.guest) playAsGuest();
+}
+function drawAccount(w, h) {
+  ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0, 0, w, h);
+  const PW = 420, PH = 360, px = Math.round((w - PW) / 2), py = Math.round((h - PH) / 2), reg = account.mode === 'register';
+  account.hits = [];
+  ctx.fillStyle = 'rgba(28,24,18,0.97)'; ctx.fillRect(px, py, PW, PH); ctx.strokeStyle = '#e2c27d'; ctx.lineWidth = 3; ctx.strokeRect(px, py, PW, PH);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#e2c27d'; ctx.font = 'bold 24px sans-serif'; ctx.fillText('🌐 Sivatagi GTA – profil', w / 2, py + 38);
+  [['register', 'Új profil'], ['login', 'Belépés']].forEach(([m, label], i) => {                       // fülek
+    const bx = px + 30 + i * 185, on = account.mode === m;
+    ctx.fillStyle = on ? 'rgba(226,194,125,0.3)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(bx, py + 56, 175, 34);
+    ctx.fillStyle = on ? '#fff' : '#aaa'; ctx.font = 'bold 16px sans-serif'; ctx.fillText(label, bx + 87, py + 79);
+    account.hits.push({ x: bx, y: py + 56, w: 175, h: 34, mode: m });
+  });
+  [['Név', account.name], ['Jelszó', '•'.repeat(account.pass.length)]].forEach(([label, val], i) => {   // mezők
+    const fy = py + 112 + i * 70, on = account.field === i;
+    ctx.textAlign = 'left'; ctx.fillStyle = '#ccc'; ctx.font = '13px sans-serif'; ctx.fillText(label, px + 30, fy);
+    ctx.fillStyle = '#fff'; ctx.fillRect(px + 30, fy + 6, PW - 60, 36); ctx.strokeStyle = on ? '#3b82f6' : '#999'; ctx.lineWidth = on ? 3 : 1; ctx.strokeRect(px + 30, fy + 6, PW - 60, 36);
+    ctx.fillStyle = '#1a202c'; ctx.font = '17px sans-serif'; ctx.fillText(val + (on && Math.floor(clock * 2 + performance.now() / 500) % 2 ? '|' : ''), px + 40, fy + 31);
+    account.hits.push({ x: px + 30, y: fy + 6, w: PW - 60, h: 36, field: i });
+  });
+  ctx.textAlign = 'center';
+  ctx.fillStyle = account.busy ? '#666' : '#22c55e'; ctx.fillRect(px + 30, py + 252, PW - 60, 40);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 18px sans-serif'; ctx.fillText(reg ? 'Profil létrehozása' : 'Belépés', w / 2, py + 279);
+  account.hits.push({ x: px + 30, y: py + 252, w: PW - 60, h: 40, go: true });
+  if (account.msg) { ctx.fillStyle = /…|Kijelentkeztél/.test(account.msg) ? '#9fd8ff' : '#ff8a8a'; ctx.font = '13px sans-serif'; ctx.fillText(account.msg, w / 2, py + 312); }
+  ctx.fillStyle = '#aaa'; ctx.font = '12px sans-serif';
+  ctx.fillText(reg ? 'Az eddigi játékállásod átkerül az új profilba.' : 'Tab: mező váltás · Enter: mehet', w / 2, py + 332);
+  ctx.fillStyle = '#7fe0ff'; ctx.fillText('Esc: vendégként játszom (profil nélkül)', w / 2, py + 350);
+  account.hits.push({ x: px, y: py + 338, w: PW, h: 20, guest: true });
+  ctx.textAlign = 'left';
+}
 function netConnect() {                             // a GitHub Pages-en (statikus oldal) nincs szerver: ott egyjátékos marad
   const loc = window.location, WS = window.WebSocket;
   if (!WS || !loc || !/^https?:$/.test(loc.protocol)) return false;
@@ -2821,8 +2926,15 @@ function netConnect() {                             // a GitHub Pages-en (statik
   const url = pages ? NET_SERVER.replace(/\/$/, '') + '/ws' : (loc.protocol === 'https:' ? 'wss://' : 'ws://') + loc.host + '/ws';
   let ws; try { ws = new WS(url); } catch (e) { return false; }
   net.ws = ws;
-  ws.onopen = () => { net.online = true; net.tries = 0; popup(`🌐 Csatlakoztál a szerverhez – ${net.name} néven`, '#7fe0ff'); };
+  ws.onopen = () => {
+    net.online = true; net.tries = 0;
+    const tok = getToken();
+    if (tok) netSendRaw({ t: 'auth', token: tok });                            // megjegyzett belépés: jelszó nélkül visszalép
+    else if (!account.guest && !account.user) openAccount(account.name ? 'login' : 'register');   // első belépés: profil
+    else popup('🌐 Csatlakoztál a szerverhez', '#7fe0ff');
+  };
   ws.onclose = () => {                              // kapcsolatbontás: újracsatlakozás egyre ritkábban (2, 4, … legfeljebb 30 mp)
+    account.busy = false; account.authed = false;   // a profil marad (a helyi mentés a frissebb); újracsatlakozáskor a jeggyel visszalép, és felküldi
     if (net.online) popup('🌐 Megszakadt a kapcsolat a szerverrel – újracsatlakozás…', '#f66');
     net.online = false; net.others.clear(); net.ws = null; net.id = 0;
     net.tries++;
@@ -2837,6 +2949,27 @@ function netReceive(text) {                         // a szerver üzenetei: hell
   let msg; try { msg = JSON.parse(text); } catch (e) { return; }
   if (!msg) return;
   if (msg.t === 'hello') net.id = msg.id;
+  if (msg.t === 'auth_ok') {                        // belépett: a profil játékállása jön
+    const local = sanitizeProgress(progress);
+    if (!local.owner && nonTrivial(local)) { try { window.localStorage.setItem(BACKUP_KEY, JSON.stringify(local)); } catch (e) { /* nincs */ } }   // a vendég-állás megmarad
+    const pick = chooseProgress(msg.name, msg.progress, msg.rev, local);
+    account.user = msg.name; account.authed = true; account.name = msg.name; account.busy = false; account.open = false; account.guest = false;
+    setToken(msg.token);
+    if (pick.use !== local) applyProfile(pick.use ? { ...pick.use, owner: msg.name, rev: msg.rev || pick.use.rev || 0 } : { owner: msg.name });
+    else progress.owner = msg.name;
+    if (pick.push) { progress.rev = Math.max(progress.rev || 0, msg.rev || 0) + 1; netSaveNow(); }   // a frissebb helyi állás felmegy
+    popup(`🌐 Belépve: ${msg.name} – a játékállásod a szerveren van`, '#7fe0ff');
+  }
+  if (msg.t === 'saved' && msg.stale) {             // egy másik gépen / lapon frissebb a profil: azt töltjük be
+    popup('🌐 A profilod máshol frissebb – betöltöm', '#ffb040');
+    const tok = getToken(); if (tok) netSendRaw({ t: 'auth', token: tok });
+  }
+  if (msg.t === 'auth_err') {
+    account.busy = false;
+    if (msg.expired) { setToken(null); openAccount('login', msg.msg); }
+    else if (account.open) account.msg = msg.msg;
+    else openAccount(account.mode, msg.msg);
+  }
   if (msg.t === 'players' && Array.isArray(msg.list)) {
     const seen = new Set();
     for (const o of msg.list) {
@@ -2851,7 +2984,7 @@ function netReceive(text) {                         // a szerver üzenetei: hell
 }
 function netState() {                               // amit a többiek látnak belőlünk
   const sk = SKINS[activeSkin], t = player.inCar ? car : player;
-  return { name: net.name, x: Math.round(t.x), y: Math.round(t.y), a: +(player.inCar ? car.angle : player.angle).toFixed(2), car: !!player.inCar, len: car.len, wid: car.wid,
+  return { name: account.user || net.name, x: Math.round(t.x), y: Math.round(t.y), a: +(player.inCar ? car.angle : player.angle).toFixed(2), car: !!player.inCar, len: car.len, wid: car.wid,
     c0: car.color[0], c1: car.color[1], kind: car.type, shirt: sk.shirt, head: sk.head, legs: sk.legs || '', hat: sk.hat || '', hp: Math.round(player.health), dead: !!player.dead };
 }
 function netSend() {
@@ -5594,6 +5727,8 @@ function drawMenu(w, h) {
   ctx.fillStyle = '#e2c27d'; ctx.font = 'bold 34px sans-serif';
   ctx.fillText('SIVATAGI GTA – MENÜ', w / 2, py + 50);
 
+  ctx.fillStyle = '#9fd8ff'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(account.user ? `🌐 Profil: ${account.user} · L: kijelentkezés` : account.guest ? '🌐 Vendégként játszol · L: belépés / új profil' : '', w / 2, py + 74);
   menu.hits = [];
   const cm = CAR_MODELS[menu.carModel];
   const values = [null, SKINS[menu.skin].name + (ownsSkin(menu.skin) ? '' : `  🔒 $${skinPrice(menu.skin)}`), cm.name + (owns(menu.carModel) ? '' : `  🔒 $${cm.price}`)];
@@ -5777,6 +5912,7 @@ function render() {
   if (school.open) drawSchool(w, h);
   if (tv.open) drawTv(w, h);
   if (phone.open) drawPhone(w, h);
+  if (account.open) drawAccount(w, h);
   if (taxiMenu.open) drawTaxiMenu(w, h);
   if (mapView.open) drawBigMap(w, h);
   if (taxiTrip) {                                    // utazás: elsötétül, felirat
@@ -5792,7 +5928,7 @@ function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   netInterp(dt);                                    // a többi játékos akkor is mozog, ha nálunk menü / telefon van nyitva
-  if (!menu.open && !donate.open && !bank.open && !shop.open && !school.open && !tv.open && !phone.open && !taxiMenu.open && !mapView.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
+  if (!account.open && !menu.open && !donate.open && !bank.open && !shop.open && !school.open && !tv.open && !phone.open && !taxiMenu.open && !mapView.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
     time = (time + dt * timeScale) % CYCLE;
     clock += dt;
     update(dt);
@@ -5806,3 +5942,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 netConnect();                                       // többjátékos mód, ha a saját szerverről fut a játék
+if (window.addEventListener) { window.addEventListener('pagehide', () => netSaveNow()); window.addEventListener('visibilitychange', () => { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') netSaveNow(); }); }   // bezáráskor a legutolsó állás is felmegy

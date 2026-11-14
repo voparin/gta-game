@@ -51,3 +51,4 @@ Itt van naplózva minden architekturális döntés: mit, miért és milyen alter
 | [0044](0044-tobbjatekos-mod-sajat-node-szerverrel.md) | Többjátékos mód: saját, függőség nélküli Node-szerver, csak a játékosok helyzete utazik | Elfogadva | 2026-11-14 |
 | [0045](0045-tenger-a-palya-kozepen-kepletbol.md) | Tenger a pálya közepén: képletből számolt part, az utak hidakon kelnek át | Elfogadva | 2026-11-14 |
 | [0046](0046-szerver-a-google-cloud-runon-alvo-uzemmodban.md) | A többjátékos szerver a Google Cloud Runon, alvó üzemmódban | Elfogadva | 2026-11-14 |
+| [0047](0047-jatekosprofilok-nev-jelszo-mentes-a-szerveren.md) | Játékosprofilok: név + jelszó, a játékállás a szerveren (Firestore) | Elfogadva | 2026-11-14 |

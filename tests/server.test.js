@@ -2,7 +2,9 @@
 // A többjátékos szerver tesztje (ADR-0044): elindítja a szervert egy szabad porton, két WebSocket-klienssel
 // ellenőrzi, hogy kiszolgálja a játékot, és a játékosok látják egymás helyzetét.
 // Futtatás: node tests/server.test.js   (Node 22+, a beépített WebSocket-kliens miatt)
-const { createServer, encodeFrame, decodeFrames, cleanState } = require('../server.js');
+const { createServer, encodeFrame, decodeFrames, cleanState, fileStore, normName, nameId } = require('../server.js');
+const os = require('os'), fs = require('fs'), path = require('path');
+const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'gta-profiles-'));
 
 let failed = 0;
 function check(name, cond) { console.log(`${cond ? '✓' : '✗'} ${name}`); if (!cond) failed++; }
@@ -27,7 +29,7 @@ const until = async (cond, ms = 3000) => { const end = Date.now() + ms; while (D
   check('a túl nagy vezérlőkeretet elutasítja', decodeFrames(Buffer.concat([Buffer.from([0x89, 0x80 | 126, 0, 200, 1, 2, 3, 4]), Buffer.alloc(200)])).bad === true);
 
   // élő szerver két klienssel
-  const { server, players } = createServer();
+  const { server, players } = createServer(fileStore(DIR));
   await new Promise(r => server.listen(0, r));
   const port = server.address().port, base = `http://127.0.0.1:${port}`;
   const html = await (await fetch(base + '/')).text(), js = await fetch(base + '/game.js'), nf = await fetch(base + '/nincs');
@@ -41,7 +43,8 @@ const until = async (cond, ms = 3000) => { const end = Date.now() + ms; while (D
   b.ws.send(JSON.stringify({ t: 'state', s: { name: 'Bence', x: 5000, y: 6000, a: 0, car: true, c0: '#d42020', len: 72, wid: 36 } }));
   await until(() => a.last && a.last.length === 2 && b.last && b.last.length === 2);
   const seenByA = a.last && a.last.find(p => p.id === b.id), seenByB = b.last && b.last.find(p => p.id === a.id);
-  check('a játékosok látják egymás helyzetét és kinézetét', !!seenByA && seenByA.name === 'Bence' && seenByA.x === 5000 && seenByA.car === true && !!seenByB && seenByB.name === 'Anna' && seenByB.shirt === '#2f6fd0');
+  check('a játékosok látják egymás helyzetét és kinézetét', !!seenByA && seenByA.x === 5000 && seenByA.car === true && !!seenByB && seenByB.shirt === '#2f6fd0');
+  check('fiók nélkül a név „Vendég” (a kliens nem adhatja ki magát másnak)', seenByA.name === 'Vendég ' + b.id && seenByB.name === 'Vendég ' + a.id);
   a.ws.send('nem json'); a.ws.send(JSON.stringify({ t: 'state', s: { name: 'Anna', x: 150, y: 200 } }));
   await until(() => b.last && b.last.find(p => p.id === a.id && p.x === 150));
   check('a hibás üzenetet kihagyja, a mozgást továbbítja', !!(b.last && b.last.find(p => p.id === a.id && p.x === 150)));
@@ -58,10 +61,52 @@ const until = async (cond, ms = 3000) => { const end = Date.now() + ms; while (D
   await until(() => pagesOpen, 2000);
   check('a GitHub Pages-en futó játék csatlakozhat (engedélyezett oldal)', pagesOpen);
   pages.close(); await until(() => players.size === 1, 2000);
+  // ---- fiókok: regisztráció, belépés, jegy, mentés ----
+  check('a név szabályai: kis- és nagybetű egyforma, szóköz összevonva', nameId('  Kis  Pista ') === nameId('kis pista') && normName('  Kis  Pista ') === 'Kis Pista');
+  const ask = (c, msg) => new Promise(res => { const prev = c.ws.onmessage; c.ws.onmessage = ev => { const m = JSON.parse(ev.data); if (m.t === 'auth_ok' || m.t === 'auth_err' || m.t === 'saved') { c.ws.onmessage = prev; res(m); } else prev(ev); }; c.ws.send(JSON.stringify(msg)); });
+  const c1 = mk(); await until(() => c1.id);
+  const r1 = await ask(c1, { t: 'register', name: 'Vadim', pass: 'titok1', progress: { money: 123, xp: 5 } });
+  check('regisztráció: jegyet kap, és a magával hozott mentés megmarad', r1.t === 'auth_ok' && r1.name === 'Vadim' && typeof r1.token === 'string' && r1.progress && r1.progress.money === 123);
+  check('a jelszó nincs sima szövegként tárolva', !fs.readFileSync(path.join(DIR, 'profiles.json'), 'utf8').includes('titok1'));
+  c1.ws.send(JSON.stringify({ t: 'state', s: { name: 'Hamis Név', x: 7, y: 7 } }));
+  await until(() => b.last && b.last.find(p2 => p2.id === c1.id));
+  check('belépve a fiók nevével látszik (nem azzal, amit a kliens küld)', b.last.find(p2 => p2.id === c1.id).name === 'Vadim');
+  const dup = await ask(b, { t: 'register', name: 'VADIM', pass: 'mas123' });
+  check('foglalt nevet nem lehet újra regisztrálni (kis-nagybetűtől függetlenül)', dup.t === 'auth_err' && /foglalt/.test(dup.msg));
+  check('rossz név / rövid jelszó: hibaüzenet', (await ask(b, { t: 'register', name: 'ab', pass: 'titok1' })).t === 'auth_err' && (await ask(b, { t: 'register', name: 'Jóska', pass: '12' })).t === 'auth_err');
+  const sv = await ask(c1, { t: 'save', progress: { money: 999, xp: 50, rev: 1 } });
+  check('mentés a szerverre (új verzió)', sv.t === 'saved' && sv.ok === true && sv.rev === 1);
+  await wait(1100);
+  const old = await ask(c1, { t: 'save', progress: { money: 5, xp: 1, rev: 1 } });
+  check('régebbi / azonos verzió nem írja felül az újabbat (másik gép, elavult lap)', old.ok === false && old.stale === true && old.rev === 1);
+  const fast = await ask(c1, { t: 'save', progress: { money: 6, rev: 2 } });
+  check('másodpercenként legfeljebb egy mentés', fast.ok === false && fast.slow === true);
+  const wrong = await ask(b, { t: 'login', name: 'vadim', pass: 'rossz' });
+  check('rossz jelszóval nem lehet belépni', wrong.t === 'auth_err');
+  const good = await ask(b, { t: 'login', name: 'vadim', pass: 'titok1' });
+  check('jó jelszóval belép, és a saját (mentett) profilját kapja', good.t === 'auth_ok' && good.name === 'Vadim' && good.progress.money === 999 && good.rev === 1);
+  const c2 = mk(); await until(() => c2.id);
+  const re = await ask(c2, { t: 'auth', token: r1.token });
+  check('a jeggyel (új lap / újratöltés) jelszó nélkül visszalép', re.t === 'auth_ok' && re.name === 'Vadim' && re.progress.money === 999);
+  const fake = await ask(c2, { t: 'auth', token: r1.token.slice(0, -3) + 'abc' });
+  check('a hamisított jegyet elutasítja', fake.t === 'auth_err' && fake.expired === true);
+  await wait(1100);
+  const big = await ask(c1, { t: 'save', progress: { junk: 'x'.repeat(55000), rev: 9 } });
+  check('a túl nagy mentést elutasítja', big.t === 'saved' && big.ok === false);
+  check('fiók nélkül nem lehet menteni', await new Promise(res => { b.ws.send(JSON.stringify({ t: 'logout' })); b.ws.send(JSON.stringify({ t: 'save', progress: { money: 1 } })); setTimeout(() => res(true), 300); }) && JSON.parse(fs.readFileSync(path.join(DIR, 'profiles.json'), 'utf8')).profiles[nameId('vadim')].progress.includes('999'));
+  let locks = 0; for (let i = 0; i < 6; i++) { const r = await ask(c2, { t: 'login', name: 'vadim', pass: 'rossz' + i }); if (/zárolva/.test(r.msg || '')) locks++; }
+  check('5 hibás jelszó után a profil 15 percre zárolva (új kapcsolattal sem lehet tovább találgatni)', locks >= 1 && (await (async () => { const c3 = mk(); await until(() => c3.id); const r = await ask(c3, { t: 'login', name: 'vadim', pass: 'titok1' }); c3.ws.close(); return /zárolva/.test(r.msg || ''); })()));
+  check('a vendég-nevet nem lehet regisztrálni, és a túl nagy kezdő-állást sem (ne vesszen el csendben)', /foglalt/.test((await ask(c2, { t: 'register', name: 'Vendég 5', pass: 'titok12' })).msg || '') && (await ask(c2, { t: 'register', name: 'Nagyállás', pass: 'titok12', progress: { junk: 'x'.repeat(52000) } })).t === 'auth_err');
+  const c4 = mk(); await until(() => c4.id);   // új kapcsolat (a c2 már elérte a percenkénti korlátot)
+  const hom = await ask(c4, { t: 'register', name: 'ＶＡＤＩＭ', pass: 'titok12' });
+  check('a széles betűs névváltozat is foglaltnak számít (NFKC)', hom.t === 'auth_err' && /foglalt/.test(hom.msg));
+  check('a nem ASCII karakteres hamis jegy sem okoz hibát (szabályos elutasítás)', (await ask(c4, { t: 'auth', token: r1.token.split('.')[0] + '.' + 'é'.repeat(22) })).expired === true);
+  c4.ws.close();
+  c1.ws.close(); c2.ws.close(); await until(() => players.size === 1, 3000);
   const status = await (await fetch(base + '/status')).json();
   check('a /status kiírja, hányan játszanak', status.players === 1);
   b.ws.close(); await wait(100);
-  server.close();
+  server.close(); fs.rmSync(DIR, { recursive: true, force: true });
   console.log(failed ? `\n${failed} teszt elbukott` : '\nMinden szerverteszt sikeres');
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

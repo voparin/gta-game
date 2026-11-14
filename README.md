@@ -42,6 +42,12 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - 🦈 **Vigyázz, cápák!** Ha úszol, a közeli cápa üldözőbe vesz és megharap. A hídon és a parton biztonságban vagy – a cápák nem jönnek ki a vízből. Úszva vágtázva (**Shift**) el lehet menekülni előlük. Le is lőheted őket (4 lövés, +$30).
 - 🐟 A tengerben **színes halrajok** úsznak, és elúsznak előled és a cápák elől.
 
+## Profil 👤
+- Első belépéskor (a többjátékos szerverhez csatlakozva) megnyílik a **profil-ablak**: **Új profil** – megadod a neved és a jelszavad. Onnantól a **saját profilodban** játszol: a pénz, az autók, a szkin, a rekordok a szerveren vannak, bármelyik gépről folytathatod.
+- Másik gépen / böngészőben: **Belépés** fül, név + jelszó. Ugyanazon a gépen a játék 90 napig megjegyzi a belépést.
+- **Esc** menü → **L**: kijelentkezés. A profil-ablakban **Esc**: vendégként játszol (profil nélkül, csak ebben a böngészőben ment).
+- Az elfelejtett jelszót nem lehet visszaállítani – ilyenkor új profilt kell létrehozni.
+
 ## Rendőrség
 - Az utakon (és járdán) **145 km/h** a sebességkorlát – a táblák is jelzik. Ha túlléped, körözni kezdenek (★), rendőrre lövésért ★★.
 - **Lerázás:** ha 12 másodpercig egy rendőrautó sincs a közeledben, leszállnak rólad.

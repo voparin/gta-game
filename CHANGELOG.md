@@ -5,6 +5,13 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.40.0 – 2026-11-14
+- **Saját profil** 👤 (ADR-0047): első belépéskor megnyílik a profil-ablak – megadod a neved és a jelszavad, és onnantól a saját profilodban játszol: a pénzed, autóid, szkined, rekordjaid a szerveren vannak, bármelyik gépről belépve folytathatod. A böngésző megjegyzi a belépést (90 napig); máshol a **Belépés** fülön a neveddel és jelszavaddal lépsz be
+- Az eddigi játékállásod az új profilba kerül. A többi játékos a profilod nevét látja
+- Esc menü → **L**: kijelentkezés. A profil-ablakban **Esc**: vendégként játszol (profil nélkül)
+- A jelszavakat a szerver biztonságosan (scrypt) tárolja; a jelszó legalább 6 karakter. 5 hibás jelszó után a profil 15 percre zárolódik; IP-címenként és kapcsolatonként is korlátozott a próbálkozás, a mentés másodpercenként legfeljebb egy
+- Nem vész el semmi: kapcsolat nélkül játszott állás újracsatlakozáskor felmegy; bezáráskor az utolsó állás is mentődik; ha két gépen játszol ugyanazzal a profillal, a régebbi nem írja felül az újabbat (verziózott mentés); a vendégként elért állás belépés után is megmarad (kijelentkezéskor visszajön); vendégként az Esc menü **L** gombjával lehet később belépni
+
 ## 0.39.0 – 2026-11-14
 - **Többjátékos mód az interneten** 🌐 (ADR-0046): a szerver a Google Cloud Runon fut (Európa, alvó üzemmód: csak játék közben ébred fel, legfeljebb egy példány, hogy mindenki egy világban legyen). A **https://voparin.github.io/gta-game/** oldal is ide csatlakozik, így bárhonnan együtt lehet játszani; a szerver saját címe: https://sivatagi-gta-568950307806.europe-west1.run.app
 - Ha egy ideje senki nem játszott, az első csatlakozás pár másodpercig tart (a szerver felébred)
