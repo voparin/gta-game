@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.35.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.36.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -2710,6 +2710,84 @@ function alertPeds(x, y) {
   }
 }
 
+// ===== Többjátékos mód (ADR-0044): ha a játék a saját szerveréről (node server.js) fut, a /ws-en látjuk egymást =====
+// A világ képletből épül (mindenkinél ugyanolyan), ezért csak a játékosok helyzete és kinézete utazik a hálózaton.
+const NET_SEND = 0.1;
+const net = { ws: null, id: 0, online: false, others: new Map(), sendT: 0, name: '', tries: 0, keepAlive: null };
+function netName() {
+  try { const n = window.localStorage.getItem('gta.name'); if (n) return n; } catch (e) { /* nincs tárhely */ }
+  const n = 'Játékos ' + (100 + ((Math.random() * 900) | 0));
+  try { window.localStorage.setItem('gta.name', n); } catch (e) { /* nincs tárhely */ }
+  return n;
+}
+function netConnect() {                             // a GitHub Pages-en (statikus oldal) nincs szerver: ott egyjátékos marad
+  const loc = window.location, WS = window.WebSocket;
+  if (!WS || !loc || !/^https?:$/.test(loc.protocol) || /github\.io$/.test(loc.hostname)) return false;
+  net.name = netName();
+  let ws; try { ws = new WS((loc.protocol === 'https:' ? 'wss://' : 'ws://') + loc.host + '/ws'); } catch (e) { return false; }
+  net.ws = ws;
+  ws.onopen = () => { net.online = true; net.tries = 0; popup(`🌐 Csatlakoztál a szerverhez – ${net.name} néven`, '#7fe0ff'); };
+  ws.onclose = () => {                              // kapcsolatbontás: újracsatlakozás egyre ritkábban (2, 4, … legfeljebb 30 mp)
+    if (net.online) popup('🌐 Megszakadt a kapcsolat a szerverrel – újracsatlakozás…', '#f66');
+    net.online = false; net.others.clear(); net.ws = null; net.id = 0;
+    net.tries++;
+    if (net.tries <= 20 && typeof setTimeout === 'function') setTimeout(netConnect, Math.min(30000, 2000 * net.tries));
+  };
+  ws.onerror = () => {};
+  ws.onmessage = ev => netReceive(ev.data);
+  if (!net.keepAlive && typeof setInterval === 'function') net.keepAlive = setInterval(netSend, 1000);   // életjel akkor is, ha a játék áll (menü, telefon) vagy a lap a háttérben van
+  return true;
+}
+function netReceive(text) {                         // a szerver üzenetei: hello (saját azonosító), players (mindenki helyzete)
+  let msg; try { msg = JSON.parse(text); } catch (e) { return; }
+  if (!msg) return;
+  if (msg.t === 'hello') net.id = msg.id;
+  if (msg.t === 'players' && Array.isArray(msg.list)) {
+    const seen = new Set();
+    for (const o of msg.list) {
+      if (!o || o.id === net.id || !Number.isFinite(o.x) || !Number.isFinite(o.y)) continue;
+      seen.add(o.id);
+      const cur = net.others.get(o.id);
+      if (cur) Object.assign(cur, o, { px: cur.dx, py: cur.dy, pa: cur.da, k: 0 });        // a régi kirajzolt helyről úszik az újra
+      else net.others.set(o.id, { ...o, px: o.x, py: o.y, pa: o.a, dx: o.x, dy: o.y, da: o.a, k: 1 });
+    }
+    for (const id of [...net.others.keys()]) if (!seen.has(id)) net.others.delete(id);   // kilépett
+  }
+}
+function netState() {                               // amit a többiek látnak belőlünk
+  const sk = SKINS[activeSkin], t = player.inCar ? car : player;
+  return { name: net.name, x: Math.round(t.x), y: Math.round(t.y), a: +(player.inCar ? car.angle : player.angle).toFixed(2), car: !!player.inCar, len: car.len, wid: car.wid,
+    c0: car.color[0], c1: car.color[1], kind: car.type, shirt: sk.shirt, head: sk.head, legs: sk.legs || '', hat: sk.hat || '', hp: Math.round(player.health), dead: !!player.dead };
+}
+function netSend() {
+  if (!net.online || !net.ws) return;
+  try { net.ws.send(JSON.stringify({ t: 'state', s: netState() })); } catch (e) { /* a következő körben újra */ }
+}
+function netInterp(dt) {                            // sima mozgás a két üzenet között (a frame-ből: menü / telefon alatt is)
+  for (const o of net.others.values()) {
+    o.k = Math.min(1, o.k + dt / NET_SEND);
+    o.dx = o.px + (o.x - o.px) * o.k; o.dy = o.py + (o.y - o.py) * o.k;
+    o.da = o.pa + Math.atan2(Math.sin(o.a - o.pa), Math.cos(o.a - o.pa)) * o.k;
+  }
+}
+function updateNet(dt) {
+  net.sendT -= dt;
+  if (net.sendT > 0) return;
+  net.sendT = NET_SEND;
+  netSend();
+}
+function drawOthers(inView) {
+  for (const o of net.others.values()) {
+    const v = { x: o.dx, y: o.dy };
+    if (!inView(v)) continue;
+    if (o.dead) drawCorpse(v.x, v.y, o.da, o.shirt || '#888', o.head || '#333');
+    else if (o.car) drawCar({ x: v.x, y: v.y, angle: o.da, len: o.len || 72, wid: o.wid || 36, color: [o.c0 || '#888', o.c1 || '#555'], type: o.kind === 'plane' || o.kind === 'horse' || o.kind === 'bike' ? o.kind : 'car', vx: 0, vy: 0 }, 0);
+    else drawPerson(v.x, v.y, o.da, clock * 6, o.shirt || '#888', o.head || '#333', true, o.legs || '#2b2b4a', o.hat || null, null);
+    ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(v.x - 46, v.y - 52, 92, 18);
+    ctx.fillStyle = '#7fe0ff'; ctx.fillText(`🌐 ${o.name}`, v.x, v.y - 39); ctx.textAlign = 'left';
+  }
+}
+
 // ===== Fegyvertár (ADR-0042): G / egérgörgő – váltás; bal klikk / F – tűz. A nehézfegyverek lőszere idővel újratöltődik =====
 const WEAPONS = [
   { id: 'pistol', icon: '🔫', name: 'Pisztoly', cd: 0.14 },
@@ -4165,6 +4243,7 @@ function update(dt) {
   updateTornado(dt);
   updateBombs(dt);
   updateArsenal(dt);
+  updateNet(dt);
   updateAliens(dt);
   updateWar(dt);
   updateAirforce(dt);
@@ -5513,6 +5592,7 @@ function render() {
   if (player.dead) drawCorpse(player.x, player.y, player.angle, sk.shirt, sk.head);
   else if (!player.inCar && !player.riding && !player.inHouse && !player.abduct) drawPerson(player.x, player.y, player.angle, player.walk, sk.shirt, sk.head, true, sk.legs, sk.hat, sk.pattern);
   if (clock < (player.shieldUntil || 0) && !player.dead && !player.inHouse) { ctx.strokeStyle = `rgba(120,220,255,${0.5 + 0.4 * Math.sin(clock * 14)})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(player.x, player.y, 26, 0, Math.PI * 2); ctx.stroke(); }   // védőgyűrű újraéledés után
+  drawOthers(inView);                                // a többi játékos (többjátékos módban)
   for (const c of cars) drawCar(c, n);
   viewHouses.filter(hs => hs.sky).sort((a, b) => Math.hypot(b.x - cam.x, b.y - cam.y) - Math.hypot(a.x - cam.x, a.y - cam.y)).forEach(drawSkyTop);   // a felhőkarcolók magas teste mindenek fölött (távolabbiak előbb)
   ctx.strokeStyle = '#ffe680'; ctx.lineWidth = 2;
@@ -5566,6 +5646,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
+  netInterp(dt);                                    // a többi játékos akkor is mozog, ha nálunk menü / telefon van nyitva
   if (!menu.open && !donate.open && !bank.open && !shop.open && !school.open && !tv.open && !phone.open && !taxiMenu.open && !mapView.open) {   // menüben, adományozás és banki ügyintézés közben megáll a játék
     time = (time + dt * timeScale) % CYCLE;
     clock += dt;
@@ -5579,3 +5660,4 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+netConnect();                                       // többjátékos mód, ha a saját szerverről fut a játék

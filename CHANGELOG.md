@@ -5,6 +5,12 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.36.0 – 2026-11-14
+- **Többjátékos mód** 🌐 (ADR-0044): új `server.js` – a `node server.js` paranccsal elindul a játék saját szervere (függőség nélkül), és a böngészőben a `http://localhost:8080` címen játszható; a hálózat többi gépe a `http://<a géped IP-címe>:8080` címen csatlakozhat. A játékosok egy világban látják egymást (gyalog vagy járműben, a szkinjükkel, „🌐 Játékos 123” névtáblával), simán mozognak
+- Megszakadt kapcsolatnál a játék magától újracsatlakozik; menü, telefon vagy háttérbe tett lap alatt is küld életjelet, így a szerver nem dob ki. A szerver csak a saját oldaláról enged csatlakozni, és a lassú / nem olvasó klienst kidobja
+- A GitHub Pages-en futó változat továbbra is egyjátékos
+- A CI a szervert is teszteli (két valódi WebSocket-klienssel), Node 22-vel
+
 ## 0.35.0 – 2026-11-14
 - **Trolibuszok** 🚎 (ADR-0043): minden 3. vízszintes úton (a kezdőhely útján is) trolivonal fut felsővezetékkel; a vonalakon piros trolimegállók vannak 2500 px-enként. A piros-krém trolibusz 40 mp-enként jár, a megállóban megáll, a vezeték mentén egyenesen megy. Felszállás a troli mellett **E**, a **jegy $3**; leszállás **E**, amikor megáll. A megállóban kiírja, mikor jön a következő troli
 

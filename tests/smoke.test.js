@@ -40,7 +40,7 @@ eval(src + `
   set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
   set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, bank, LOAN_MIN, LOAN_MAX, LOAN_FEE, FACTORY_WAGE, WAGE_PERIOD, BOX_SIZE, BELT, bombs, bombInv, BOMB_FUSE, BOMB_RADIUS, BOMB_MAX, BOMB_REGEN, get taxi(){return taxi}, get taxiTrip(){return taxiTrip}, taxiMenu, TAXI_FARE, taxiDestinations, nearestStation, stationCache, STATION_CACHE_MAX, raiseWanted,
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
-  get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, TORNADO_CHASE, horsesIn, nearestHorse, usedHorses, droppedHorses, TROLLEY_FARE, TROLLEY_OFFSET, TROLLEY_INTERVAL, trolleyRoad, trolleyStopsIn, nearestTrolleyStop, spawnTrolley, dispatchTrolley, trolleySchedule, WEAPONS, arsenal, cycleWeapon, fireWeapon, nukeDevices, callOwnPlane, curWeapon, NUKE_FUSE, MISSILE_MAX_RANGE, OWN_PLANE_CD, dropPhone, pickUpPhone, nearestDroppedPhone, crackText, DROPPED_PHONE_MAX, explode, phoneBack, openApp, phoneClick, snakeNew, snakeStep, snakeSteer, snakeFood, SNAKE_N, SNAKE_STEP, flappyNew, flappyFlap, flappyStep, FLAP_H, FLAP_GAP, FLAP_SPACE, FLAP_BIRD_X, PHONE_APPS, PHONE_VIDEOS, newsLog, addNews, newsLive, downtown, planeCrash, callArmy, ARMY_JOIN, ARMY_SIZE, ARMY_TANKS, ARMY_REINFORCE, ARMY_FOLLOW, RESPAWN_SHIELD, WAR_RESPAWN_DIST, WAR_RESPAWN_RANGE, PLANE_MISSILES, PLANE_ATOMS, ATOM_FALL, PLAYER_MISSILE_RANGE, PLANE_WEAPONS, cyclePlaneWeapon, dropWarMissiles, planes, bombers, airBombs, spawnParkedPlane, sendBomber, mountPlane, leavePlane, nearestPlane, PLANE_MIN, PLANE_MAX, PLANE_LAND, PLANE_AMMO, BOMBER_EVERY, AIRBOMB_FALL, AIRBOMB_RADIUS, phone, robiReply, openPhone, closePhone, sendPhone, tickPhone, norm, compass, PHONE_ITEMS, missiles, garrison, get occupation(){return occupation}, launchMissile, missileImpact, startOccupation, endOccupation, updateOccupation, MISSILE_EVERY, MISSILE_FLIGHT, MISSILE_RADIUS, MISSILE_HOUSES, OCCUPY_TIME, GARRISON, LIBERATE_BOUNTY, OCCUPY_RADIUS, callWar, WAR_REINFORCE, WAR_TANKS, TANK_HP, TANK_BOUNTY, TANK_RELOAD, NUKE_WARN, NUKE_KILL, NUKE_RADIUS, NUKE_HOUSES, warShells, craters, get nukeFx(){return nukeFx}, set nukeFx(v){nukeFx=v}, nuke, spawnSoldier, callWar, get war(){return war}, soldiers, fallen, warClock, startWar, endWar, shell, killSoldier, set warsOn(v){warsEnabled=v}, WAR_FIRST, WAR_LIFE, WAR_SOLDIERS, SOLDIER_HP, SOLDIER_BOUNTY, WAR_GAP_MIN, indoor, pickErrand, houseService, updateIndoor, set errands(v){errandsEnabled=v}, AI_REFUEL_BELOW, AI_FUEL_FLOOR, AI_FUEL_USE, ERRAND_EVERY, ERRAND_TIMEOUT, stationsIn, trainPose, nextTrainIn, getTrain, trainsIn, railStopsIn, onPlatform, TRAIN_FARE, TRAIN_DWELL, TRAIN_PERIOD, STOP_SPACE, STOP_X0, RAIL_Y0, RAIL_SPACE, RAIL_GAP, TRAIN_LEN, PLATFORM, set trainShift(v){trainShift=v}, hpFraction, ESCAPE_SPOT, HORROR_KILLS, DEMO_HIT, DEMO_HP, MAX_DEMOS, aliens, alienClock, spawnAliens, shootAlien, set aliensOn(v){aliensEnabled=v}, ALIEN_INTERVAL, ALIEN_COUNT, ALIEN_SPEED, ALIEN_CHASE_TIME, ALIEN_BOUNTY, ABDUCT_TIME, MOON_TERM, CHEAT_MONEY, HORSE_CELL, HORSE_TROT, HORSE_GALLOP, skidMarks, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
+  get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, TORNADO_CHASE, horsesIn, nearestHorse, usedHorses, droppedHorses, netSend, net, netConnect, netReceive, netState, updateNet, NET_SEND, TROLLEY_FARE, TROLLEY_OFFSET, TROLLEY_INTERVAL, trolleyRoad, trolleyStopsIn, nearestTrolleyStop, spawnTrolley, dispatchTrolley, trolleySchedule, WEAPONS, arsenal, cycleWeapon, fireWeapon, nukeDevices, callOwnPlane, curWeapon, NUKE_FUSE, MISSILE_MAX_RANGE, OWN_PLANE_CD, dropPhone, pickUpPhone, nearestDroppedPhone, crackText, DROPPED_PHONE_MAX, explode, phoneBack, openApp, phoneClick, snakeNew, snakeStep, snakeSteer, snakeFood, SNAKE_N, SNAKE_STEP, flappyNew, flappyFlap, flappyStep, FLAP_H, FLAP_GAP, FLAP_SPACE, FLAP_BIRD_X, PHONE_APPS, PHONE_VIDEOS, newsLog, addNews, newsLive, downtown, planeCrash, callArmy, ARMY_JOIN, ARMY_SIZE, ARMY_TANKS, ARMY_REINFORCE, ARMY_FOLLOW, RESPAWN_SHIELD, WAR_RESPAWN_DIST, WAR_RESPAWN_RANGE, PLANE_MISSILES, PLANE_ATOMS, ATOM_FALL, PLAYER_MISSILE_RANGE, PLANE_WEAPONS, cyclePlaneWeapon, dropWarMissiles, planes, bombers, airBombs, spawnParkedPlane, sendBomber, mountPlane, leavePlane, nearestPlane, PLANE_MIN, PLANE_MAX, PLANE_LAND, PLANE_AMMO, BOMBER_EVERY, AIRBOMB_FALL, AIRBOMB_RADIUS, phone, robiReply, openPhone, closePhone, sendPhone, tickPhone, norm, compass, PHONE_ITEMS, missiles, garrison, get occupation(){return occupation}, launchMissile, missileImpact, startOccupation, endOccupation, updateOccupation, MISSILE_EVERY, MISSILE_FLIGHT, MISSILE_RADIUS, MISSILE_HOUSES, OCCUPY_TIME, GARRISON, LIBERATE_BOUNTY, OCCUPY_RADIUS, callWar, WAR_REINFORCE, WAR_TANKS, TANK_HP, TANK_BOUNTY, TANK_RELOAD, NUKE_WARN, NUKE_KILL, NUKE_RADIUS, NUKE_HOUSES, warShells, craters, get nukeFx(){return nukeFx}, set nukeFx(v){nukeFx=v}, nuke, spawnSoldier, callWar, get war(){return war}, soldiers, fallen, warClock, startWar, endWar, shell, killSoldier, set warsOn(v){warsEnabled=v}, WAR_FIRST, WAR_LIFE, WAR_SOLDIERS, SOLDIER_HP, SOLDIER_BOUNTY, WAR_GAP_MIN, indoor, pickErrand, houseService, updateIndoor, set errands(v){errandsEnabled=v}, AI_REFUEL_BELOW, AI_FUEL_FLOOR, AI_FUEL_USE, ERRAND_EVERY, ERRAND_TIMEOUT, stationsIn, trainPose, nextTrainIn, getTrain, trainsIn, railStopsIn, onPlatform, TRAIN_FARE, TRAIN_DWELL, TRAIN_PERIOD, STOP_SPACE, STOP_X0, RAIL_Y0, RAIL_SPACE, RAIL_GAP, TRAIN_LEN, PLATFORM, set trainShift(v){trainShift=v}, hpFraction, ESCAPE_SPOT, HORROR_KILLS, DEMO_HIT, DEMO_HP, MAX_DEMOS, aliens, alienClock, spawnAliens, shootAlien, set aliensOn(v){aliensEnabled=v}, ALIEN_INTERVAL, ALIEN_COUNT, ALIEN_SPEED, ALIEN_CHASE_TIME, ALIEN_BOUNTY, ABDUCT_TIME, MOON_TERM, CHEAT_MONEY, HORSE_CELL, HORSE_TROT, HORSE_GALLOP, skidMarks, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   school, makeQuestion, TEACHER_HOME, SHOUT, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, nearestAlex, talkToAlex, ALEX_LINES, selectCar, tv, TV_CHANNELS, atTv, RESTAURANT_ITEMS, MECHANIC_ITEMS, TUNE_MAX, TUNE_SPEED, PAINTS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
@@ -1926,6 +1926,34 @@ G.npcs.length = 0; G.aiCars.length = 0;
   G.aliensOn = false; reset();
 }
 
+// --- többjátékos mód: a kliens oldal (a szervert a tests/server.test.js teszteli) ---
+{
+  check('a teszt-böngészőben (WebSocket nélkül) nincs hálózat: egyjátékos marad', !G.net.ws && !G.net.online);
+  let fake = null;
+  global.window.WebSocket = class { constructor(url) { this.url = url; this.sent = []; fake = this; } send(t) { this.sent.push(t); } };
+  global.window.location = { protocol: 'https:', host: 'voparin.github.io', hostname: 'voparin.github.io' };
+  check('a GitHub Pages-en (statikus oldal) nem próbál szerverhez csatlakozni', G.netConnect() === false && fake === null);
+  global.window.location = { protocol: 'http:', host: 'localhost:8080', hostname: 'localhost' };
+  check('a saját szerverről futva a /ws-hez csatlakozik', G.netConnect() === true && fake.url === 'ws://localhost:8080/ws' && /Játékos|\w/.test(G.net.name));
+  fake.onopen(); check('a kapcsolat létrejön (online)', G.net.online);
+  Object.assign(G.player, { x: G.C + 5000, y: G.C, inCar: false, dead: 0, health: 100 }); step(10);
+  const sent = fake.sent.map(t => JSON.parse(t)).filter(m => m.t === 'state');
+  check('időnként (0,1 mp) elküldi a saját helyzetét és kinézetét', sent.length >= 1 && sent.length <= 3 && sent[sent.length - 1].s.x === G.C + 5000 && !!sent[sent.length - 1].s.shirt && sent[sent.length - 1].s.name === G.net.name);
+  fake.onmessage({ data: JSON.stringify({ t: 'hello', id: 7 }) });
+  fake.onmessage({ data: JSON.stringify({ t: 'players', list: [{ id: 7, name: 'Én', x: 1, y: 1 }, { id: 9, name: 'Anna', x: G.C + 5200, y: G.C, a: 0, car: false, shirt: '#2f6fd0', head: '#333' }, { id: 10, name: 'Bence', x: G.C + 5300, y: G.C + 100, a: 1, car: true, c0: '#d42020', c1: '#a31515', len: 72, wid: 36, kind: 'car' }, { id: 11, x: 'rossz' }] }) });
+  check('a többiek bekerülnek (magát és a hibás adatot kihagyja)', G.net.others.size === 2 && G.net.others.has(9) && G.net.others.has(10) && !G.net.others.has(7));
+  step(3); check('a többi játékos kirajzolása (gyalog, autóban, névtáblával) hibátlan', true);
+  fake.onmessage({ data: JSON.stringify({ t: 'players', list: [{ id: 9, name: 'Anna', x: G.C + 5400, y: G.C, a: 0 }] }) });
+  const an = G.net.others.get(9), mid = an.dx; step(3);
+  check('a mozgás simán úszik a két üzenet között (nem ugrik)', mid < G.C + 5250 && an.dx > mid && an.dx <= G.C + 5400 + 0.01);
+  check('aki kilépett, eltűnik', G.net.others.size === 1 && !G.net.others.has(10));
+  fake.onmessage({ data: 'nem json' }); check('a hibás üzenet nem okoz gondot', G.net.others.size === 1);
+  G.menu.open = true; const sent0 = fake.sent.length; G.net.online = true; G.net.ws = fake; G.netSend(); G.menu.open = false;
+  check('menü / telefon alatt is küld életjelet (ne dobja ki a szerver)', fake.sent.length === sent0 + 1);
+  fake.onclose(); check('kapcsolatbontáskor a többiek eltűnnek, és újracsatlakozást ütemez', !G.net.online && G.net.others.size === 0 && !G.net.ws && G.net.tries >= 1);
+  delete global.window.WebSocket; delete global.window.location;
+}
+
 // --- trolibuszok: saját vonalak és megállók, jegy $3 ---
 {
   G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false; G.errands = false; G.warsOn = false;
@@ -2595,7 +2623,7 @@ G.npcs.length = 0; G.aiCars.length = 0;
   G.war.missileT = 0.01; step(3);
   check('a háború alatt ballisztikus rakéták indulnak', G.missiles.length >= 1 && G.missiles[0].t < G.MISSILE_FLIGHT);
   const mm0 = G.missiles[0];
-  check('a rakéta távolról (2800 px-re) indul, és a célja a csatatér környékén van (lakott terület / csatatér)', Math.hypot(mm0.x0 - G.war.x, mm0.y0 - G.war.y) > 2500 && Math.hypot(mm0.tx - G.war.x, mm0.ty - G.war.y) < 2400);
+  check('a rakéta távolról (2800 px-re) indul, és a célja a csatatér környékén van (lakott terület / csatatér)', Math.hypot(mm0.x0 - G.war.x, mm0.y0 - G.war.y) > 2500 && Math.hypot(mm0.tx - G.war.x, mm0.ty - G.war.y) < 2600);   // a célház a ±1800 px-es négyzetben (sarokban ~2550 px)
   const n0 = G.missiles.length; step(60 * (G.MISSILE_FLIGHT + 0.5));
   check('a rakéta becsapódik (eltűnik a levegőből, robbanás marad)', G.missiles.length < n0 + 1 && G.missiles.every(m => m.t < G.MISSILE_FLIGHT));
   const tg = G.housesIn(G.C + 80000, G.C - 400, G.C + 95000, G.C), mh = tg[0], mh2 = tg.find(h => Math.hypot(h.x - mh.x, h.y - mh.y) > 500);
@@ -2887,6 +2915,7 @@ G.npcs.length = 0; G.aiCars.length = 0;
 {
   const wf = fs.readFileSync(path.join(__dirname, '..', '.github', 'workflows', 'deploy.yml'), 'utf8');
   check('kiadáskor a game.js címe egyedi (nem a régi, tárolt változat fut)', /game\.js\?v=\$\{GITHUB_SHA\}/.test(wf));
+  check('a CI a többjátékos szervert is teszteli (Node 22)', /node tests\/server\.test\.js/.test(wf) && /node-version: 22/.test(wf));
 }
 
 // --- verzió ---

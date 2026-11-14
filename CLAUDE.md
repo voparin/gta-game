@@ -11,6 +11,8 @@ Felülnézetes, GTA-szerű böngészős játék. Tiszta HTML + JavaScript (Canva
 |---|---|
 | `index.html` | betölti a canvas-t és a `game.js`-t |
 | `game.js` | a teljes játék: világ, karakter, autó, nappal/éjszaka, fények, HUD |
+| `server.js` | többjátékos szerver (ADR-0044): kiszolgálja a játékot, `/ws` – a játékosok helyzete; függőség nélkül |
+| `tests/server.test.js` | a szerver tesztje két valódi WebSocket-klienssel (Node 22) |
 | `tests/smoke.test.js` | füstteszt kamu böngészőkörnyezetben (Node, függőség nélkül) |
 | `.github/workflows/deploy.yml` | CI: teszt, majd publikálás GitHub Pages-re |
 | `CHANGELOG.md` | változásnapló, verziónként |
@@ -41,6 +43,7 @@ Felépítés a `game.js`-en belül:
 - **Tévé**: `tv` (modális), `atTv`, `TV_CHANNELS`, `drawTv` (menet közben rajzolt műsor, `tv.t`).
 - **Alex**: járókelő `alex` jelzővel (`ALEX_CHANCE`, `ALEX_LOOK`), `nearestAlex`, `talkToAlex` (E).
 - **Bicikli**: `CAR_MODELS` elem `type: 'bike'`, `fuelUse: 0` (ezért `??` és nem `||`), `drawBike`.
+- **Többjátékos mód** (ADR-0044): `net` (`ws`, `id`, `online`, `others`), `netConnect` (csak saját szerverről, a GitHub Pages-en nem), `netReceive`, `netState`, `updateNet` (küldés `NET_SEND`-enként, interpoláció), `drawOthers`. Csak a játékosok helyzete utazik; a világ képletből egyezik.
 - **Fegyvertár** (ADR-0042): `WEAPONS`, `arsenal` (`sel`, `ammo`, `regen`, `latch`), `cycleWeapon` (G / görgő), `fireWeapon` (az `updatePlayerShooting` hívja), `updateArsenal` (újratöltés, `nukeDevices` visszaszámlálás → `nuke`), rakétavető: `bullets[].rocket` → `explode`; saját bombázó: `callOwnPlane` (J, `planes[].own`).
 - **Saját sereg** (ADR-0036): `side: 'P'` a `soldiers`-ben, `callArmy` (a háború `ARMY_JOIN` körzetében, egyszer), `spawnArmySoldier`; a háborús lövedék (`from: 'war' + oldal`) minden más oldalt talál, `P` nem sebzi a játékost / polgárt; a játékos lövése és bombája a `P`-t kíméli.
 - **Felhőkarcoló** (ADR-0039): ház-típus `hs.sky` (`skyRoll`, `floors`), `downtown(x, y)`, `drawSkyTop` (parallaxis, a cars után), `nearestDoor` kiszűri, a repülő nekirepülve `planeCrash`.
@@ -90,7 +93,7 @@ Szabályok:
 2. **Fejlesztés** – kis, egy célú változtatások. Új funkció esetén bővítsd a `tests/smoke.test.js`-t is egy `check(...)` sorral, ami az új viselkedést ellenőrzi. Ha a változás architekturális döntést tartalmaz, írd meg hozzá az ADR-t (lásd fent).
 3. **Ellenőrzés helyben** – kötelező, mielőtt bármit publikálsz:
    ```bash
-   node --check game.js && node tests/smoke.test.js
+   node --check game.js && node tests/smoke.test.js && node --check server.js && node tests/server.test.js
    ```
    Csak akkor „működik”, ha mindkettő 0-s kilépési kóddal fut le és minden sor `✓`.
 4. **Kódátnézés (code review)** – minden kiadás előtt nézd át a saját változtatásodat (`git diff`) a `code-review` skill-lel (vagy egy független reviewer subagenttel), legalább ezekre: logikai hibák, határesetek (0, üres, nagyon nagy érték, NaN), elfelejtett régi kódhívások, teljesítmény (soha ne járd be az egész világot, ADR-0006), meglévő ADR-ek megsértése. A megerősített hibákat javítsd, és írj rájuk tesztet; utána újra a 3. lépés.

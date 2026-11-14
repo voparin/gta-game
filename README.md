@@ -9,6 +9,12 @@ Az utak mentén házak, buszmegállók (magyar zászlóval), parkolók és benzi
 ## Indítás
 Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 
+## Többjátékos mód 🌐
+1. A játék mappájában indítsd el a szervert: `node server.js` (Node 22 kell, más telepítés nem).
+2. Nyisd meg a böngészőben: **http://localhost:8080** – a többiek ugyanazon a hálózaton (pl. otthoni wifi) a **http://&lt;a géped IP-címe&gt;:8080** címen csatlakozhatnak.
+3. Mindenki ugyanabban a világban van, és **látjátok egymást** (gyalog vagy járműben, a szkinetekkel, névtáblával). A többi szereplő (forgalom, háború, időjárás) mindenkinél külön fut.
+- A **https://voparin.github.io/gta-game/** oldalon a játék egyjátékos (ott nincs szerver). Az interneten való közös játékhoz a `server.js`-t egy mindig futó tárhelyre kell telepíteni.
+
 ## Irányítás
 | Gomb | Funkció |
 |---|---|

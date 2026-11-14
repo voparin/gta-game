@@ -48,3 +48,4 @@ Itt van naplózva minden architekturális döntés: mit, miért és milyen alter
 | [0041](0041-telefon-appok-jatekok-videok-hirek.md) | Telefon-appok: főképernyő, mini játékok, videók és a játék hírcsatornája | Elfogadva | 2026-11-14 |
 | [0042](0042-fegyvertar-valthato-fegyverek-ujratoltodo-loszerrel.md) | Fegyvertár: váltható fegyverek, újratöltődő lőszerrel, és a játékos saját bombázója | Elfogadva | 2026-11-14 |
 | [0043](0043-trolibusz-vonalak-kepletbol.md) | Trolibuszok: képletből számolt vonalak és megállók, a busz-rendszeren | Elfogadva | 2026-11-14 |
+| [0044](0044-tobbjatekos-mod-sajat-node-szerverrel.md) | Többjátékos mód: saját, függőség nélküli Node-szerver, csak a játékosok helyzete utazik | Elfogadva | 2026-11-14 |
