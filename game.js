@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.41.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.41.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -5975,6 +5975,7 @@ function render() {
   if (phone.open) drawPhone(w, h);
   if (account.open) drawAccount(w, h);
   syncGoogleButton();                               // a Google-gomb (DOM) a profil-ablakkal együtt látszik / tűnik el
+  if (canvas.style) canvas.style.cursor = account.open || menu.open || donate.open || bank.open || shop.open || school.open || tv.open || phone.open || taxiMenu.open || mapView.open ? 'default' : 'none';   // ablakban a szokásos egérmutató látszik (a célkereszt a játékban)
   if (taxiMenu.open) drawTaxiMenu(w, h);
   if (mapView.open) drawBigMap(w, h);
   if (taxiTrip) {                                    // utazás: elsötétül, felirat

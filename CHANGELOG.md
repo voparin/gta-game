@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.41.1 – 2026-11-14
+- Javítás: menüben és ablakokban (profil, bolt, telefon, térkép…) újra látszik az egérmutató.
+
 ## 0.41.0 – 2026-11-14
 - **Belépés Google-fiókkal** 🔑 (ADR-0048): a profil-ablakban a Google hivatalos „Bejelentkezés Google-fiókkal” gombja; első alkalommal egy játékbeli nevet választasz (ezt látják a többiek), utána egy kattintással belépsz bármelyik gépről, jelszó nélkül. A Google e-mail-címedet és valódi nevedet a játék nem tárolja. A név + jelszavas belépés is megmarad
 
