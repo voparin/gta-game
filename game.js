@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.37.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.38.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -145,6 +145,84 @@ function inSea(x, y, pad = 0) {                   // a pont a vízben van-e (pad
   return d < seaRadius(Math.atan2(dy, dx)) + pad;
 }
 const inWater = (x, y) => inSea(x, y) && !onRoad(x, y, SIDEWALK_W);   // víz, nem híd
+
+// ===== Cápák (ADR-0045): a tengerben úsznak; az úszó játékost megtámadják (a hídon és a parton biztonságban vagy) =====
+const SHARK_COUNT = 6, SHARK_SPEED = 90, SHARK_CHASE = 110, SHARK_SIGHT = 500,   // gyorsabb a gyalog úszónál (63), de úszva vágtázva (Shift, 117) el lehet menekülni
+  SHARK_BITE = 18, SHARK_BITE_CD = 1, SHARK_HP = 4, SHARK_BOUNTY = 30;
+const sharks = [];                                 // { x, y, angle, hp, cd, turnT, flash }
+let sharksEnabled = true;                          // teszteléshez kikapcsolható
+const playerSwimming = () => !player.inCar && !player.dead && !player.inHouse && !player.riding && !player.moon && !player.abduct && inWater(player.x, player.y);
+function spawnShark(x, y) { const sh = { x, y, angle: rand() * Math.PI * 2, hp: SHARK_HP, cd: 0, turnT: 0, flash: 0 }; sharks.push(sh); return sh; }
+function updateSharks(dt) {
+  for (let i = sharks.length - 1; i >= 0; i--) if (Math.hypot(sharks[i].x - player.x, sharks[i].y - player.y) > 3200) sharks.splice(i, 1);   // a távoliak eltűnnek
+  if (sharksEnabled && sharks.length < SHARK_COUNT && inSea(player.x, player.y, 2200) && rand() < dt * 2) {   // a tenger közelében cápák jönnek (nem a játékos szeme előtt)
+    const a = rand() * Math.PI * 2, d = 900 + rand() * 900, x = player.x + Math.cos(a) * d, y = player.y + Math.sin(a) * d;
+    if (inWater(x, y) && inSea(x, y, -150)) spawnShark(x, y);
+  }
+  const swim = playerSwimming();
+  for (const sh of sharks) {
+    sh.cd = Math.max(0, sh.cd - dt); sh.flash = Math.max(0, sh.flash - dt);
+    const dx = player.x - sh.x, dy = player.y - sh.y, d = Math.hypot(dx, dy) || 1;
+    let sp = SHARK_SPEED;
+    sh.blockT = Math.max(0, (sh.blockT || 0) - dt);
+    if (swim && d < SHARK_SIGHT && !sh.blockT) {   // üldöz: egyenesen az úszó játékos felé (ha a part / híd útját állja, egy ideig kerül)
+      sh.angle = Math.atan2(dy, dx); sp = SHARK_CHASE;
+      if (d < 30 && sh.cd <= 0) { damagePlayer(SHARK_BITE); sh.cd = SHARK_BITE_CD; if (player.dead) message = { text: '🦈 MEGEVETT EGY CÁPA!', until: clock + 3, color: '#ff6a3a' }; else popup('🦈 Megharapott egy cápa! Menekülj a hídra vagy a partra!', '#ff6a3a'); }
+      if (d < 26) sp = 0;
+    } else { sh.turnT -= dt; if (sh.turnT <= 0) { sh.turnT = 2 + rand() * 3; sh.angle += (rand() - 0.5) * 2; } }   // körbe-körbe cirkál
+    const nx = sh.x + Math.cos(sh.angle) * sp * dt, ny = sh.y + Math.sin(sh.angle) * sp * dt;
+    if (inWater(nx, ny)) { sh.x = nx; sh.y = ny; } else { sh.angle += Math.PI * (0.6 + rand() * 0.8); sh.turnT = 1.5; sh.blockT = 1.5; }   // a vízből nem jön ki: megfordul, és egy ideig nem üldöz (ne rángatózzon a partnál)
+  }
+}
+// ===== Halak: színes rajok a tengerben; a játékostól és a cápától elúsznak =====
+const FISH_COUNT = 40, FISH_SPEED = 55, FISH_FLEE = 170, FISH_SCARE = 160;
+const FISH_COLORS = ['#ffb020', '#ff6a3a', '#ffe14a', '#5ad0ff', '#c070ff', '#7fff9f'];
+const fish = [];                                  // { x, y, angle, color, turnT, size }
+function spawnFishSchool(x, y) {                  // egy raj: egyforma színű, egy irányba úszó halak
+  const color = FISH_COLORS[(rand() * FISH_COLORS.length) | 0], angle = rand() * Math.PI * 2, n = 6 + ((rand() * 5) | 0);
+  for (let i = 0; i < n; i++) { const fx = x + (rand() - 0.5) * 90, fy = y + (rand() - 0.5) * 90; if (inWater(fx, fy)) fish.push({ x: fx, y: fy, angle: angle + (rand() - 0.5) * 0.4, color, turnT: 1 + rand() * 2, size: 0.8 + rand() * 0.5 }); }
+}
+function updateFish(dt) {
+  for (let i = fish.length - 1; i >= 0; i--) if (Math.hypot(fish[i].x - player.x, fish[i].y - player.y) > 2600) fish.splice(i, 1);
+  if (sharksEnabled && fish.length < FISH_COUNT && inSea(player.x, player.y, 1800) && rand() < dt * 1.5) {
+    const a = rand() * Math.PI * 2, d = 400 + rand() * 1100, x = player.x + Math.cos(a) * d, y = player.y + Math.sin(a) * d;
+    if (inWater(x, y) && inSea(x, y, -100)) spawnFishSchool(x, y);
+  }
+  for (const f of fish) {
+    let sp = FISH_SPEED, threat = null;
+    if (playerSwimming() || player.inCar) { const dp = Math.hypot(player.x - f.x, player.y - f.y); if (dp < FISH_SCARE) threat = player; }
+    for (const sh of sharks) if (Math.hypot(sh.x - f.x, sh.y - f.y) < FISH_SCARE) threat = sh;
+    if (threat) { f.angle = Math.atan2(f.y - threat.y, f.x - threat.x) + (rand() - 0.5) * 0.6; sp = FISH_FLEE; }   // menekül
+    else { f.turnT -= dt; if (f.turnT <= 0) { f.turnT = 1.5 + rand() * 2.5; f.angle += (rand() - 0.5) * 1.2; } }
+    const nx = f.x + Math.cos(f.angle) * sp * dt, ny = f.y + Math.sin(f.angle) * sp * dt;
+    if (inWater(nx, ny)) { f.x = nx; f.y = ny; } else { f.angle += Math.PI * (0.7 + rand() * 0.6); f.turnT = 1; }
+  }
+}
+function drawFish(f) {
+  ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.angle); ctx.scale(f.size, f.size);
+  ctx.fillStyle = f.color; ctx.beginPath(); ctx.ellipse(0, 0, 9, 4, 0, 0, Math.PI * 2); ctx.fill();
+  const wag = Math.sin(clock * 14 + f.x) * 2;
+  ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(-14, -4 + wag); ctx.lineTo(-14, 4 + wag); ctx.closePath(); ctx.fill();   // farok
+  ctx.fillStyle = '#111'; ctx.fillRect(4, -1.5, 2, 2);
+  ctx.restore();
+}
+function hurtShark(sh, n, byPlayer) {              // true, ha elpusztult
+  sh.hp -= n; sh.flash = 0.15;
+  if (sh.hp > 0) return false;
+  sharks.splice(sharks.indexOf(sh), 1);
+  if (byPlayer) earn(SHARK_BOUNTY, 'cápa 🦈');
+  return true;
+}
+function drawShark(sh) {
+  const near = Math.hypot(sh.x - player.x, sh.y - player.y) < SHARK_SIGHT && playerSwimming();
+  ctx.save(); ctx.translate(sh.x, sh.y); ctx.rotate(sh.angle);
+  ctx.fillStyle = 'rgba(20,40,70,0.45)'; ctx.beginPath(); ctx.ellipse(0, 0, 44, 13, 0, 0, Math.PI * 2); ctx.fill();   // a víz alatti test
+  ctx.beginPath(); ctx.moveTo(-40, 0); ctx.lineTo(-60, -12); ctx.lineTo(-56, 0); ctx.lineTo(-60, 12); ctx.closePath(); ctx.fill();   // farok
+  ctx.fillStyle = sh.flash ? '#fff' : '#5a6672'; ctx.beginPath(); ctx.moveTo(6, -3); ctx.lineTo(-10, -3); ctx.lineTo(-2, -22); ctx.closePath(); ctx.fill();   // a hátuszony kilóg a vízből
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(10, -6); ctx.quadraticCurveTo(0, -1, -14, -6); ctx.stroke();   // hullám az uszony előtt
+  ctx.restore();
+  if (near) { ctx.fillStyle = '#ff5a5a'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🦈', sh.x, sh.y - 30); ctx.textAlign = 'left'; }
+}
 
 function generateChunk(cx, cy) {
   const r = rng(chunkSeed(cx, cy));
@@ -2931,6 +3009,9 @@ function updateBullets(dt) {
             hit = true; break;
           }
         }
+        if (!hit) for (const sh of sharks) {
+          if (Math.hypot(sh.x - b.x, sh.y - b.y) < 22) { hurtShark(sh, 1, true); hit = true; break; }
+        }
         if (!hit) for (const a of aliens) {
           if (Math.hypot(a.x - b.x, a.y - b.y) < 16) { shootAlien(a); hit = true; break; }
         }
@@ -3936,6 +4017,8 @@ function nuke(x, y) {
   if (dc < NUKE_RADIUS && dc > 1) { car.vx += (car.x - x) / dc * 1500; car.vy += (car.y - y) / dc * 1500; }   // a játékos autóját csak ellöki
   for (const n of npcs) if (!n.dead && Math.hypot(n.x - x, n.y - y) < NUKE_RADIUS) killNpc(n, false);
   for (let i = aliens.length - 1; i >= 0; i--) if (Math.hypot(aliens[i].x - x, aliens[i].y - y) < NUKE_RADIUS) aliens.splice(i, 1);
+  for (let i = sharks.length - 1; i >= 0; i--) if (Math.hypot(sharks[i].x - x, sharks[i].y - y) < NUKE_RADIUS) sharks.splice(i, 1);
+  for (let i = fish.length - 1; i >= 0; i--) if (Math.hypot(fish[i].x - x, fish[i].y - y) < NUKE_RADIUS) fish.splice(i, 1);
   for (let i = indoor.length - 1; i >= 0; i--) if (Math.hypot(indoor[i].hs.x - x, indoor[i].hs.y - y) < NUKE_HOUSES) indoor.splice(i, 1);
   for (const hs of housesIn(x - NUKE_HOUSES, y - NUKE_HOUSES, x + NUKE_HOUSES, y + NUKE_HOUSES)) if (Math.hypot(hs.x - x, hs.y - y) < NUKE_HOUSES) destroyHouse(hs, 'ELPUSZTÍTOTT AZ ATOMBOMBA!');   // a bent lévőt is megöli
   for (let i = 0; i < 40; i++) addSmoke(x + (rand() - 0.5) * 500, y + (rand() - 0.5) * 500, (rand() - 0.5) * 300, (rand() - 0.5) * 300, true);
@@ -4118,6 +4201,7 @@ function explode(x, y, rocket = false) {           // rocket: a rakétavető rob
   }
   for (const p of npcs) if (!p.dead && Math.hypot(p.x - x, p.y - y) < BOMB_RADIUS) killNpc(p, true);
   for (let i = aliens.length - 1; i >= 0; i--) if (Math.hypot(aliens[i].x - x, aliens[i].y - y) < BOMB_RADIUS) { aliens[i].hp = 1; shootAlien(aliens[i]); }   // a bomba az űrlényt is megöli
+  for (const sh of [...sharks]) if (Math.hypot(sh.x - x, sh.y - y) < BOMB_RADIUS) hurtShark(sh, 99, true);                                                     // és a cápát is
   for (const sd of [...soldiers, ...garrison]) if (sd.side !== 'P' && Math.hypot(sd.x - x, sd.y - y) < BOMB_RADIUS) killSoldier(sd, true);   // a saját seregedet a bomba megkíméli                                                       // és a katonákat is
   const wasInside = !!player.inHouse;               // a ház ledőlése előtt kell megjegyezni (az kiveszi belőle a játékost)
   for (const hs of housesIn(x - BOMB_RADIUS, y - BOMB_RADIUS, x + BOMB_RADIUS, y + BOMB_RADIUS)) {
@@ -4260,6 +4344,8 @@ function update(dt) {
   updateArsenal(dt);
   updateNet(dt);
   updateAliens(dt);
+  updateSharks(dt);
+  updateFish(dt);
   updateWar(dt);
   updateAirforce(dt);
   updateOccupation(dt);
@@ -5623,6 +5709,8 @@ function render() {
   for (const pl of planes) if (inView(pl)) drawPlane(pl, false);
   for (const b of bombers) drawPlane(b, true);
   drawAirBombs();
+  for (const f of fish) if (inView(f)) drawFish(f);
+  for (const sh of sharks) if (inView(sh)) drawShark(sh);
   for (const a of aliens) if (inView(a)) drawAlien(a);
   if (player.abduct) drawAbduct();
   for (const dp of progress.droppedPhones) if (inView(dp)) drawDroppedPhone(dp);

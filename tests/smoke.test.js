@@ -40,7 +40,7 @@ eval(src + `
   set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
   set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, bank, LOAN_MIN, LOAN_MAX, LOAN_FEE, FACTORY_WAGE, WAGE_PERIOD, BOX_SIZE, BELT, bombs, bombInv, BOMB_FUSE, BOMB_RADIUS, BOMB_MAX, BOMB_REGEN, get taxi(){return taxi}, get taxiTrip(){return taxiTrip}, taxiMenu, TAXI_FARE, taxiDestinations, nearestStation, stationCache, STATION_CACHE_MAX, raiseWanted,
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
-  get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, TORNADO_CHASE, horsesIn, nearestHorse, usedHorses, droppedHorses, inSea, inWater, seaRadius, SEA_X, SEA_Y, SEA_R, netSend, net, netConnect, netReceive, netState, updateNet, NET_SEND, TROLLEY_FARE, TROLLEY_OFFSET, TROLLEY_INTERVAL, trolleyRoad, trolleyStopsIn, nearestTrolleyStop, spawnTrolley, dispatchTrolley, trolleySchedule, WEAPONS, arsenal, cycleWeapon, fireWeapon, nukeDevices, callOwnPlane, curWeapon, NUKE_FUSE, MISSILE_MAX_RANGE, OWN_PLANE_CD, dropPhone, pickUpPhone, nearestDroppedPhone, crackText, DROPPED_PHONE_MAX, explode, phoneBack, openApp, phoneClick, snakeNew, snakeStep, snakeSteer, snakeFood, SNAKE_N, SNAKE_STEP, flappyNew, flappyFlap, flappyStep, FLAP_H, FLAP_GAP, FLAP_SPACE, FLAP_BIRD_X, PHONE_APPS, PHONE_VIDEOS, newsLog, addNews, newsLive, downtown, planeCrash, callArmy, ARMY_JOIN, ARMY_SIZE, ARMY_TANKS, ARMY_REINFORCE, ARMY_FOLLOW, RESPAWN_SHIELD, WAR_RESPAWN_DIST, WAR_RESPAWN_RANGE, PLANE_MISSILES, PLANE_ATOMS, ATOM_FALL, PLAYER_MISSILE_RANGE, PLANE_WEAPONS, cyclePlaneWeapon, dropWarMissiles, planes, bombers, airBombs, spawnParkedPlane, sendBomber, mountPlane, leavePlane, nearestPlane, PLANE_MIN, PLANE_MAX, PLANE_LAND, PLANE_AMMO, BOMBER_EVERY, AIRBOMB_FALL, AIRBOMB_RADIUS, phone, robiReply, openPhone, closePhone, sendPhone, tickPhone, norm, compass, PHONE_ITEMS, missiles, garrison, get occupation(){return occupation}, launchMissile, missileImpact, startOccupation, endOccupation, updateOccupation, MISSILE_EVERY, MISSILE_FLIGHT, MISSILE_RADIUS, MISSILE_HOUSES, OCCUPY_TIME, GARRISON, LIBERATE_BOUNTY, OCCUPY_RADIUS, callWar, WAR_REINFORCE, WAR_TANKS, TANK_HP, TANK_BOUNTY, TANK_RELOAD, NUKE_WARN, NUKE_KILL, NUKE_RADIUS, NUKE_HOUSES, warShells, craters, get nukeFx(){return nukeFx}, set nukeFx(v){nukeFx=v}, nuke, spawnSoldier, callWar, get war(){return war}, soldiers, fallen, warClock, startWar, endWar, shell, killSoldier, set warsOn(v){warsEnabled=v}, WAR_FIRST, WAR_LIFE, WAR_SOLDIERS, SOLDIER_HP, SOLDIER_BOUNTY, WAR_GAP_MIN, indoor, pickErrand, houseService, updateIndoor, set errands(v){errandsEnabled=v}, AI_REFUEL_BELOW, AI_FUEL_FLOOR, AI_FUEL_USE, ERRAND_EVERY, ERRAND_TIMEOUT, stationsIn, trainPose, nextTrainIn, getTrain, trainsIn, railStopsIn, onPlatform, TRAIN_FARE, TRAIN_DWELL, TRAIN_PERIOD, STOP_SPACE, STOP_X0, RAIL_Y0, RAIL_SPACE, RAIL_GAP, TRAIN_LEN, PLATFORM, set trainShift(v){trainShift=v}, hpFraction, ESCAPE_SPOT, HORROR_KILLS, DEMO_HIT, DEMO_HP, MAX_DEMOS, aliens, alienClock, spawnAliens, shootAlien, set aliensOn(v){aliensEnabled=v}, ALIEN_INTERVAL, ALIEN_COUNT, ALIEN_SPEED, ALIEN_CHASE_TIME, ALIEN_BOUNTY, ABDUCT_TIME, MOON_TERM, CHEAT_MONEY, HORSE_CELL, HORSE_TROT, HORSE_GALLOP, skidMarks, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
+  get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, TORNADO_CHASE, horsesIn, nearestHorse, usedHorses, droppedHorses, fish, spawnFishSchool, updateFish, FISH_COUNT, FISH_SCARE, sharks, spawnShark, updateSharks, hurtShark, playerSwimming, SHARK_BITE, SHARK_HP, SHARK_BOUNTY, SHARK_SIGHT, SHARK_COUNT, set sharksOn(v){sharksEnabled=v}, inSea, inWater, seaRadius, SEA_X, SEA_Y, SEA_R, netSend, net, netConnect, netReceive, netState, updateNet, NET_SEND, TROLLEY_FARE, TROLLEY_OFFSET, TROLLEY_INTERVAL, trolleyRoad, trolleyStopsIn, nearestTrolleyStop, spawnTrolley, dispatchTrolley, trolleySchedule, WEAPONS, arsenal, cycleWeapon, fireWeapon, nukeDevices, callOwnPlane, curWeapon, NUKE_FUSE, MISSILE_MAX_RANGE, OWN_PLANE_CD, dropPhone, pickUpPhone, nearestDroppedPhone, crackText, DROPPED_PHONE_MAX, explode, phoneBack, openApp, phoneClick, snakeNew, snakeStep, snakeSteer, snakeFood, SNAKE_N, SNAKE_STEP, flappyNew, flappyFlap, flappyStep, FLAP_H, FLAP_GAP, FLAP_SPACE, FLAP_BIRD_X, PHONE_APPS, PHONE_VIDEOS, newsLog, addNews, newsLive, downtown, planeCrash, callArmy, ARMY_JOIN, ARMY_SIZE, ARMY_TANKS, ARMY_REINFORCE, ARMY_FOLLOW, RESPAWN_SHIELD, WAR_RESPAWN_DIST, WAR_RESPAWN_RANGE, PLANE_MISSILES, PLANE_ATOMS, ATOM_FALL, PLAYER_MISSILE_RANGE, PLANE_WEAPONS, cyclePlaneWeapon, dropWarMissiles, planes, bombers, airBombs, spawnParkedPlane, sendBomber, mountPlane, leavePlane, nearestPlane, PLANE_MIN, PLANE_MAX, PLANE_LAND, PLANE_AMMO, BOMBER_EVERY, AIRBOMB_FALL, AIRBOMB_RADIUS, phone, robiReply, openPhone, closePhone, sendPhone, tickPhone, norm, compass, PHONE_ITEMS, missiles, garrison, get occupation(){return occupation}, launchMissile, missileImpact, startOccupation, endOccupation, updateOccupation, MISSILE_EVERY, MISSILE_FLIGHT, MISSILE_RADIUS, MISSILE_HOUSES, OCCUPY_TIME, GARRISON, LIBERATE_BOUNTY, OCCUPY_RADIUS, callWar, WAR_REINFORCE, WAR_TANKS, TANK_HP, TANK_BOUNTY, TANK_RELOAD, NUKE_WARN, NUKE_KILL, NUKE_RADIUS, NUKE_HOUSES, warShells, craters, get nukeFx(){return nukeFx}, set nukeFx(v){nukeFx=v}, nuke, spawnSoldier, callWar, get war(){return war}, soldiers, fallen, warClock, startWar, endWar, shell, killSoldier, set warsOn(v){warsEnabled=v}, WAR_FIRST, WAR_LIFE, WAR_SOLDIERS, SOLDIER_HP, SOLDIER_BOUNTY, WAR_GAP_MIN, indoor, pickErrand, houseService, updateIndoor, set errands(v){errandsEnabled=v}, AI_REFUEL_BELOW, AI_FUEL_FLOOR, AI_FUEL_USE, ERRAND_EVERY, ERRAND_TIMEOUT, stationsIn, trainPose, nextTrainIn, getTrain, trainsIn, railStopsIn, onPlatform, TRAIN_FARE, TRAIN_DWELL, TRAIN_PERIOD, STOP_SPACE, STOP_X0, RAIL_Y0, RAIL_SPACE, RAIL_GAP, TRAIN_LEN, PLATFORM, set trainShift(v){trainShift=v}, hpFraction, ESCAPE_SPOT, HORROR_KILLS, DEMO_HIT, DEMO_HP, MAX_DEMOS, aliens, alienClock, spawnAliens, shootAlien, set aliensOn(v){aliensEnabled=v}, ALIEN_INTERVAL, ALIEN_COUNT, ALIEN_SPEED, ALIEN_CHASE_TIME, ALIEN_BOUNTY, ABDUCT_TIME, MOON_TERM, CHEAT_MONEY, HORSE_CELL, HORSE_TROT, HORSE_GALLOP, skidMarks, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   school, makeQuestion, TEACHER_HOME, SHOUT, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, nearestAlex, talkToAlex, ALEX_LINES, selectCar, tv, TV_CHANNELS, atTv, RESTAURANT_ITEMS, MECHANIC_ITEMS, TUNE_MAX, TUNE_SPEED, PAINTS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
@@ -65,6 +65,7 @@ G.tornadoes = false;
 G.aliensOn = false;       // az űrlények csak a saját tesztjükben jöjjenek
 G.errands = false;        // a gyalogosok ügyintézése is (különben eltűnnek a házakban)
 G.warsOn = false;         // a háború is csak a saját tesztjében
+G.sharksOn = false;       // a cápák is
 
 step(10);
 check('a játék elindul és fut', typeof rafCb === 'function');
@@ -1954,6 +1955,41 @@ G.npcs.length = 0; G.aiCars.length = 0;
   G.player.inCar = false; Object.assign(G.player, { x: G.SEA_X, y: G.SEA_Y - 3000 }); step(3);
   check('a tenger, a part és a hidak kirajzolása hibátlan', true);
   press('KeyK'); step(1); press('KeyK'); check('a nagy térképen is látszik (hibátlan rajz)', true);
+  // cápák
+  G.sharks.length = 0; G.sharksOn = true;
+  Object.assign(G.player, { x: wx, y: wy, inCar: false, inHouse: null, riding: null, dead: 0, health: 100 }); Object.assign(G.car, { x: G.C - 20000, y: G.C });
+  for (let i = 0; i < 60 * 20 && G.sharks.length < G.SHARK_COUNT; i++) { const hp = G.player.health; step(1); G.player.health = 100; Object.assign(G.player, { x: wx, y: wy }); }
+  check('a tengerben cápák úsznak (a játékos körül, a vízben)', G.sharks.length === G.SHARK_COUNT && G.sharks.every(sh => G.inWater(sh.x, sh.y)));
+  let wet2 = true; for (let i = 0; i < 60 * 10; i++) { step(1); G.player.health = 100; Object.assign(G.player, { x: wx, y: wy }); if (G.sharks.some(sh => !G.inWater(sh.x, sh.y))) wet2 = false; }
+  check('a cápák sosem jönnek ki a vízből (a hídra, a partra)', wet2);
+  G.sharksOn = false; G.sharks.length = 0;
+  const sh1 = G.spawnShark(wx + 300, wy); G.player.health = 100;
+  let bitten = false; for (let i = 0; i < 60 * 8 && !bitten; i++) { step(1); Object.assign(G.player, { x: wx, y: wy }); if (G.player.health < 100) bitten = true; }
+  check('az úszó játékost a cápa üldözi és megharapja', bitten && Math.hypot(sh1.x - wx, sh1.y - wy) < 60);
+  // úszva vágtázva el lehet menekülni (a cápa gyorsabb a sima úszásnál, lassabb a vágtánál)
+  G.player.health = 100; G.sharks.length = 0; Object.assign(G.player, { x: wx, y: wy }); const sh5 = G.spawnShark(wx - 250, wy);
+  key('ShiftLeft', true); key('KeyD', true); let caughtS = false; for (let i = 0; i < 60 * 4; i++) { step(1); if (Math.hypot(sh5.x - G.player.x, sh5.y - G.player.y) < 30) caughtS = true; } key('KeyD', false); key('ShiftLeft', false);
+  check('úszva vágtázva (Shift) el lehet menekülni a cápa elől', !caughtS && Math.hypot(sh5.x - G.player.x, sh5.y - G.player.y) > 250);
+  G.player.health = 100; G.sharks.length = 0; const sh2 = G.spawnShark(G.SEA_X + 600, bridgeY + 300);
+  Object.assign(G.player, { x: G.SEA_X + 600, y: bridgeY + 40 }); const d0 = Math.hypot(sh2.x - G.player.x, sh2.y - G.player.y);
+  for (let i = 0; i < 60 * 6; i++) { step(1); Object.assign(G.player, { x: G.SEA_X + 600, y: bridgeY + 40 }); }
+  check('a hídon biztonságban vagy (nem harap, és nem jön ki a hídra)', G.player.health === 100 && !G.playerSwimming() && G.inWater(sh2.x, sh2.y));
+  G.sharks.length = 0; const sh3 = G.spawnShark(G.SEA_X + 900, bridgeY + 120); const m0 = G.progress.money;
+  for (let k = 0; k < G.SHARK_HP; k++) { G.bullets.push({ x: sh3.x - 10, y: sh3.y, vx: 100, vy: 0, life: 1, from: 'player' }); step(2); }
+  check('a cápát le lehet lőni (' + G.SHARK_HP + ' lövés, +$' + G.SHARK_BOUNTY + ')', !G.sharks.includes(sh3) && G.progress.money === m0 + G.SHARK_BOUNTY);
+  const sh4 = G.spawnShark(G.SEA_X + 900, bridgeY + 120); G.explode(sh4.x, sh4.y);
+  check('a bomba a cápát is megöli', !G.sharks.includes(sh4));
+  G.sharks.length = 0; G.clearWanted();
+  // halak
+  G.fish.length = 0; G.sharksOn = true; Object.assign(G.player, { x: wx, y: wy, health: 100, dead: 0, inCar: false });
+  for (let i = 0; i < 60 * 25 && G.fish.length < G.FISH_COUNT - 10; i++) { step(1); G.sharks.length = 0; G.player.health = 100; Object.assign(G.player, { x: wx, y: wy }); }
+  check('a tengerben színes halrajok úsznak, csak a vízben', G.fish.length >= G.FISH_COUNT - 10 && G.fish.every(f => G.inWater(f.x, f.y)) && new Set(G.fish.map(f => f.color)).size >= 2);
+  G.sharksOn = false; G.fish.length = 0;
+  G.spawnFishSchool(wx + 60, wy); const f0 = G.fish[0], fd0 = Math.hypot(f0.x - wx, f0.y - wy);
+  for (let i = 0; i < 40; i++) { step(1); Object.assign(G.player, { x: wx, y: wy }); }
+  check('a halak elúsznak a közelükben úszó játékos elől', G.fish.length > 0 && Math.hypot(f0.x - wx, f0.y - wy) > fd0 + 20);
+  G.fish.length = 0; Object.assign(G.player, { x: G.C, y: G.C }); step(5);
+  check('a szárazföldön nincsenek halak', G.fish.length === 0);
   // háború a part közelében: a csatatér a szárazföldön
   let wet = 0; G.warsOn = true;
   for (let i = 0; i < 12; i++) { Object.assign(G.player, { x: G.SEA_X, y: G.SEA_Y - G.SEA_R + 200 }); G.callWar(); if (G.war && G.inSea(G.war.x, G.war.y)) wet++; G.endWar('x'); }
@@ -2628,7 +2664,7 @@ G.npcs.length = 0; G.aiCars.length = 0;
   G.bullets.push({ x: a_ped2.x - 8, y: a_ped2.y, vx: 1100, vy: 0, life: 0.9, from: 'warP' }); step(3);
   check('és a polgárokat sem', !(a_ped2.dead > 0));
   // az ellenség a saját sereget is támadja, a saját sereg az ellenséget
-  const a_foe = G.soldiers.find(s2 => s2.side === 'A' && !s2.tank), a_fhp = a_foe.hp; Object.assign(a_foe, { x: G.player.x + 600, y: G.player.y + 900, cd: 99 });
+  const a_foe = G.soldiers.find(s2 => s2.side === 'A' && !s2.tank), a_fhp = a_foe.hp; Object.assign(a_foe, { x: G.player.x + 600, y: G.nearestRoad(G.player.y + 900) + 20, cd: 99 });   // az úton (akadálymentesen)
   G.bullets.push({ x: a_foe.x - 8, y: a_foe.y, vx: 1100, vy: 0, life: 0.9, from: 'warP' }); step(3);
   check('a saját sereg golyója az ellenséget sebzi', a_foe.hp === a_fhp - 1);
   const a_me2 = a_army().find(s2 => !s2.tank), mhp = a_me2.hp; Object.assign(a_me2, { x: G.player.x + 700, y: G.nearestRoad(G.player.y + 1200) + 20 });   // akadálymentes helyen (az úton)

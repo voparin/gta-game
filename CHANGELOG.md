@@ -5,6 +5,10 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.38.0 – 2026-11-14
+- **Cápák** 🦈 a tengerben: ha a tenger közelében vagy, cápák cirkálnak a vízben (a hátuszonyuk kilóg). Ha úszol, a közeli cápa üldözőbe vesz, és megharap (-18 élet harapásonként) – a **hídon és a parton biztonságban vagy**, mert a cápák sosem jönnek ki a vízből. A cápa gyorsabb a sima úszásnál, de úszva vágtázva (Shift) el lehet menekülni előle. Lelőhetők (4 lövés, +$30) vagy felrobbanthatók
+- **Halak** 🐟: színes halrajok úsznak a tengerben, és elúsznak előled és a cápák elől
+
 ## 0.37.0 – 2026-11-14
 - **Tenger** 🌊 (ADR-0045): a pálya közepén, a kezdőhelytől délre (kb. 11 km-re) egy nagy, kb. 17 km széles tenger hullámos parttal, homokos stranddal, hullámzó vízzel. Az utak és a vasút **hidakon** kelnek át (korláttal). A vízben **úszni** lehet (lassan), az autó alig halad, a ló is úszik. A vízben nincsenek házak, kutak, megállók, sziklák. A nagy térképen (K) is látszik
 

@@ -38,6 +38,8 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 ## Tenger 🌊
 - A pálya közepén, a **kezdőhelytől délre** (kb. 11 km-re) egy nagy **tenger** van, hullámos parttal és homokos stranddal. A nagy térképen (K) kéken látszik.
 - Az utak és a vasút **hidakon** kelnek át rajta. A vízben **úszni** lehet (lassabban), az autó alig halad – a hídon viszont rendesen mehetsz.
+- 🦈 **Vigyázz, cápák!** Ha úszol, a közeli cápa üldözőbe vesz és megharap. A hídon és a parton biztonságban vagy – a cápák nem jönnek ki a vízből. Úszva vágtázva (**Shift**) el lehet menekülni előlük. Le is lőheted őket (4 lövés, +$30).
+- 🐟 A tengerben **színes halrajok** úsznak, és elúsznak előled és a cápák elől.
 
 ## Rendőrség
 - Az utakon (és járdán) **145 km/h** a sebességkorlát – a táblák is jelzik. Ha túlléped, körözni kezdenek (★), rendőrre lövésért ★★.
