@@ -12,6 +12,7 @@ Felülnézetes, GTA-szerű böngészős játék. Tiszta HTML + JavaScript (Canva
 | `index.html` | betölti a canvas-t és a `game.js`-t |
 | `game.js` | a teljes játék: világ, karakter, autó, nappal/éjszaka, fények, HUD |
 | `server.js` | többjátékos szerver (ADR-0044): kiszolgálja a játékot, `/ws` – a játékosok helyzete; függőség nélkül |
+| `Dockerfile`, `.gcloudignore` | a szerver a Google Cloud Runon (ADR-0046): projekt `sivatagi-gta`, régió `europe-west1`, alvó üzemmód (min 0, max 1 példány); a `NET_SERVER` (game.js) a felhős cím. Kiadáskor a felhőt is frissítsd: `gcloud run deploy sivatagi-gta --source . --region europe-west1 --project sivatagi-gta --quiet` |
 | `tests/server.test.js` | a szerver tesztje két valódi WebSocket-klienssel (Node 22) |
 | `tests/smoke.test.js` | füstteszt kamu böngészőkörnyezetben (Node, függőség nélkül) |
 | `.github/workflows/deploy.yml` | CI: teszt, majd publikálás GitHub Pages-re |

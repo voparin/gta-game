@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.38.2';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.39.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -2804,6 +2804,7 @@ function alertPeds(x, y) {
 // ===== Többjátékos mód (ADR-0044): ha a játék a saját szerveréről (node server.js) fut, a /ws-en látjuk egymást =====
 // A világ képletből épül (mindenkinél ugyanolyan), ezért csak a játékosok helyzete és kinézete utazik a hálózaton.
 const NET_SEND = 0.1;
+const NET_SERVER = 'wss://sivatagi-gta-568950307806.europe-west1.run.app';                              // a felhős (Cloud Run) szerver címe, pl. 'wss://sivatagi-gta-….run.app' – a GitHub Pages-en ide csatlakozik (ADR-0046)
 const net = { ws: null, id: 0, online: false, others: new Map(), sendT: 0, name: '', tries: 0, keepAlive: null };
 function netName() {
   try { const n = window.localStorage.getItem('gta.name'); if (n) return n; } catch (e) { /* nincs tárhely */ }
@@ -2813,9 +2814,12 @@ function netName() {
 }
 function netConnect() {                             // a GitHub Pages-en (statikus oldal) nincs szerver: ott egyjátékos marad
   const loc = window.location, WS = window.WebSocket;
-  if (!WS || !loc || !/^https?:$/.test(loc.protocol) || /github\.io$/.test(loc.hostname)) return false;
+  if (!WS || !loc || !/^https?:$/.test(loc.protocol)) return false;
+  const pages = /github\.io$/.test(loc.hostname);   // a statikus GitHub Pages-en nincs saját szerver: a felhősre csatlakozik (ha van)
+  if (pages && !NET_SERVER) return false;
   net.name = netName();
-  let ws; try { ws = new WS((loc.protocol === 'https:' ? 'wss://' : 'ws://') + loc.host + '/ws'); } catch (e) { return false; }
+  const url = pages ? NET_SERVER.replace(/\/$/, '') + '/ws' : (loc.protocol === 'https:' ? 'wss://' : 'ws://') + loc.host + '/ws';
+  let ws; try { ws = new WS(url); } catch (e) { return false; }
   net.ws = ws;
   ws.onopen = () => { net.online = true; net.tries = 0; popup(`🌐 Csatlakoztál a szerverhez – ${net.name} néven`, '#7fe0ff'); };
   ws.onclose = () => {                              // kapcsolatbontás: újracsatlakozás egyre ritkábban (2, 4, … legfeljebb 30 mp)

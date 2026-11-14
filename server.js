@@ -11,6 +11,8 @@ const ROOT = __dirname;
 const FILES = { '/': 'index.html', '/index.html': 'index.html', '/game.js': 'game.js' };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
 const TICK_MS = 100;                 // ennyi időnként küldi szét mindenki helyzetét
+// ezekről a weboldalakról is lehet csatlakozni (a saját címén túl): a GitHub Pages-en futó játék
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'https://voparin.github.io').split(',').map(s => s.trim()).filter(Boolean);
 const MAX_PLAYERS = 32, MAX_MSG = 2048, IDLE_MS = 15000, MAX_BACKLOG = 64 * 1024;   // a lassú / nem olvasó kliens kidobása (ne nőjön a memória)
 
 // egy játékos állapotának szűrése (a kliensre nem bízunk semmit)
@@ -68,7 +70,7 @@ function createServer() {
   });
   server.on('upgrade', (req, sock) => {
     const origin = req.headers.origin;                                            // csak a saját oldalról (más weboldal ne foglalhasson helyet)
-    const sameOrigin = !origin || origin.replace(/^https?:\/\//, '') === req.headers.host;
+    const sameOrigin = !origin || origin.replace(/^https?:\/\//, '') === req.headers.host || ALLOWED_ORIGINS.includes(origin);
     if ((req.url || '').split('?')[0] !== '/ws' || !req.headers['sec-websocket-key'] || !/websocket/i.test(req.headers.upgrade || '') || !sameOrigin || players.size >= MAX_PLAYERS) { sock.destroy(); return; }
     const accept = crypto.createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
     sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');

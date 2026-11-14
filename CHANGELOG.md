@@ -5,6 +5,10 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.39.0 – 2026-11-14
+- **Többjátékos mód az interneten** 🌐 (ADR-0046): a szerver a Google Cloud Runon fut (Európa, alvó üzemmód: csak játék közben ébred fel, legfeljebb egy példány, hogy mindenki egy világban legyen). A **https://voparin.github.io/gta-game/** oldal is ide csatlakozik, így bárhonnan együtt lehet játszani; a szerver saját címe: https://sivatagi-gta-568950307806.europe-west1.run.app
+- Ha egy ideje senki nem játszott, az első csatlakozás pár másodpercig tart (a szerver felébred)
+
 ## 0.38.2 – 2026-11-14
 - A térkép csak az **M** gombbal nyílik (a K-val már nem)
 

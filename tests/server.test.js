@@ -53,6 +53,11 @@ const until = async (cond, ms = 3000) => { const end = Date.now() + ms; while (D
   let evilOpen = false; evil.onopen = () => { evilOpen = true; }; let evilClosed = false; evil.onerror = () => { evilClosed = true; }; evil.onclose = () => { evilClosed = true; };
   await until(() => evilClosed || evilOpen, 2000);
   check('más weboldal nem csatlakozhat a szerverhez (Origin-ellenőrzés)', !evilOpen && players.size === 1);
+  const pages = new WebSocket(`ws://127.0.0.1:${port}/ws`, { headers: { origin: 'https://voparin.github.io' } });
+  let pagesOpen = false; pages.onopen = () => { pagesOpen = true; };
+  await until(() => pagesOpen, 2000);
+  check('a GitHub Pages-en futó játék csatlakozhat (engedélyezett oldal)', pagesOpen);
+  pages.close(); await until(() => players.size === 1, 2000);
   const status = await (await fetch(base + '/status')).json();
   check('a /status kiírja, hányan játszanak', status.players === 1);
   b.ws.close(); await wait(100);

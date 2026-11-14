@@ -1,0 +1,7 @@
+# a Cloud Runra csak a szerver és a játék kell
+.git/
+.github/
+.claude/
+docs/
+tests/
+*.md

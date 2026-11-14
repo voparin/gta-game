@@ -50,3 +50,4 @@ Itt van naplózva minden architekturális döntés: mit, miért és milyen alter
 | [0043](0043-trolibusz-vonalak-kepletbol.md) | Trolibuszok: képletből számolt vonalak és megállók, a busz-rendszeren | Elfogadva | 2026-11-14 |
 | [0044](0044-tobbjatekos-mod-sajat-node-szerverrel.md) | Többjátékos mód: saját, függőség nélküli Node-szerver, csak a játékosok helyzete utazik | Elfogadva | 2026-11-14 |
 | [0045](0045-tenger-a-palya-kozepen-kepletbol.md) | Tenger a pálya közepén: képletből számolt part, az utak hidakon kelnek át | Elfogadva | 2026-11-14 |
+| [0046](0046-szerver-a-google-cloud-runon-alvo-uzemmodban.md) | A többjátékos szerver a Google Cloud Runon, alvó üzemmódban | Elfogadva | 2026-11-14 |
