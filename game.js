@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.34.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.35.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -304,6 +304,70 @@ const BUS_FARE = 2;           // buszjegy ára ($)
 // Menetrend (ADR-0027): percenként egy busz a játékoshoz legközelebbi megállóba
 const BUS_INTERVAL = 60, BUS_LEAD = 1000;   // indulás a megálló előtt legalább 1000 px-rel
 const busSchedule = { next: 15, dispatched: 0 };
+
+// ===== Trolibuszok (ADR-0043): minden 3. vízszintes úton (a kezdőhelyén is) trolivonal, felsővezetékkel; saját megállók 2500 px-enként; jegy $3 =====
+const TROLLEY_FARE = 3, TROLLEY_OFFSET = 625, TROLLEY_INTERVAL = 40;            // a megállók a buszmegállóktól 625 px-re (ne essenek egybe)
+const TROLLEY = { type: 'citybus', color: ['#c8202a', '#f2e6c8'], len: 124, wid: 44, accel: 240, maxRoad: 330, maxSand: 250, sandDrag: 0.9, fuelUse: 1 };
+const trolleySchedule = { next: 8 };
+const trolleyRoad = R => { const k = Math.round((R - ROAD_OFFSET) / ROAD_SPACING), b = Math.round((C - ROAD_OFFSET) / ROAD_SPACING); return (((k - b) % 3) + 3) % 3 === 0 && ((R - RAIL_Y0) % RAIL_SPACE + RAIL_SPACE) % RAIL_SPACE !== 0; };   // a vasútvonal útján nincs troli
+function trolleyStopsIn(xa, ya, xb, yb) {          // csak a trolivonalakon (vízszintes utak), mindkét oldalon
+  const out = [];
+  for (const R of roadsIn(ya - EDGE, yb + EDGE)) {
+    if (!trolleyRoad(R)) continue;
+    for (let k = Math.ceil((xa - TROLLEY_OFFSET) / STOP_SPACING); TROLLEY_OFFSET + k * STOP_SPACING <= xb; k++) {
+      const a = TROLLEY_OFFSET + k * STOP_SPACING;
+      for (const side of [-1, 1]) out.push({ axis: 'h', road: R, along: a, side, dir: side, x: a, y: R + side * (EDGE - 12), trolley: true });
+    }
+  }
+  return out;
+}
+function nearestTrolleyStop(x, y) {
+  let best = null, bd = Infinity;
+  for (const bs of trolleyStopsIn(x - 2600, y - 2600, x + 2600, y + 2600)) { const d = Math.hypot(bs.x - x, bs.y - y); if (d < bd) { bd = d; best = bs; } }
+  return best;
+}
+function spawnTrolley(dir, road, along) {
+  const c = spawnAiCar('h', dir, road, along);
+  applyCarModel(c, TROLLEY);
+  Object.assign(c, { citybus: true, trolley: true, health: 12, dwellUntil: 0, lastStop: null });
+  c.ai.speed = 280;
+  return c;
+}
+function dispatchTrolley() {                       // a játékoshoz legközelebbi trolimegálló felé, a megálló előtt indul
+  const lead = busLead();
+  const stops = trolleyStopsIn(player.x - 2600, player.y - 2600, player.x + 2600, player.y + 2600)
+    .sort((a, b) => Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y)).slice(0, 6);
+  for (const bs of stops) {
+    const along = bs.along - bs.dir * lead, lane = { x: along, y: bs.road + bs.dir * 40 };
+    if (dist(lane, player) > 2700) continue;                                     // különben a távoli autókat eltüntető takarítás rögtön törölné
+    if ([car, ...aiCars].some(c => dist(c, lane) < 300)) continue;
+    return spawnTrolley(bs.dir, bs.road, along);
+  }
+  return null;
+}
+const nextTrolleyIn = () => Math.max(0, trolleySchedule.next - clock) + busLead() / 280 + 1.5;
+function drawTrolleyWires(view) {                  // felsővezeték a trolivonalak két sávja fölött, oszlopokkal
+  for (const R of roadsIn(view.y0 - EDGE, view.y1 + EDGE)) {
+    if (!trolleyRoad(R)) continue;
+    ctx.save(); ctx.strokeStyle = 'rgba(30,30,30,0.75)'; ctx.lineWidth = 1.5;
+    for (const ly of [R - 40 - 4, R - 40 + 4, R + 40 - 4, R + 40 + 4]) { ctx.beginPath(); ctx.moveTo(view.x0, ly); ctx.lineTo(view.x1, ly); ctx.stroke(); }
+    ctx.fillStyle = '#555';
+    for (let x = Math.ceil(view.x0 / 300) * 300; x < view.x1; x += 300) {
+      ctx.fillRect(x - 2, R - EDGE - 2, 4, EDGE * 2 + 4);                         // tartókötél az út fölött
+      ctx.beginPath(); ctx.arc(x, R - EDGE, 5, 0, Math.PI * 2); ctx.arc(x, R + EDGE, 5, 0, Math.PI * 2); ctx.fill();   // oszlopok a járdán
+    }
+    ctx.restore();
+  }
+}
+function drawTrolleyStop(bs) {
+  ctx.fillStyle = 'rgba(200,32,42,0.85)'; ctx.fillRect(bs.x - 28, bs.y - 8, 56, 16);              // fedett váró
+  ctx.fillStyle = 'rgba(255,220,220,0.6)'; ctx.fillRect(bs.x - 25, bs.y - 5, 50, 10);
+  ctx.fillStyle = '#c8202a'; ctx.fillRect(bs.x + 27, bs.y - 9, 18, 18);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🚎', bs.x + 36, bs.y + 5);
+  const ly = bs.road + bs.dir * 40;                                                              // felfestés az úton
+  ctx.strokeStyle = 'rgba(200,32,42,0.8)'; ctx.lineWidth = 3; ctx.strokeRect(bs.along - 70, ly - 22, 140, 44);
+  ctx.fillStyle = 'rgba(200,32,42,0.9)'; ctx.font = 'bold 14px sans-serif'; ctx.fillText('TROLI', bs.along, ly + 5); ctx.textAlign = 'left';
+}
 
 // side: az út melyik oldalán (±1); dir: az a haladási irány, amelyik itt áll meg (jobb oldali közlekedés)
 function busStopsIn(xa, ya, xb, yb) {
@@ -1613,7 +1677,7 @@ function nearestBoardableBus() {
 // az E gomb felirata – PONTOSAN a toggleCar sorrendjét követi
 function interactionPrompt() {
   if (player.dead || player.arrested || player.passedOut > 0 || player.abduct || player.moon) return null;
-  if (player.riding) return player.riding.train ? { text: '🚆 Vonaton utazol – E: leszállás (amikor megáll az állomáson)', color: '#7df' } : { text: '🚌 Buszon utazol – E: leszállás (amikor megáll)', color: '#f28c1e' };
+  if (player.riding) return player.riding.train ? { text: '🚆 Vonaton utazol – E: leszállás (amikor megáll az állomáson)', color: '#7df' } : player.riding.trolley ? { text: '🚎 Trolibuszon utazol – E: leszállás (amikor megáll)', color: '#ff8a8a' } : { text: '🚌 Buszon utazol – E: leszállás (amikor megáll)', color: '#f28c1e' };
   if (atBlackboard() && breakLeft() > 0) return { text: `🔔 Szünet – a következő óra ${breakLeft()} mp múlva`, color: '#ffd23a' };
   if (atBlackboard()) return { text: `🏫 E: matekóra (${LESSON_LEN} feladat, jó válaszonként $${ANSWER_PAY}, hibátlanért +$${LESSON_BONUS})`, color: '#ffd23a' };
   if (atShopCounter()) return { text: STORES[storeKind(player.inHouse.hs)].prompt, color: '#7f7' };
@@ -1629,7 +1693,7 @@ function interactionPrompt() {
   if (player.inCar) return car.plane ? { text: Math.hypot(car.vx, car.vy) <= PLANE_LAND ? '✈ E: leszállás' : '🪂 E: kiugrás (a gép lezuhan) – lassíts a leszálláshoz (S)', color: '#ffb040' } : car.horse ? { text: '🐴 E: leszállás a lóról', color: '#c8a060' } : null;
   if (dist(player, car) < 75) return { text: 'Nyomd meg az E-t a beszálláshoz', color: '#fff' };
   if (taxiReady()) return { text: `🚕 E: taxi – válassz úti célt ($${TAXI_FARE})`, color: '#f2c230' };
-  { const tb = nearestBoardableBus(); if (tb) return tb.train ? { text: `🚆 E: felszállás a vonatra ($${TRAIN_FARE})`, color: '#7df' } : { text: `🚌 E: felszállás a buszra ($${BUS_FARE})`, color: '#f28c1e' }; }   // a toggleCar-ban a busz megelőzi a többit
+  { const tb = nearestBoardableBus(); if (tb) return tb.train ? { text: `🚆 E: felszállás a vonatra ($${TRAIN_FARE})`, color: '#7df' } : tb.trolley ? { text: `🚎 E: felszállás a trolibuszra ($${TROLLEY_FARE})`, color: '#ff8a8a' } : { text: `🚌 E: felszállás a buszra ($${BUS_FARE})`, color: '#f28c1e' }; }   // a toggleCar-ban a busz megelőzi a többit
   const ns = nearestBusStop(player.x, player.y);
   if (nearestDoor()) return { text: '🏠 E: bemenés a házba', color: '#7df' };
   if (nearestRentable()) return { text: `🔑 E: autóbérlés ($${RENT_PRICE})`, color: '#7f7' };
@@ -1639,6 +1703,7 @@ function interactionPrompt() {
   if (nearestAlex()) return { text: '💬 E: beszélgetés Alexszel', color: '#7f7' };
   { const st = onPlatform(player.x, player.y); if (st) return { text: `🚆 Vasútállomás – ${nextTrainIn(st.k, clock + trainShift) | 0} mp múlva érkezik a következő vonat (jegy $${TRAIN_FARE})`, color: '#7df' }; }
   if (nearestHomeless()) return { text: `🤲 E: adományozás ($${DONATE_MIN}–$${DONATE_MAX})`, color: '#7f7' };
+  { const ts = nearestTrolleyStop(player.x, player.y); if (ts && Math.hypot(ts.x - player.x, ts.y - player.y) < 160) return { text: `🚎 Trolimegálló – a trolibusz 40 mp-enként jár, a következő ~${Math.ceil(nextTrolleyIn())} mp múlva (jegy $${TROLLEY_FARE})`, color: '#ff8a8a' }; }
   if (ns && Math.hypot(ns.x - player.x, ns.y - player.y) < 160) return { text: `🚌 Buszmegálló – a busz percenként jár, a következő ~${Math.ceil(nextBusIn())} mp múlva`, color: '#f28c1e' };
   return null;
 }
@@ -1647,7 +1712,7 @@ function toggleCar() {
   if (!controllable()) return;
   if (player.riding) {                               // leszállás a busz jobb oldalán (a járda felé)
     const b = player.riding;
-    if (Math.hypot(b.vx, b.vy) > 100) { popup(b.train ? 'Várd meg, amíg a vonat megáll!' : 'Várd meg, amíg a busz megáll!', '#f66'); return; }
+    if (Math.hypot(b.vx, b.vy) > 100) { popup(`Várd meg, amíg ${b.train ? 'a vonat' : b.trolley ? 'a trolibusz' : 'a busz'} megáll!`, '#f66'); return; }
     player.x = b.x - Math.sin(b.angle) * (b.wid / 2 + 22);
     player.y = b.y + Math.cos(b.angle) * (b.wid / 2 + 22);
     player.riding = null;
@@ -1672,12 +1737,12 @@ function toggleCar() {
   const homeless = !bus && !player.inCar && dist(player, car) >= 75 ? nearestHomeless() : null;
   if (homeless) { openDonate(homeless); return; }
   if (bus) {
-    const fare = bus.train ? TRAIN_FARE : BUS_FARE, what = bus.train ? 'vonatjegy' : 'buszjegy';
+    const fare = bus.train ? TRAIN_FARE : bus.trolley ? TROLLEY_FARE : BUS_FARE, what = bus.train ? 'vonatjegy' : bus.trolley ? 'trolijegy' : 'buszjegy';
     if (!(progress.money >= fare)) { popup(`A ${what} $${fare} – nincs elég pénzed!`, '#f66'); return; }
     progress.money -= fare;
     saveProgress();
     player.riding = bus;
-    popup(bus.train ? `🚆 Felszálltál a vonatra (-$${fare}) – a másik állomáson E: leszállás` : `🚌 Felszálltál a buszra (-$${fare}) – E: leszállás`, bus.train ? '#7df' : '#f28c1e');
+    popup(bus.train ? `🚆 Felszálltál a vonatra (-$${fare}) – a másik állomáson E: leszállás` : bus.trolley ? `🚎 Felszálltál a trolibuszra (-$${fare}) – E: leszállás` : `🚌 Felszálltál a buszra (-$${fare}) – E: leszállás`, bus.train ? '#7df' : bus.trolley ? '#ff8a8a' : '#f28c1e');
     return;
   }
   if (player.inCar && car.plane) { playerPlaneExit(); return; }
@@ -1926,6 +1991,9 @@ function spawnAround(dt) {
       h.angle = axis === 'h' ? (side > 0 ? -Math.PI / 2 : Math.PI / 2) : (side > 0 ? Math.PI : 0);   // az út felé néz
     }
   }
+  if (clock >= trolleySchedule.next) {              // trolibusz menetrend: 40 mp-enként, ha van trolivonal a közelben
+    trolleySchedule.next = clock + (dispatchTrolley() ? TROLLEY_INTERVAL : 3);
+  }
   if (clock >= busSchedule.next) {                  // percenként egy városi busz (menetrend)
     busSchedule.next = clock + (dispatchBus() ? BUS_INTERVAL : 2);   // ha foglalt az indulóhely, 2 mp múlva újra próbálja
   }
@@ -1997,7 +2065,7 @@ function aiCarInput(c) {
       const pump = st.pumps[(rand() * st.pumps.length) | 0], ux = X - pump.x, uy = Y - pump.y, ul = Math.hypot(ux, uy) || 1;
       ai.pit = { x: pump.x + ux / ul * 90, y: pump.y + uy / ul * 90, phase: 'go', until: clock + 30 };
     }
-    const roll = st ? 1 : rand();
+    const roll = st || c.trolley ? 1 : rand();       // a troli a felsővezeték mentén egyenesen megy
     if (roll < 0.5) {
       const right = roll < 0.25;
       const newAxis = ai.axis === 'h' ? 'v' : 'h';
@@ -2023,8 +2091,9 @@ function aiCarInput(c) {
   if (c.citybus) {                                   // városi busz: a következő megállóban megáll
     if (clock < c.dwellUntil) return { up: false, down: false, steer: 0, handbrake: true };
     const al = ai.axis === 'h' ? c.x : c.y;
-    const k = ai.dir > 0 ? Math.ceil((al - 20 - STOP_OFFSET) / STOP_SPACING) : Math.floor((al + 20 - STOP_OFFSET) / STOP_SPACING);   // a kicsit túlfutott megálló is számít
-    const stopAt = STOP_OFFSET + k * STOP_SPACING, ahead = (stopAt - al) * ai.dir, stopKey = ai.axis + ai.road + ':' + stopAt;
+    const off = c.trolley ? TROLLEY_OFFSET : STOP_OFFSET;                    // a troli a saját megállóinál áll meg
+    const k = ai.dir > 0 ? Math.ceil((al - 20 - off) / STOP_SPACING) : Math.floor((al + 20 - off) / STOP_SPACING);   // a kicsit túlfutott megálló is számít
+    const stopAt = off + k * STOP_SPACING, ahead = (stopAt - al) * ai.dir, stopKey = ai.axis + ai.road + ':' + stopAt;
     if (stopKey !== c.lastStop && ahead >= -20 && ahead < 220) {
       if (ahead < 30 && fwd < 30) { c.dwellUntil = clock + BUS_DWELL; c.lastStop = stopKey; }
       target = Math.min(target, Math.max(0, ahead * 1.6));
@@ -4694,6 +4763,11 @@ function drawCar(c, n) {
     for (let x = -L / 2 + 14; x < L / 2 - 34; x += 16) { ctx.fillRect(x, -W / 2 + 2, 11, 5); ctx.fillRect(x, W / 2 - 7, 11, 5); }
     ctx.fillStyle = '#d8d8d8'; ctx.fillRect(-14, -8, 26, 16);
   }
+  if (c.trolley) {                                   // troli: két áramszedő rúd hátrafelé, a vezetékig
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+    for (const sy of [-4, 4]) { ctx.beginPath(); ctx.moveTo(-L / 6, sy); ctx.lineTo(-L / 2 - 26, sy * 2); ctx.stroke(); }
+    ctx.fillStyle = '#c8202a'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('TROLI', L / 6, 4); ctx.textAlign = 'left';
+  }
   if (c.police) {                                    // fényhíd: üldözéskor villog
     const on = c.chasing && !c.wrecked, blink = Math.floor(clock * 6) % 2;
     ctx.fillStyle = on && blink ? '#ff2020' : '#701010'; ctx.fillRect(-6, -W / 2 + 4, 8, W / 2 - 4);
@@ -5398,6 +5472,8 @@ function render() {
   const viewHouses = housesIn(view.x0, view.y0, view.x1, view.y1);
   for (const hs of viewHouses) drawHouse(hs, n);
   for (const l of lotsIn(view.x0, view.y0, view.x1, view.y1)) drawParkingLot(l);
+  drawTrolleyWires(view);
+  for (const ts of trolleyStopsIn(view.x0, view.y0, view.x1, view.y1)) drawTrolleyStop(ts);
   for (const bs of busStopsIn(view.x0, view.y0, view.x1, view.y1)) { drawBusStop(bs); const f = parkingLot(bs).flag; drawHungarianFlag(f.x, f.y); }
   drawSkidMarks(view);
   for (const p of npcs) if (p.dead && inView(p)) drawCorpse(p.x, p.y, p.angle, p.shirt, p.head);

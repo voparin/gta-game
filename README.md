@@ -56,6 +56,11 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - A **zöld busz** csak a tiéd – az Esc menüben választhatod ki.
 - Minden megállóban ki van tűzve a 🇭🇺 magyar zászló.
 
+## Trolibuszok
+- Minden 3. vízszintes úton (a kezdőhely útján is) **trolivonal** fut, felsővezetékkel. A vonalakon **piros trolimegállók** vannak („🚎”, „TROLI” felfestés).
+- A piros-krém **trolibusz 40 másodpercenként** jár, a megállóban megáll, a vezeték mentén egyenesen halad.
+- A troli mellett **E**: felszállás, a **jegy $3**. **E** újra: leszállás, amikor megáll. A megállóban kiírja, mikor jön a következő.
+
 ## Autóbérlés
 - Minden buszmegálló mellett van egy parkoló egy fehér **bérautóval**. Mellé állva **E**: kibérled **$15-ért** (tele tankkal).
 - A saját autóidat az Esc menüben bármikor visszaválaszthatod.

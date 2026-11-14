@@ -40,7 +40,7 @@ eval(src + `
   set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
   set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, bank, LOAN_MIN, LOAN_MAX, LOAN_FEE, FACTORY_WAGE, WAGE_PERIOD, BOX_SIZE, BELT, bombs, bombInv, BOMB_FUSE, BOMB_RADIUS, BOMB_MAX, BOMB_REGEN, get taxi(){return taxi}, get taxiTrip(){return taxiTrip}, taxiMenu, TAXI_FARE, taxiDestinations, nearestStation, stationCache, STATION_CACHE_MAX, raiseWanted,
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
-  get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, TORNADO_CHASE, horsesIn, nearestHorse, usedHorses, droppedHorses, WEAPONS, arsenal, cycleWeapon, fireWeapon, nukeDevices, callOwnPlane, curWeapon, NUKE_FUSE, MISSILE_MAX_RANGE, OWN_PLANE_CD, dropPhone, pickUpPhone, nearestDroppedPhone, crackText, DROPPED_PHONE_MAX, explode, phoneBack, openApp, phoneClick, snakeNew, snakeStep, snakeSteer, snakeFood, SNAKE_N, SNAKE_STEP, flappyNew, flappyFlap, flappyStep, FLAP_H, FLAP_GAP, FLAP_SPACE, FLAP_BIRD_X, PHONE_APPS, PHONE_VIDEOS, newsLog, addNews, newsLive, downtown, planeCrash, callArmy, ARMY_JOIN, ARMY_SIZE, ARMY_TANKS, ARMY_REINFORCE, ARMY_FOLLOW, RESPAWN_SHIELD, WAR_RESPAWN_DIST, WAR_RESPAWN_RANGE, PLANE_MISSILES, PLANE_ATOMS, ATOM_FALL, PLAYER_MISSILE_RANGE, PLANE_WEAPONS, cyclePlaneWeapon, dropWarMissiles, planes, bombers, airBombs, spawnParkedPlane, sendBomber, mountPlane, leavePlane, nearestPlane, PLANE_MIN, PLANE_MAX, PLANE_LAND, PLANE_AMMO, BOMBER_EVERY, AIRBOMB_FALL, AIRBOMB_RADIUS, phone, robiReply, openPhone, closePhone, sendPhone, tickPhone, norm, compass, PHONE_ITEMS, missiles, garrison, get occupation(){return occupation}, launchMissile, missileImpact, startOccupation, endOccupation, updateOccupation, MISSILE_EVERY, MISSILE_FLIGHT, MISSILE_RADIUS, MISSILE_HOUSES, OCCUPY_TIME, GARRISON, LIBERATE_BOUNTY, OCCUPY_RADIUS, callWar, WAR_REINFORCE, WAR_TANKS, TANK_HP, TANK_BOUNTY, TANK_RELOAD, NUKE_WARN, NUKE_KILL, NUKE_RADIUS, NUKE_HOUSES, warShells, craters, get nukeFx(){return nukeFx}, set nukeFx(v){nukeFx=v}, nuke, spawnSoldier, callWar, get war(){return war}, soldiers, fallen, warClock, startWar, endWar, shell, killSoldier, set warsOn(v){warsEnabled=v}, WAR_FIRST, WAR_LIFE, WAR_SOLDIERS, SOLDIER_HP, SOLDIER_BOUNTY, WAR_GAP_MIN, indoor, pickErrand, houseService, updateIndoor, set errands(v){errandsEnabled=v}, AI_REFUEL_BELOW, AI_FUEL_FLOOR, AI_FUEL_USE, ERRAND_EVERY, ERRAND_TIMEOUT, stationsIn, trainPose, nextTrainIn, getTrain, trainsIn, railStopsIn, onPlatform, TRAIN_FARE, TRAIN_DWELL, TRAIN_PERIOD, STOP_SPACE, STOP_X0, RAIL_Y0, RAIL_SPACE, RAIL_GAP, TRAIN_LEN, PLATFORM, set trainShift(v){trainShift=v}, hpFraction, ESCAPE_SPOT, HORROR_KILLS, DEMO_HIT, DEMO_HP, MAX_DEMOS, aliens, alienClock, spawnAliens, shootAlien, set aliensOn(v){aliensEnabled=v}, ALIEN_INTERVAL, ALIEN_COUNT, ALIEN_SPEED, ALIEN_CHASE_TIME, ALIEN_BOUNTY, ABDUCT_TIME, MOON_TERM, CHEAT_MONEY, HORSE_CELL, HORSE_TROT, HORSE_GALLOP, skidMarks, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
+  get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, TORNADO_CHASE, horsesIn, nearestHorse, usedHorses, droppedHorses, TROLLEY_FARE, TROLLEY_OFFSET, TROLLEY_INTERVAL, trolleyRoad, trolleyStopsIn, nearestTrolleyStop, spawnTrolley, dispatchTrolley, trolleySchedule, WEAPONS, arsenal, cycleWeapon, fireWeapon, nukeDevices, callOwnPlane, curWeapon, NUKE_FUSE, MISSILE_MAX_RANGE, OWN_PLANE_CD, dropPhone, pickUpPhone, nearestDroppedPhone, crackText, DROPPED_PHONE_MAX, explode, phoneBack, openApp, phoneClick, snakeNew, snakeStep, snakeSteer, snakeFood, SNAKE_N, SNAKE_STEP, flappyNew, flappyFlap, flappyStep, FLAP_H, FLAP_GAP, FLAP_SPACE, FLAP_BIRD_X, PHONE_APPS, PHONE_VIDEOS, newsLog, addNews, newsLive, downtown, planeCrash, callArmy, ARMY_JOIN, ARMY_SIZE, ARMY_TANKS, ARMY_REINFORCE, ARMY_FOLLOW, RESPAWN_SHIELD, WAR_RESPAWN_DIST, WAR_RESPAWN_RANGE, PLANE_MISSILES, PLANE_ATOMS, ATOM_FALL, PLAYER_MISSILE_RANGE, PLANE_WEAPONS, cyclePlaneWeapon, dropWarMissiles, planes, bombers, airBombs, spawnParkedPlane, sendBomber, mountPlane, leavePlane, nearestPlane, PLANE_MIN, PLANE_MAX, PLANE_LAND, PLANE_AMMO, BOMBER_EVERY, AIRBOMB_FALL, AIRBOMB_RADIUS, phone, robiReply, openPhone, closePhone, sendPhone, tickPhone, norm, compass, PHONE_ITEMS, missiles, garrison, get occupation(){return occupation}, launchMissile, missileImpact, startOccupation, endOccupation, updateOccupation, MISSILE_EVERY, MISSILE_FLIGHT, MISSILE_RADIUS, MISSILE_HOUSES, OCCUPY_TIME, GARRISON, LIBERATE_BOUNTY, OCCUPY_RADIUS, callWar, WAR_REINFORCE, WAR_TANKS, TANK_HP, TANK_BOUNTY, TANK_RELOAD, NUKE_WARN, NUKE_KILL, NUKE_RADIUS, NUKE_HOUSES, warShells, craters, get nukeFx(){return nukeFx}, set nukeFx(v){nukeFx=v}, nuke, spawnSoldier, callWar, get war(){return war}, soldiers, fallen, warClock, startWar, endWar, shell, killSoldier, set warsOn(v){warsEnabled=v}, WAR_FIRST, WAR_LIFE, WAR_SOLDIERS, SOLDIER_HP, SOLDIER_BOUNTY, WAR_GAP_MIN, indoor, pickErrand, houseService, updateIndoor, set errands(v){errandsEnabled=v}, AI_REFUEL_BELOW, AI_FUEL_FLOOR, AI_FUEL_USE, ERRAND_EVERY, ERRAND_TIMEOUT, stationsIn, trainPose, nextTrainIn, getTrain, trainsIn, railStopsIn, onPlatform, TRAIN_FARE, TRAIN_DWELL, TRAIN_PERIOD, STOP_SPACE, STOP_X0, RAIL_Y0, RAIL_SPACE, RAIL_GAP, TRAIN_LEN, PLATFORM, set trainShift(v){trainShift=v}, hpFraction, ESCAPE_SPOT, HORROR_KILLS, DEMO_HIT, DEMO_HP, MAX_DEMOS, aliens, alienClock, spawnAliens, shootAlien, set aliensOn(v){aliensEnabled=v}, ALIEN_INTERVAL, ALIEN_COUNT, ALIEN_SPEED, ALIEN_CHASE_TIME, ALIEN_BOUNTY, ABDUCT_TIME, MOON_TERM, CHEAT_MONEY, HORSE_CELL, HORSE_TROT, HORSE_GALLOP, skidMarks, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   school, makeQuestion, TEACHER_HOME, SHOUT, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, nearestAlex, talkToAlex, ALEX_LINES, selectCar, tv, TV_CHANNELS, atTv, RESTAURANT_ITEMS, MECHANIC_ITEMS, TUNE_MAX, TUNE_SPEED, PAINTS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
@@ -1924,6 +1924,50 @@ G.npcs.length = 0; G.aiCars.length = 0;
   G.bombs.push({ x: G.aliens[0].x, y: G.aliens[0].y, fuse: 0.05 }); step(10);
   check('a bomba az űrlényt is megöli', G.aliens.length === 0);
   G.aliensOn = false; reset();
+}
+
+// --- trolibuszok: saját vonalak és megállók, jegy $3 ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false; G.errands = false; G.warsOn = false;
+  check('a trolijegy $3', G.TROLLEY_FARE === 3);
+  const rs = []; for (let k = -6; k <= 6; k++) rs.push(G.C + k * G.ROAD_SPACING);
+  check('minden 3. vízszintes úton trolivonal van, a kezdőhely útján is', G.trolleyRoad(G.C) && rs.filter(r => G.trolleyRoad(r)).length >= 4 && rs.filter(r => G.trolleyRoad(r)).length <= 5 && !G.trolleyRoad(G.C + G.ROAD_SPACING));
+  const ts = G.trolleyStopsIn(G.C - 6000, G.C - 300, G.C + 6000, G.C + 300);
+  check('a trolimegállók 2500 px-enként, mindkét oldalon, a buszmegállóktól és a kereszteződésektől távol', ts.length >= 8 && ts.every(s2 => ((s2.along - G.TROLLEY_OFFSET) % 2500 + 2500) % 2500 === 0 && Math.abs(s2.along - G.nearestRoad(s2.along)) > 400) && !G.busStopsIn(G.C - 6000, G.C - 300, G.C + 6000, G.C + 300).some(b => ts.some(t2 => Math.abs(b.x - t2.x) < 300 && Math.abs(b.y - t2.y) < 50)));
+  check('a vasútvonal útján nincs trolivonal (a sín és a troli nem fedi egymást)', rs.concat([G.RAIL_Y0, G.RAIL_Y0 + G.RAIL_SPACE, G.RAIL_Y0 - G.RAIL_SPACE * 2]).every(r => !G.trolleyRoad(r) || ((r - G.RAIL_Y0) % G.RAIL_SPACE + G.RAIL_SPACE) % G.RAIL_SPACE !== 0) && !G.trolleyRoad(-17500) && !G.trolleyRoad(42500));
+  check('nem trolivonalon nincs trolimegálló', G.trolleyStopsIn(G.C - 6000, G.C + G.ROAD_SPACING - 300, G.C + 6000, G.C + G.ROAD_SPACING + 300).length === 0);
+  // a troli a következő trolimegállóban megáll (nem a buszmegállóban), és nem fordul be a kereszteződésben
+  const stop = ts.find(s2 => s2.dir === 1 && s2.along > G.C + 3000);
+  Object.assign(G.player, { x: stop.along - 2500, y: G.C + 300, inCar: false, inHouse: null, riding: null, dead: 0 }); Object.assign(G.car, { x: G.C - 30000, y: G.C });
+  const tr = G.spawnTrolley(1, stop.road, stop.along - 1800);
+  let stoppedAt = null, turned = false;
+  for (let i = 0; i < 60 * 25 && !stoppedAt; i++) { step(1); if (tr.ai.axis !== 'h') turned = true; if (tr.dwellUntil > G.clock && Math.abs(tr.vx) < 20) stoppedAt = tr.x; }
+  check('a troli a trolimegállóban áll meg (nem a buszmegállóban)', stoppedAt !== null && Math.abs(stoppedAt - stop.along) < 60);
+  check('a troli a felsővezeték mentén megy (a kereszteződésben nem fordul be)', !turned);
+  // felszállás: $3
+  Object.assign(G.player, { x: tr.x, y: tr.y + 70 }); G.progress.money = 2;
+  check('a troli mellett kiírja: felszállás a trolibuszra ($3)', /trolibuszra.*\$3/.test(G.interactionPrompt().text));
+  press('KeyE');
+  check('$3 nélkül nem lehet felszállni', !G.player.riding && G.progress.money === 2);
+  G.progress.money = 10; press('KeyE');
+  check('felszállás a trolibuszra: -$3', G.player.riding === tr && G.progress.money === 7);
+  check('utazás közben kiírja, hogy trolin vagy', /Trolibuszon utazol/.test(G.interactionPrompt().text));
+  tr.dwellUntil = 0; step(60 * 3);
+  check('a troli viszi a játékost', G.player.riding === tr && Math.abs(G.player.x - tr.x) < 1 && tr.x > stoppedAt + 100);
+  for (let i = 0; i < 60 * 15 && Math.hypot(tr.vx, tr.vy) > 50; i++) step(1);
+  press('KeyE');
+  check('megállásnál le lehet szállni', !G.player.riding);
+  G.aiCars.length = 0;
+  // menetrend: a játékoshoz legközelebbi trolimegálló felé küld egy trolit
+  Object.assign(G.player, { x: G.C + 1000, y: G.C + 200 });
+  const tr2 = G.dispatchTrolley();
+  check('a menetrend trolit küld a közeli trolimegálló felé (a vonalon, a sávban)', !!tr2 && tr2.trolley && tr2.ai.axis === 'h' && G.trolleyRoad(tr2.ai.road) && Math.abs(tr2.y - (tr2.ai.road + tr2.ai.dir * 40)) < 1);
+  check('a troli a játékoshoz elég közel indul (a takarítás nem törli rögtön)', Math.hypot(tr2.x - G.player.x, tr2.y - G.player.y) <= 2700);
+  const ns = G.nearestTrolleyStop(G.player.x, G.player.y); Object.assign(G.player, { x: ns.x, y: ns.y });
+  G.aiCars.length = 0;
+  check('a trolimegállóban kiírja, mikor jön a következő troli', /Trolimegálló.*mp múlva/.test((G.interactionPrompt() || {}).text || ''));
+  check('a troli nem tankol (nem hajt be a kúthoz)', (() => { const t3 = G.spawnTrolley(1, G.C, G.C - 380); t3.fuel = 5; Object.assign(t3, { x: G.C - 380, y: G.C + 40 }); let pit = false; for (let i = 0; i < 120; i++) { step(1); if (t3.ai.pit) pit = true; } G.aiCars.length = 0; return !pit; })());
+  G.progress.money = 0; Object.assign(G.player, { x: G.C + 30000, y: G.C });
 }
 
 // --- fegyvertár: többféle fegyver, ballisztikus rakéta, atombomba, saját bombázó ---

@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.35.0 – 2026-11-14
+- **Trolibuszok** 🚎 (ADR-0043): minden 3. vízszintes úton (a kezdőhely útján is) trolivonal fut felsővezetékkel; a vonalakon piros trolimegállók vannak 2500 px-enként. A piros-krém trolibusz 40 mp-enként jár, a megállóban megáll, a vezeték mentén egyenesen megy. Felszállás a troli mellett **E**, a **jegy $3**; leszállás **E**, amikor megáll. A megállóban kiírja, mikor jön a következő troli
+
 ## 0.34.0 – 2026-11-14
 - **Fegyvertár** (ADR-0042): **G** vagy egérgörgő – fegyverváltás, bal klikk / F – tűz. Hat fegyver: 🔫 pisztoly, 💥 sörétes puska (6 sörét legyezőben), 🔥 gépfegyver (nagyon gyors), 🎯 rakétavető (10 rakéta, becsapódáskor felrobban), 🚀 **ballisztikus rakéta** (3 db, oda csapódik be, ahová az egérrel célzol, max. 2500 px), ☢ **atombomba** (1 db: lerakod, 15 mp múlva felrobban – menekülj legalább 1000 px-re!). A nehézfegyverek lőszere idővel visszatöltődik (rakétavető 15 mp, rakéta 60 mp, atombomba 5 perc). A ballisztikus rakéta és az atombomba ★★, a rakétavető ★ körözést hoz; a saját rakétavető-lövés közelről legfeljebb 30 életet visz el. Ha meghalsz, a lerakott atombombát hatástalanítják. A HUD-on látszik a kiválasztott fegyver és a lőszer
 - **Saját bombázó**: **J** – a saját bombázó repülőgéped melléd száll (tele: 30 bomba, 6 rakéta, 1 atombomba), 30 mp-enként hívható; E-vel felszállsz, B-vel bombázol, V-vel vált a fegyverek között
