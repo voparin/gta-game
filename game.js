@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.38.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.38.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -62,7 +62,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyH') toggleStorm();
   if (e.code === 'KeyB') dropBomb();
   if (e.code === 'KeyX') callTaxi();
-  if (e.code === 'KeyK' && !taxiTrip) openMap();
+  if ((e.code === 'KeyM' && !player.inHouse || e.code === 'KeyK') && !taxiTrip) openMap();   // M (a régi K is) – térkép; házban az M a rádió
   if (e.code === 'KeyQ' && !e.repeat) callWar();
   if (e.code === 'KeyP' && !e.repeat) openPhone();
   if (e.code === 'KeyO' && !e.repeat) dropPhone();
@@ -700,7 +700,7 @@ function robiReply(raw) {
     if (!pt) return { text: `Nem találok ilyet a közelben.` };
     if (has(t, 'jelol', 'pin', 'terkep')) {
       if (!smart) return { text: `A térképre jelölést az okostelefonon tudok tenni – ez az egyszerű telefon azt nem tudja. ${where(pt.label, pt)}` };
-      return { text: `📍 Megjelöltem a térképen (K): ${where(pt.label, pt)}`, pin: { x: pt.x, y: pt.y } };
+      return { text: `📍 Megjelöltem a térképen (M): ${where(pt.label, pt)}`, pin: { x: pt.x, y: pt.y } };
     }
     if (kind === 'train' && has(t, 'mikor', 'indul', 'jon')) { const st = onPlatform(player.x, player.y); if (st) return { text: `🚆 A következő vonat kb. ${Math.ceil(nextTrainIn(st.k, clock + trainShift))} mp múlva érkezik (jegy $${TRAIN_FARE}).` }; }
     return { text: where(pt.label, pt) + (smart ? ' Mondd: „jelöld meg”, és felteszem a térképre.' : '') };
@@ -859,7 +859,7 @@ function tickPhone(dt) {
   if (phone.pending && phone.t >= phone.pending.until) {
     const r = phone.pending.reply; phone.pending = null;
     phoneSay('ai', r.text);
-    if (r.pin && (progress.phone || 0) >= 2) { if (progress.pins.length < PIN_MAX) { progress.pins.push({ x: r.pin.x, y: r.pin.y }); saveProgress(); } else phoneSay('ai', `Sajnos már ${PIN_MAX} jelölésed van – töröld a térképen (K, Delete).`); }
+    if (r.pin && (progress.phone || 0) >= 2) { if (progress.pins.length < PIN_MAX) { progress.pins.push({ x: r.pin.x, y: r.pin.y }); saveProgress(); } else phoneSay('ai', `Sajnos már ${PIN_MAX} jelölésed van – töröld a térképen (M, Delete).`); }
     if (r.taxi) callTaxi();
   }
 }
@@ -2419,7 +2419,7 @@ function mapClick(sx, sy) {
   saveProgress();
 }
 function mapKey(code) {
-  if (code === 'Escape' || code === 'KeyK') closeMap();
+  if (code === 'Escape' || code === 'KeyK' || code === 'KeyM') closeMap();
   if ((code === 'Delete' || code === 'Backspace') && progress.pins.length) {   // a térképen kívülre esett jelölések is törölhetők
     progress.pins = []; saveProgress(); popup('📍 Minden jelölés törölve', '#f6c');
   }
@@ -5201,7 +5201,7 @@ function drawHud(w, h) {
   if (tornado && tornado.power > 0.3) drawEdgeArrow(tornado.x, tornado.y, '#ff6a3a', `🌪 ${Math.round(dist(tornado, player) / 10)} m`, w, h);
   ctx.fillText('WASD/nyilak: mozgás · Shift: futás · E: be/ki', 20, 176);
   ctx.fillText('Space: kézifék (drift = pénz) · Bal klikk / F: lövés · G / görgő: fegyver · J: saját bombázó', 20, 196);
-  ctx.fillText(`H: vihar · T: idő (${timeScale}x) · X: taxi · K: térkép · Q: háború · P: telefon · O: eldob · Esc: menü`, 20, 216);
+  ctx.fillText(`H: vihar · T: idő (${timeScale}x) · X: taxi · M: térkép · Q: háború · P: telefon · O: eldob · Esc: menü`, 20, 216);
   ctx.fillStyle = '#bbb'; ctx.font = '12px sans-serif';
   ctx.fillText(`Az úton ${SPEED_LIMIT} km/h felett jön a rendőrség · tankolni a ⛽ kutaknál lehet`, 20, 238);
 
@@ -5370,7 +5370,7 @@ function drawBigMap(w, h) {
     mapView.hits.push({ cat: type, x: lx, y, w: 220, h: 28 });
   });
   ctx.fillStyle = '#ccc'; ctx.font = '13px sans-serif';
-  const tips = ['Kattints a térképre: pont jelölése', 'Kattints egy 📍-re: törlés', `Legfeljebb ${PIN_MAX} jelölés`, 'Delete: minden jelölés törlése', 'K / Esc: bezárás'];
+  const tips = ['Kattints a térképre: pont jelölése', 'Kattints egy 📍-re: törlés', `Legfeljebb ${PIN_MAX} jelölés`, 'Delete: minden jelölés törlése', 'M / Esc: bezárás'];
   const ty = L.y0 + 62 + Object.keys(POI_TYPES).length * 33;   // a jelmagyarázat alatt
   tips.forEach((t, i) => ctx.fillText(t, lx, ty + i * 18));
 }

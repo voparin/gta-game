@@ -28,7 +28,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 | H | homokvihar be/ki |
 | X | taxi hívása ($5 bárhova) |
 | B | bomba lerakása (3 mp múlva robban) |
-| K | térkép (pontok jelölése kattintással) |
+| M | térkép (pontok jelölése kattintással; a K is jó) |
 | T | gyorsított idő (60x) |
 | Q | háború indítása (azonnal, a környéken) |
 | P | telefon (ha van): csetelés Robival |
@@ -36,7 +36,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 | Esc | menü: szünet, szkin- és autóváltás, szkin- és autóbolt (a választás megmarad) |
 
 ## Tenger 🌊
-- A pálya közepén, a **kezdőhelytől délre** (kb. 11 km-re) egy nagy **tenger** van, hullámos parttal és homokos stranddal. A nagy térképen (K) kéken látszik.
+- A pálya közepén, a **kezdőhelytől délre** (kb. 11 km-re) egy nagy **tenger** van, hullámos parttal és homokos stranddal. A nagy térképen (M) kéken látszik.
 - Az utak és a vasút **hidakon** kelnek át rajta. A vízben **úszni** lehet (lassabban), az autó alig halad – a hídon viszont rendesen mehetsz.
 - 🦈 **Vigyázz, cápák!** Ha úszol, a közeli cápa üldözőbe vesz és megharap. A hídon és a parton biztonságban vagy – a cápák nem jönnek ki a vízből. Úszva vágtázva (**Shift**) el lehet menekülni előlük. Le is lőheted őket (4 lövés, +$30).
 - 🐟 A tengerben **színes halrajok** úsznak, és elúsznak előled és a cápák elől.
@@ -219,6 +219,6 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Ha beülsz az autódba, vagy a taxi 45 mp alatt nem ér oda, lemond. A tönkrement taxi nem visz. A szállítási célpontra nem visz el (a szállítást vezetned kell).
 
 ## Térkép
-- **K**: megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák, 🛒 boltok, 🏫 iskolák, 🍽 éttermek, 🔧 autószerelők, 🚆 vasútállomások, 📱 telefonboltok. Az **1–9** és **0** (a saját jelölések: **P**) gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
+- **M** (vagy K): megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák, 🛒 boltok, 🏫 iskolák, 🍽 éttermek, 🔧 autószerelők, 🚆 vasútállomások, 📱 telefonboltok. Az **1–9** és **0** (a saját jelölések: **P**) gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
 - **Kattints a térképre:** saját pontot jelölsz 📍 (legfeljebb 10, megmaradnak). Egy jelölésre kattintva törlöd, a **Delete** gomb mindet törli.
 - A jelölések a radaron és a világban is látszanak, a képernyő szélén nyíl mutat a legközelebbire, és a **taxi** is elvisz oda (a 3 legközelebbihez).

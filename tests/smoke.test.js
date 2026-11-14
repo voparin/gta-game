@@ -1469,8 +1469,9 @@ G.npcs.length = 0; G.aiCars.length = 0;
 {
   Object.assign(G.player, { x: G.C + 3000, y: G.C, inCar: false, inHouse: null, riding: null });
   G.progress.pins = [];
-  press('KeyK'); step(1);
-  check('K: megnyílik a térkép', G.mapView.open && !!G.mapView.layout);
+  press('KeyM'); step(1);
+  check('M: megnyílik a térkép', G.mapView.open && !!G.mapView.layout);
+  press('KeyM'); check('M újra: bezárul', !G.mapView.open); press('KeyK'); check('a régi K is működik', G.mapView.open); press('Escape'); press('KeyM'); step(1);
   const pt0 = { x: G.player.x, y: G.player.y }; key('KeyD', true); step(30); key('KeyD', false);
   check('nyitott térképnél áll a játék', G.player.x === pt0.x && G.player.y === pt0.y);
   const types = new Set(G.mapView.pois.map(p => p.type));
