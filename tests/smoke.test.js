@@ -8,7 +8,7 @@ const path = require('path');
 const ctxStub = new Proxy({}, {
   get: (t, p) => {
     if (p in t) return t[p];
-    if (p === 'createRadialGradient' || p === 'createPattern') return () => ({ addColorStop() {} });
+    if (p === 'createRadialGradient' || p === 'createLinearGradient' || p === 'createPattern') return () => ({ addColorStop() {} });
     return () => {};
   },
   set: (t, p, v) => { t[p] = v; return true; },
@@ -40,7 +40,7 @@ eval(src + `
   set missions(v){missionsEnabled=v}, VERSION, sanitizeProgress, FUEL_PRICE, BUS, selectCar, race, racePosition, RACE_PRIZES,
   set races(v){racesEnabled=v}, busStopsIn, spawnCityBus, BUS_DWELL, STOP_SPACING, BUS_FARE, busSchedule, BUS_INTERVAL, nearestBusStop, canvas, dispatchBus, bank, LOAN_MIN, LOAN_MAX, LOAN_FEE, FACTORY_WAGE, WAGE_PERIOD, BOX_SIZE, BELT, bombs, bombInv, BOMB_FUSE, BOMB_RADIUS, BOMB_MAX, BOMB_REGEN, get taxi(){return taxi}, get taxiTrip(){return taxiTrip}, taxiMenu, TAXI_FARE, taxiDestinations, nearestStation, stationCache, STATION_CACHE_MAX, raiseWanted,
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
-  get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
+  get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, TORNADO_CHASE, horsesIn, nearestHorse, usedHorses, droppedHorses, dropPhone, pickUpPhone, nearestDroppedPhone, crackText, DROPPED_PHONE_MAX, explode, phoneBack, openApp, phoneClick, snakeNew, snakeStep, snakeSteer, snakeFood, SNAKE_N, SNAKE_STEP, flappyNew, flappyFlap, flappyStep, FLAP_H, FLAP_GAP, FLAP_SPACE, FLAP_BIRD_X, PHONE_APPS, PHONE_VIDEOS, newsLog, addNews, newsLive, downtown, planeCrash, callArmy, ARMY_JOIN, ARMY_SIZE, ARMY_TANKS, ARMY_REINFORCE, ARMY_FOLLOW, RESPAWN_SHIELD, WAR_RESPAWN_DIST, WAR_RESPAWN_RANGE, PLANE_MISSILES, PLANE_ATOMS, ATOM_FALL, PLAYER_MISSILE_RANGE, PLANE_WEAPONS, cyclePlaneWeapon, dropWarMissiles, planes, bombers, airBombs, spawnParkedPlane, sendBomber, mountPlane, leavePlane, nearestPlane, PLANE_MIN, PLANE_MAX, PLANE_LAND, PLANE_AMMO, BOMBER_EVERY, AIRBOMB_FALL, AIRBOMB_RADIUS, phone, robiReply, openPhone, closePhone, sendPhone, tickPhone, norm, compass, PHONE_ITEMS, missiles, garrison, get occupation(){return occupation}, launchMissile, missileImpact, startOccupation, endOccupation, updateOccupation, MISSILE_EVERY, MISSILE_FLIGHT, MISSILE_RADIUS, MISSILE_HOUSES, OCCUPY_TIME, GARRISON, LIBERATE_BOUNTY, OCCUPY_RADIUS, callWar, WAR_REINFORCE, WAR_TANKS, TANK_HP, TANK_BOUNTY, TANK_RELOAD, NUKE_WARN, NUKE_KILL, NUKE_RADIUS, NUKE_HOUSES, warShells, craters, get nukeFx(){return nukeFx}, set nukeFx(v){nukeFx=v}, nuke, spawnSoldier, callWar, get war(){return war}, soldiers, fallen, warClock, startWar, endWar, shell, killSoldier, set warsOn(v){warsEnabled=v}, WAR_FIRST, WAR_LIFE, WAR_SOLDIERS, SOLDIER_HP, SOLDIER_BOUNTY, WAR_GAP_MIN, indoor, pickErrand, houseService, updateIndoor, set errands(v){errandsEnabled=v}, AI_REFUEL_BELOW, AI_FUEL_FLOOR, AI_FUEL_USE, ERRAND_EVERY, ERRAND_TIMEOUT, stationsIn, trainPose, nextTrainIn, getTrain, trainsIn, railStopsIn, onPlatform, TRAIN_FARE, TRAIN_DWELL, TRAIN_PERIOD, STOP_SPACE, STOP_X0, RAIL_Y0, RAIL_SPACE, RAIL_GAP, TRAIN_LEN, PLATFORM, set trainShift(v){trainShift=v}, hpFraction, ESCAPE_SPOT, HORROR_KILLS, DEMO_HIT, DEMO_HP, MAX_DEMOS, aliens, alienClock, spawnAliens, shootAlien, set aliensOn(v){aliensEnabled=v}, ALIEN_INTERVAL, ALIEN_COUNT, ALIEN_SPEED, ALIEN_CHASE_TIME, ALIEN_BOUNTY, ABDUCT_TIME, MOON_TERM, CHEAT_MONEY, HORSE_CELL, HORSE_TROT, HORSE_GALLOP, skidMarks, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
   school, makeQuestion, TEACHER_HOME, SHOUT, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, nearestAlex, talkToAlex, ALEX_LINES, selectCar, tv, TV_CHANNELS, atTv, RESTAURANT_ITEMS, MECHANIC_ITEMS, TUNE_MAX, TUNE_SPEED, PAINTS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
@@ -62,6 +62,9 @@ G.missions = false;
 G.races = false;
 G.storm.timer = 1e9;      // a homokvihar csak a saját tesztjében jöjjön (a szél sodor mindent)
 G.tornadoes = false;
+G.aliensOn = false;       // az űrlények csak a saját tesztjükben jöjjenek
+G.errands = false;        // a gyalogosok ügyintézése is (különben eltűnnek a házakban)
+G.warsOn = false;         // a háború is csak a saját tesztjében
 
 step(10);
 check('a játék elindul és fut', typeof rafCb === 'function');
@@ -1167,6 +1170,27 @@ G.npcs.length = 0; G.aiCars.length = 0;
   G.storm.level = G.storm.target = 0; T0.life = 0;
   step(240);
   check('a vihar végén a tornádó elül', G.tornado === null);
+  // vadászik a játékosra
+  {
+    G.storm.level = G.storm.target = 1; G.storm.timer = 1e9;
+    const hunt = (px, py, tx, ty, ticks, move) => {
+      Object.assign(G.player, { x: px, y: py, inCar: false, riding: null, inHouse: null, dead: 0, health: 100 });
+      G.spawnTornado(tx, ty); const T = G.tornado; T.power = 1; T.life = 1e9; T.wander = 0;
+      const d0 = Math.hypot(T.x - px, T.y - py);
+      for (let i = 0; i < ticks; i++) { if (move) { G.player.x += move.x; G.player.y += move.y; } step(1); if (G.player.dead) break; }
+      return { T, d0, d1: Math.hypot(T.x - G.player.x, T.y - G.player.y) };
+    };
+    const a = hunt(G.C + 90000, G.C, G.C + 90000 + 1200, G.C - 900, 120, null);
+    check('a tornádó a játékos felé tart (közeledik)', a.d1 < a.d0 - 150);
+    const b = hunt(G.C + 95000, G.C, G.C + 95000 - 800, G.C, 60 * 14, { x: 130 / 60, y: 0 });
+    check('a sétáló (130 px/s) játékost utoléri és megöli', G.player.dead > 0);
+    G.tornado = null; step(200);
+    G.tornado = null;
+    const c = hunt(G.C + 99000, G.C, G.C + 99000 - 800, G.C, 60 * 10, { x: 240 / 60, y: 0 });
+    check('a futó (240 px/s) játékos elmenekül előle', !G.player.dead && c.d1 > c.d0);
+    G.tornado = null;
+    G.storm.level = G.storm.target = 0;
+  }
   G.aiCars.length = 0; G.npcs.length = 0; G.storm.timer = 1e9;
 }
 
@@ -1782,6 +1806,944 @@ G.npcs.length = 0; G.aiCars.length = 0;
   check('a térképen az éttermek és a szerelők is látszanak', types.has('restaurant') && types.has('mechanic'));
   const labels = G.taxiDestinations().map(d => d.label).join(' ');
   check('a taxi étterembe és szerelőhöz is visz', labels.includes('étterem') && labels.includes('autószerelő'));
+}
+
+// --- lovak ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null;
+  const hs = G.horsesIn(G.C + 40000, G.C - 20000, G.C + 60000, G.C + 20000);
+  check('vannak vadlovak, nem túl sok és nem túl kevés', hs.length > 200 && hs.length < 900);
+  check('a vadlovak nem az úton állnak', hs.every(h => !G.onRoad(h.x, h.y, 100)));
+  const again = G.horsesIn(G.C + 40000, G.C - 20000, G.C + 60000, G.C + 20000);
+  check('a lovak helye mindig ugyanaz (képletből)', again.length === hs.length && again.every((h, i) => h.x === hs[i].x && h.y === hs[i].y));
+  const hz = hs[0];
+  const own = { x: G.C - 20000, y: G.C, angle: 0.5, fuel: 66 };
+  Object.assign(G.car, { ...own, vx: 0, vy: 0, rental: false });
+  Object.assign(G.player, { x: hz.x + 30, y: hz.y, inCar: false, inHouse: null, riding: null, dead: 0, arrested: 0, passedOut: 0 });
+  check('ló mellett kiírja: lovaglás', /lovaglás/.test(G.interactionPrompt().text));
+  press('KeyE');
+  check('E-re felülsz a lóra', G.player.inCar && G.car.horse && G.car.type === 'horse' && Math.hypot(G.car.x - hz.x, G.car.y - hz.y) < 1);
+  check('a vadló elfogyott a helyéről (nem lehet kétszer felülni)', !G.horsesIn(hz.x - 5, hz.y - 5, hz.x + 5, hz.y + 5).some(h => h.id === hz.id));
+  Object.assign(G.car, { x: 1000, y: G.C, angle: 0, vx: 0, vy: 0 });   // akadálymentes út
+  const sm0 = G.skidMarks.length;
+  key('KeyD', true); step(90);
+  const trot = Math.hypot(G.car.vx, G.car.vy) / G.KMH;
+  check('a ló irányba megy, mint gyalog (D: jobbra, nincs autó-kormányzás)', G.car.vx > 100 && Math.abs(G.car.vy) < 5 && Math.abs(G.car.angle) < 0.2);
+  check('Shift nélkül ügetés (~40 km/h)', trot > 35 && trot < 50);
+  key('ShiftLeft', true); step(90);
+  const kmh = Math.hypot(G.car.vx, G.car.vy) / G.KMH;
+  check('Shift: vágta (~85 km/h), és nem fogy a benzin', kmh > 75 && kmh < 95 && G.car.fuel === 100);
+  key('KeyD', false); key('KeyA', true); step(45);
+  check('hirtelen irányváltás: a ló megfordul és visszavág (nincs autós kanyar vagy sodródás)', G.car.vx < -150 && Math.abs(G.car.vy) < 20 && Math.abs(G.car.angle) > 2.8);
+  key('KeyA', false); key('ShiftLeft', false); step(30);
+  check('elengedve a ló gyorsan megáll (fél mp alatt)', Math.hypot(G.car.vx, G.car.vy) < 30);
+  check('a ló nem hagy féknyomot', G.skidMarks.length === sm0 && !G.car.skid);
+  check('lovagolva nem tank-gond: kiírja a leszállást', /leszállás a lóról/.test(G.interactionPrompt().text));
+  const spot = { x: G.car.x, y: G.car.y };
+  press('KeyE');
+  check('E-re leszállsz, az autód visszakerül oda, ahol hagytad', !G.player.inCar && !G.car.horse && G.car.type !== 'horse' && G.car.x === own.x && G.car.y === own.y && G.car.fuel === 66 && G.car.rental === false);
+  check('a ló ott marad, ahol leszálltál', G.droppedHorses.length === 1 && Math.hypot(G.droppedHorses[0].x - spot.x, G.droppedHorses[0].y - spot.y) < 1);
+  Object.assign(G.player, { x: spot.x + 25, y: spot.y });
+  press('KeyE');
+  check('a leszállt lóra újra felülhetsz', G.car.horse && G.droppedHorses.length === 0);
+  // újraélesztés lovaglás közben: az autó visszatér, nincs ló-modell
+  G.damagePlayer(10000); step(240 + 60 * 5);
+  check('lovaglás közbeni halál után az autód ló nélkül, rendben visszatér', !G.car.horse && G.car.type !== 'horse' && G.player.dead === 0);
+  // autóváltás lovaglás közben
+  Object.assign(G.car, { x: G.C - 20000, y: G.C });
+  Object.assign(G.player, { x: hz.x + 30, y: hz.y, inCar: false });
+  G.usedHorses.delete(hz.id); press('KeyE');
+  check('újra felülsz (másik ló)', G.car.horse);
+  G.selectCar(0);
+  check('autóváltáskor a ló megszűnik, az autó visszatér', !G.car.horse && G.car.type === 'car' && !G.car.rental);
+  G.droppedHorses.length = 0; G.usedHorses.clear();
+}
+
+// --- űrlények: 3 percenként üldöznek, elrabolnak, a Holdon börtön ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.clearWanted(); G.tornado = null; G.police = false;
+  const reset = () => { G.aliens.length = 0; Object.assign(G.player, { x: G.C + 120000, y: G.C, inCar: false, riding: null, inHouse: null, dead: 0, arrested: 0, passedOut: 0, health: 100, abduct: null, moon: null }); Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 }); };
+  reset();
+  check('az űrlények 3 percenként jönnek', G.ALIEN_INTERVAL === 180);
+  G.aliensOn = true; G.alienClock.left = 0.05; step(10);
+  check('az időzítő lejártakor 3 űrlény jelenik meg, 900–1100 px-re', G.aliens.length === G.ALIEN_COUNT && G.aliens.every(a => { const d = Math.hypot(a.x - G.player.x, a.y - G.player.y); return d > 800 && d < 1200; }) && G.alienClock.left > 170);
+  const d0 = Math.hypot(G.aliens[0].x - G.player.x, G.aliens[0].y - G.player.y);
+  step(60);
+  check('az űrlények a játékos felé tartanak', Math.hypot(G.aliens[0].x - G.player.x, G.aliens[0].y - G.player.y) < d0 - 100);
+  // a futó játékos elmenekül (a kamu űrlények lassabbak: 175 px/s)
+  reset(); G.spawnAliens(1); const ru = G.aliens[0]; Object.assign(ru, { x: G.player.x - 400, y: G.player.y });
+  for (let i = 0; i < 600; i++) { G.player.x += 240 / 60; step(1); if (G.player.abduct) break; }
+  check('futva (240 px/s) elmenekülsz az űrlények elől', !G.player.abduct && !G.player.moon);
+  // házban nem kapnak el
+  reset(); const hh = G.housesIn(G.C + 21000, G.C - 400, G.C + 23000, G.C)[0];
+  check('(előkészítés) van ház a teszthez', !!hh);
+  { Object.assign(G.player, G.doorOf(hh)); press('KeyE'); G.spawnAliens(1); Object.assign(G.aliens[0], { x: G.player.x + 30, y: G.player.y }); step(120);
+    check('házban nem kapnak el', !!G.player.inHouse && !G.player.abduct && !G.player.moon); G.exitHouse(); G.aliens.length = 0; }
+  // lassú / álló autóban elkapnak, gyors autóban nem
+  reset(); Object.assign(G.player, { x: G.car.x, y: G.car.y, inCar: true }); G.spawnAliens(1); Object.assign(G.aliens[0], { x: G.car.x + 60, y: G.car.y });
+  Object.assign(G.car, { vx: 400, vy: 0 }); G.aliens[0].x = G.car.x + 5; step(1); G.car.vx = 400;
+  check('gyors autót nem tudnak elrabolni', !G.player.abduct);
+  G.car.vx = 0; G.car.vy = 0; step(5);
+  check('álló autóban elkapnak', !!G.player.abduct || !!G.player.moon);
+  // lovon is elkapnak: a ló ott marad, az autó visszajön
+  reset(); G.droppedHorses.length = 0; G.usedHorses.clear();
+  const hz = { id: 'tz', x: G.player.x + 20, y: G.player.y, angle: 0, coat: ['#8a5a32', '#4a2c14'] };
+  G.droppedHorses.push({ ...hz, drop: true }); press('KeyE');
+  check('(előkészítés) lovon ülsz', G.car.horse);
+  G.spawnAliens(1); Object.assign(G.aliens[0], { x: G.car.x + 10, y: G.car.y }); G.car.vx = G.car.vy = 0; step(5);
+  check('elrabláskor a lóról is leszállsz (az autó visszajön)', !G.car.horse && G.car.type !== 'horse' && G.droppedHorses.length === 1);
+  // elrablás és Hold
+  reset(); G.droppedHorses.length = 0;
+  const spot = { x: G.player.x, y: G.player.y }; G.progress.money = 77;
+  G.spawnAliens(3); G.aliens.forEach(a => Object.assign(a, { x: spot.x + 10, y: spot.y })); step(5);
+  check('elkapnak: elrablás-jelenet indul, az űrlények eltűnnek', !!G.player.abduct && G.aliens.length === 0);
+  const clk = G.clock;
+  step(60 * (G.ABDUCT_TIME + 0.5));
+  check('az elrablás után a Holdon vagy, börtönben', !!G.player.moon && !G.player.abduct && G.player.moon.t < G.MOON_TERM);
+  const t0 = G.player.moon.t, ix0 = G.player.moon.ix;
+  key('KeyD', true); step(60); key('KeyD', false);
+  check('a cellában lehet sétálni, de kijutni nem', G.player.moon.ix > ix0 && G.player.moon.ix <= 390 - 14 && G.player.moon.t < t0);
+  press('KeyE'); key('KeyB', true); key('KeyB', false);
+  check('börtönben nem lehet semmit csinálni (nincs E / bomba)', !G.player.inHouse && G.bombs.length === 0);
+  step(60 * (G.MOON_TERM + 1));
+  check(`${G.MOON_TERM} mp után kiengednek, ott vagy, ahol elraboltak`, !G.player.moon && Math.hypot(G.player.x - spot.x, G.player.y - spot.y) < 100 && G.progress.money === 77);
+  check('szabadulás után új 3 perc kezdődik', G.alienClock.left > 170 && G.aliens.length === 0);
+  // időzítés: nem fut az idő a börtönben, és az űrlények eltűnnek, ha nem érik el a játékost
+  reset(); G.spawnAliens(2);
+  G.player.x += 0; G.aliens.forEach(a => { a.x = G.player.x + 5000; a.y = G.player.y; });
+  Object.assign(G.player, { x: G.player.x, y: G.player.y });
+  G.aliens.forEach(a => { a.until = G.clock + 0.5; });
+  step(60);
+  check(`az űrlények ${G.ALIEN_CHASE_TIME} mp után feladják`, G.aliens.length === 0);
+  // lövés és bomba
+  reset(); G.spawnAliens(2);
+  const al = G.aliens[0]; Object.assign(al, { x: G.player.x + 200, y: G.player.y }); G.aliens[1].x = G.player.x + 5000;
+  const m1 = G.progress.money;
+  for (let k = 0; k < 3; k++) G.bullets.push({ x: al.x - 4, y: al.y, vx: 100, vy: 0, life: 1, from: 'player' }), step(2);
+  check(`3 lövés kilő egy űrlényt (+$${G.ALIEN_BOUNTY})`, G.aliens.length === 1 && G.progress.money === m1 + G.ALIEN_BOUNTY);
+  G.bombs.push({ x: G.aliens[0].x, y: G.aliens[0].y, fuse: 0.05 }); step(10);
+  check('a bomba az űrlényt is megöli', G.aliens.length === 0);
+  G.aliensOn = false; reset();
+}
+
+// --- eldobható telefon: a földre esve összetörik a kijelzője ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false; G.errands = false; G.warsOn = false;
+  const rst = () => { G.progress.phone = 0; G.progress.phoneCracked = false; G.progress.droppedPhones = []; G.progress.money = 1000; G.phone.log.length = 0; G.phone.open = false; Object.assign(G.player, { x: G.C + 150000, y: G.C + 300, angle: 0, inCar: false, inHouse: null, riding: null, dead: 0, arrested: 0, passedOut: 0, health: 100, abduct: null, moon: null }); Object.assign(G.car, { x: G.C + 150000 - 20000, y: G.C }); };
+  rst();
+  press('KeyO');
+  check('telefon nélkül az O nem csinál semmit', G.progress.droppedPhones.length === 0);
+  G.progress.phone = 2;
+  press('KeyO');
+  check('az O eldobja a telefont: nincs többé nálad, a földön van, az előtted lévő helyen', G.progress.phone === 0 && G.progress.droppedPhones.length === 1 && G.progress.droppedPhones[0].level === 2 && Math.abs(G.progress.droppedPhones[0].x - (G.player.x + 140)) < 5);
+  press('KeyP');
+  check('eldobott telefonnal a P nem nyit telefont', !G.phone.open);
+  const dp = G.progress.droppedPhones[0];
+  Object.assign(G.player, { x: dp.x - 400, y: dp.y }); press('KeyE');
+  check('messziről nem veheted fel', G.progress.phone === 0 && G.progress.droppedPhones.length === 1);
+  Object.assign(G.player, { x: dp.x - 30, y: dp.y });
+  check('a telefon mellett kiírja a felvételt (összetört kijelző)', /felvétele.*összetört/.test(G.interactionPrompt().text));
+  press('KeyE');
+  check('E-re felveszed: ugyanolyan telefon (okostelefon), de repedt', G.progress.phone === 2 && G.progress.phoneCracked === true && G.progress.droppedPhones.length === 0);
+  press('KeyP');
+  check('a repedt telefon is használható', G.phone.open && G.phone.log.length >= 1);
+  // repedt kijelzőn hibás betűk (▒), ép telefonon nem
+  let garbled = 0, clean = 0; for (let i = 0; i < 20; i++) { const g = G.crackText('Szia! Robi vagyok, a telefonod MI-je.'); if (g.includes('▒')) garbled++; if (g.length === 'Szia! Robi vagyok, a telefonod MI-je.'.length && g.replace(/▒/g, '') .length > 20) clean++; }
+  check('a repedt kijelzőn a szöveg egy része nem látszik (▒), a hossza és a szóközök megmaradnak', garbled >= 15 && clean === 20 && G.crackText('a b', () => 0) === '▒ ▒' && G.crackText('a b', () => 0.99) === 'a b');
+  G.phone.log.length = 0; G.phone.input = ''; G.phone.pending = { until: 0, reply: { text: 'Szia! Ez egy elég hosszú válasz Robitól, amiben sok betű van.' } }; G.tickPhone(0.01);
+  check('Robi válasza a repedt telefonon tényleg hibásan jelenik meg', G.phone.log[G.phone.log.length - 1].text.includes('▒') || G.phone.log[G.phone.log.length - 1].text.length > 20);
+  step(30); press('Escape');
+  // a javítás
+  const sh = G.housesIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000).find(h => h.phoneShop);
+  Object.assign(G.player, G.doorOf(sh)); press('KeyE'); G.player.inHouse.ix = 280; G.player.inHouse.iy = 100; press('KeyE');
+  const m0 = G.progress.money; press('Digit3');
+  check('a telefonboltban $30-ért megjavítják a kijelzőt', G.progress.phoneCracked === false && G.progress.money === m0 - 30 && G.progress.phone === 2);
+  press('Digit3');
+  check('ép kijelzőt nem kell javítani (nem fizetsz)', G.progress.money === m0 - 30);
+  press('Escape'); G.exitHouse();
+  // az új telefon ép, a mentés hibás adatot kiszűr
+  G.progress.phone = 1; G.progress.phoneCracked = true; Object.assign(G.player, { x: G.C + 150000, y: G.C + 300, inHouse: null });
+  const sh2 = G.housesIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000).find(h => h.phoneShop);
+  Object.assign(G.player, G.doorOf(sh2)); press('KeyE'); G.player.inHouse.ix = 280; G.player.inHouse.iy = 100; press('KeyE'); press('Digit2');
+  check('az új (jobb) telefon vásárlása ép kijelzőt ad', G.progress.phone === 2 && G.progress.phoneCracked === false);
+  press('Escape'); G.exitHouse();
+  const san = G.sanitizeProgress({ phone: 1, phoneCracked: true, droppedPhones: [{ x: 5, y: 6, level: 2 }, { x: 'a', y: 1, level: 1 }, null, { x: 1, y: 2, level: 9 }, ...Array(10).fill({ x: 0, y: 0, level: 1 })] });
+  check('a mentés a repedt jelzőt és legfeljebb 5 érvényes heverő telefont őriz meg', san.phoneCracked === true && san.droppedPhones.length === G.DROPPED_PHONE_MAX && san.droppedPhones[0].x === 5 && san.droppedPhones.every(d => [1, 2].includes(d.level)));
+  check('telefon nélkül a repedt jelző nem marad meg, régi mentésben nincs heverő telefon', G.sanitizeProgress({ phone: 0, phoneCracked: true }).phoneCracked === false && G.sanitizeProgress({}).droppedPhones.length === 0);
+  // több eldobott, a legrégebbi eltűnik; autóban nem lehet eldobni; felvétel közben már van telefonod
+  rst(); for (let i = 0; i < G.DROPPED_PHONE_MAX + 2; i++) { G.progress.phone = 1; Object.assign(G.player, { x: G.C + 150000 + i * 400, y: G.C + 300 }); press('KeyO'); }
+  check('legfeljebb ' + G.DROPPED_PHONE_MAX + ' telefon hever a földön (a legrégebbi eltűnik)', G.progress.droppedPhones.length === G.DROPPED_PHONE_MAX);
+  rst(); G.progress.phone = 1; G.player.inCar = true; press('KeyO');
+  check('autóból nem lehet telefont dobni', G.progress.phone === 1 && G.progress.droppedPhones.length === 0);
+  G.player.inCar = false; G.progress.phone = 2; G.progress.droppedPhones = [{ x: G.player.x + 20, y: G.player.y, level: 1 }];
+  check('ha már van telefonod, a heverőt nem veheted fel', /dobd el/.test(G.interactionPrompt().text)); press('KeyE');
+  check('(és nem is veszed fel)', G.progress.phone === 2 && G.progress.droppedPhones.length === 1);
+  G.progress.droppedPhones = []; G.progress.phone = 0; G.progress.phoneCracked = false; G.progress.money = 0; G.phone.log.length = 0;
+}
+
+// --- telefon-appok: játékok, videók, hírek ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false; G.errands = false; G.warsOn = false;
+  Object.assign(G.player, { x: G.C + 160000, y: G.C + 300, inCar: false, inHouse: null, riding: null, dead: 0, arrested: 0, passedOut: 0, health: 100, abduct: null, moon: null });
+  G.progress.phone = 2; G.progress.phoneCracked = false; G.progress.phoneScores = { snake: 0, flappy: 0 }; G.phone.log.length = 0;
+  press('KeyP');
+  check('a főképernyő 4 appja: Robi, Játékok, Videók, Hírek', G.PHONE_APPS.map(a => a.id).join() === 'chat,games,videos,news' && G.phone.app === 'home');
+  press('Digit2'); check('2: a Játékok', G.phone.app === 'games');
+  press('Escape'); check('Esc: vissza a főképernyőre', G.phone.app === 'home' && G.phone.open);
+  press('Digit5'); check('nincs 5. app (nem történik semmi)', G.phone.app === 'home');
+  // ---- kígyó (tiszta lépések) ----
+  const r0 = () => 0.5;
+  const sg = G.snakeNew(r0);
+  check('a kígyó 3 hosszú, jobbra indul, az étel nincs a testén', sg.cells.length === 3 && sg.dir.x === 1 && sg.alive && !sg.cells.some(c => c.x === sg.food.x && c.y === sg.food.y));
+  const h0 = { ...sg.cells[0] }; G.snakeStep(sg, r0);
+  check('lépésenként egyet halad, a hossz marad', sg.cells[0].x === h0.x + 1 && sg.cells.length === 3);
+  G.snakeSteer(sg, -1, 0); G.snakeStep(sg, r0);
+  check('visszafordulni nem lehet (180°)', sg.cells[0].x === h0.x + 2 && sg.alive);
+  G.snakeSteer(sg, 0, -1); G.snakeStep(sg, r0);
+  check('fel kanyarodik', sg.cells[0].y === h0.y - 1 && sg.dir.y === -1);
+  sg.food = { x: sg.cells[0].x, y: sg.cells[0].y - 1 }; G.snakeStep(sg, r0);
+  check('az étel megevése: +1 pont, +1 hossz, új étel', sg.score === 1 && sg.cells.length === 4 && !sg.cells.some(c => c.x === sg.food.x && c.y === sg.food.y));
+  const wall = G.snakeNew(r0); wall.cells = [{ x: G.SNAKE_N - 1, y: 3 }, { x: G.SNAKE_N - 2, y: 3 }]; G.snakeStep(wall, r0);
+  check('a falnak ütközve vége a játéknak', !wall.alive);
+  const selfc = G.snakeNew(r0); selfc.cells = [{ x: 5, y: 5 }, { x: 5, y: 6 }, { x: 4, y: 6 }, { x: 4, y: 5 }, { x: 4, y: 4 }, { x: 5, y: 4 }]; selfc.dir = selfc.next = { x: 0, y: -1 }; selfc.food = { x: 0, y: 0 };
+  selfc.cells = [{ x: 5, y: 5 }, { x: 6, y: 5 }, { x: 6, y: 4 }, { x: 5, y: 4 }, { x: 4, y: 4 }, { x: 4, y: 5 }]; selfc.dir = selfc.next = { x: 0, y: -1 }; G.snakeStep(selfc, r0);
+  check('önmagába harapva vége a játéknak', !selfc.alive);
+  const dead = G.snakeNew(r0); dead.alive = false; const dh = { ...dead.cells[0] }; G.snakeStep(dead, r0);
+  check('halott kígyó nem mozog tovább', dead.cells[0].x === dh.x);
+  // ---- a kígyó a telefonon: billentyűk, idő, rekord ----
+  press('Digit2'); press('Digit1'); check('a Játékok → 1: a Kígyó elindul', G.phone.app === 'snake' && !!G.phone.snake && G.phone.snake.alive);
+  const gg = G.phone.snake; const x1 = gg.cells[0].x; step(40);
+  check('a kígyó magától halad (SNAKE_STEP mp-enként)', gg.cells[0].x !== x1 || !gg.alive);
+  press('ArrowDown'); step(20);
+  check('a nyilak irányítják', gg.dir.y === 1 || !gg.alive);
+  gg.alive = true; gg.score = 12; gg.cells = [{ x: 0, y: 0 }, { x: 1, y: 0 }]; gg.dir = gg.next = { x: -1, y: 0 }; step(30);
+  check('a játék végén a rekord elmentődik', !gg.alive && G.progress.phoneScores.snake === 12);
+  press('Enter'); check('Enter: új játék', G.phone.snake !== gg && G.phone.snake.alive && G.phone.snake.score === 0);
+  press('Escape'); check('Esc: vissza a Játékok közé', G.phone.app === 'games');
+  // ---- repülő ----
+  const fg = G.flappyNew(); const y0 = fg.y; G.flappyStep(fg, 0.5, r0);
+  check('a repülő a Space-ig áll (még nem indult)', fg.y === y0 && !fg.started);
+  G.flappyFlap(fg); G.flappyStep(fg, 0.1, r0);
+  check('a flap felfelé lódítja', fg.y < y0 && fg.started);
+  const fall = G.flappyNew(); G.flappyFlap(fall); for (let i = 0; i < 200 && fall.alive; i++) G.flappyStep(fall, 0.05, r0);
+  check('flap nélkül leesik: vége a játéknak', !fall.alive);
+  const fp = G.flappyNew(); fp.started = true; fp.y = G.FLAP_H / 2; fp.pipes = [{ x: G.FLAP_BIRD_X + 40, gap: G.FLAP_H / 2, passed: false }]; fp.vy = -200;
+  for (let i = 0; i < 40; i++) { fp.y = G.FLAP_H / 2; fp.vy = 0; G.flappyStep(fp, 0.05, r0); }   // a gép a résben marad (a gap közepén)
+  check('a csöveken átjutva pont jár', fp.score >= 1 && fp.alive);
+  const hit = G.flappyNew(); hit.started = true; hit.y = G.FLAP_H / 2; hit.pipes = [{ x: G.FLAP_BIRD_X + 5, gap: G.FLAP_H / 2 - 90, passed: false }]; G.flappyStep(hit, 0.01, r0);
+  check('a csőnek ütközve vége a játéknak', !hit.alive);
+  const sp = G.flappyNew(); sp.started = true; G.flappyFlap(sp); let pipes = 0; for (let i = 0; i < 60; i++) { sp.y = G.FLAP_H / 2; sp.vy = 0; G.flappyStep(sp, 0.1, r0); pipes = Math.max(pipes, sp.pipes.length); }
+  check('csövek keletkeznek, a távolságuk ' + G.FLAP_SPACE + ' px körül', pipes >= 2 && sp.pipes.every((p2, i, arr) => i === 0 || Math.abs((p2.x - arr[i - 1].x) - G.FLAP_SPACE) < 30));
+  press('Digit2'); check('a Játékok → 2: a Repülő', G.phone.app === 'flappy' && !G.phone.flappy.started);
+  press('Space'); check('Space: indul', G.phone.flappy.started && G.phone.flappy.vy < 0);
+  step(2); const fh = G.phone.hits.find(h => h.flap);
+  listeners.mousedown({ button: 0, clientX: fh.x + 20, clientY: fh.y + 20 }); check('a kattintás is repít', G.phone.flappy.vy < 0 || !G.phone.flappy.alive);
+  step(60 * 3); check('a repülő magától leesik, a rekord mentésre kerül', !G.phone.flappy.alive);
+  press('Enter'); check('Enter: újra', G.phone.flappy.alive && !G.phone.flappy.started);
+  press('Escape'); press('Escape');
+  check('a rekordokat a mentés őrzi és szűri', G.sanitizeProgress({ phoneScores: { snake: 7.9, flappy: -3 } }).phoneScores.snake === 7 && G.sanitizeProgress({ phoneScores: { snake: 7, flappy: -3 } }).phoneScores.flappy === 0 && G.sanitizeProgress({}).phoneScores.snake === 0);
+  // ---- videók ----
+  press('Digit3'); check('3: a Videók', G.phone.app === 'videos' && G.PHONE_VIDEOS.length === 6);
+  let drawn = true; for (let i = 0; i < G.PHONE_VIDEOS.length; i++) { press('Digit' + (i + 1)); step(5); if (G.phone.vid !== i) drawn = false; }
+  check('mind a 6 klip kiválasztható és lejátszik (tévé-csatornák + tornádó + atomgomba)', drawn);
+  press('ArrowRight'); check('a nyilak lapoznak (körbe)', G.phone.vid === 0);
+  press('ArrowLeft'); check('balra a végére', G.phone.vid === G.PHONE_VIDEOS.length - 1);
+  const t0 = G.phone.vidT; step(30); check('a videó időzítője fut (menet közben animál)', G.phone.vidT > t0);
+  const clip = G.phone.hits.find(h => h.clip === 2); listeners.mousedown({ button: 0, clientX: clip.x + 5, clientY: clip.y + 5 });
+  check('a kattintás is videót vált', G.phone.vid === 2);
+  check('a tévé továbbra is 4 csatornás', G.TV_CHANNELS.length === 4);
+  press('Escape');
+  // ---- hírek ----
+  G.newsLog.length = 0;
+  press('Digit4'); check('4: a Hírek, kezdetben nincs hír', G.phone.app === 'news' && G.newsLog.length === 0); step(3);
+  G.addNews('teszt hír'); check('az addNews naplóz', G.newsLog.length === 1 && G.newsLog[0].text === 'teszt hír');
+  for (let i = 0; i < 40; i++) G.addNews('x' + i); check('legfeljebb 30 hír marad (a legrégebbiek kihullanak)', G.newsLog.length === 30 && G.newsLog[0].text !== 'teszt hír');
+  G.newsLog.length = 0; press('Escape'); press('Escape');
+  G.callWar(); G.endWar('⚔ A háború véget ért – próba'); G.nuke(G.C + 170000, G.C); G.spawnTornado(G.C + 171000, G.C); G.tornado = null;
+  check('a játék eseményei bekerülnek a hírekbe (háború, vége, atombomba, tornádó…)', G.newsLog.some(n => /Háború tört ki/.test(n.text)) && G.newsLog.some(n => /véget ért/.test(n.text)) && G.newsLog.some(n => /ATOMBOMBA/.test(n.text)) && G.newsLog.some(n => /Tornádó/.test(n.text)));
+  press('KeyP'); press('Digit4'); step(5);
+  check('a Hírek appon élő állapotsorok vannak (háború, pénz)', G.newsLive().length >= 2 && G.newsLive().some(l => /Háború/.test(l.t)) && G.newsLive().some(l => /Pénzed/.test(l.t)));
+  G.callWar(); check('háború alatt az élő sor a háborút mutatja', G.newsLive().some(l => /dúl/.test(l.t))); G.endWar('x');
+  press('Escape'); press('Escape'); G.tornado = null; G.clearWanted();
+  // a repedt telefonon is mennek az appok
+  G.progress.phoneCracked = true; press('KeyP'); press('Digit3'); step(5); press('Escape'); press('Escape'); G.progress.phoneCracked = false;
+  check('repedt telefonon is működnek az appok', !G.phone.open);
+  Object.assign(G.player, { x: G.C + 30000, y: G.C }); G.progress.phone = 0; G.phone.log.length = 0; G.progress.phoneScores = { snake: 0, flappy: 0 };
+}
+
+// --- felhőkarcolók ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false; G.errands = false; G.warsOn = false;
+  const all = G.housesIn(G.C - 60000, G.C - 400, G.C + 60000, G.C + 400);
+  const sky = all.filter(h => h.sky), inDown = all.filter(h => G.downtown(h.x, h.y)), outDown = all.filter(h => !G.downtown(h.x, h.y));
+  check('vannak felhőkarcolók', sky.length >= 8);
+  check('belvárosban sok (>20%), máshol ritka (<6%)', inDown.filter(h => h.sky).length / inDown.length > 0.2 && outDown.filter(h => h.sky).length / outDown.length < 0.06);
+  check('a felhőkarcolók 14–49 emeletesek, és nem másféle épületek (egy házból egy típus)', sky.every(h => h.floors >= 14 && h.floors <= 49 && ![h.pub, h.bank, h.factory, h.shop, h.school, h.restaurant, h.mechanic, h.phoneShop].some(Boolean)) && all.filter(h => !h.sky).every(h => h.floors === undefined));
+  const sk = sky[0];
+  Object.assign(G.player, { ...G.doorOf(sk), inCar: false, inHouse: null, riding: null, dead: 0, health: 100 }); Object.assign(G.car, { x: sk.x - 9000, y: sk.y });
+  press('KeyE');
+  check('a felhőkarcolóba nem lehet bemenni (nincs ajtó)', !G.player.inHouse && !/bemenés/.test((G.interactionPrompt() || { text: '' }).text));
+  const probe = { x: sk.x, y: sk.y, r: 12 }; G.collideTest(probe);
+  check('a felhőkarcoló szilárd: kitol a talpából', probe.x < sk.x0 || probe.x > sk.x1 || probe.y < sk.y0 || probe.y > sk.y1);
+  Object.assign(G.player, { x: sk.x + 40, y: sk.y + 300 }); step(3);
+  check('a felhőkarcoló rajzolása (parallaxis) hibátlanul lefut', true);
+  // repülő: nekirepülve lezuhan
+  G.planes.length = 0; Object.assign(G.player, { x: sk.x - 400, y: sk.y, inCar: false, health: 100, dead: 0 }); G.spawnParkedPlane(G.player.x + 30, G.player.y, 0, 'A'); press('KeyE');
+  check('(előkészítés) repülőn ülsz', G.car.plane);
+  Object.assign(G.car, { x: sk.x0 - 200, y: sk.y, angle: 0, vx: 400, vy: 0 }); const npl = G.planes.length;
+  step(60 * 1);
+  check('felhőkarcolónak repülve a gép lezuhan (nem marad), te megsérülsz, de túléled', !G.car.plane && !G.player.inCar && G.player.health < 100 && G.player.health > 0 && G.planes.length === npl);
+  check('a lezuhanás után az autód visszatér', G.car.type !== 'plane');
+  G.player.health = 100; step(60 * 4);
+  // egy másik épület fölött nem zuhan le
+  const nonSky = all.find(h => !h.sky && Math.hypot(h.x - sk.x, h.y - sk.y) > 3000);
+  G.spawnParkedPlane(nonSky.x - 300, nonSky.y, 0, 'A'); Object.assign(G.player, { x: nonSky.x - 280, y: nonSky.y, inCar: false, health: 100, dead: 0 }); press('KeyE');
+  Object.assign(G.car, { x: nonSky.x - 300, y: nonSky.y, angle: 0, vx: 400, vy: 0 }); step(60 * 2);
+  check('a közönséges házak fölött átrepülhetsz', G.car.plane && G.player.health === 100); press('KeyS'); G.selectCar(0);
+  // rombolható
+  G.missileImpact(sk.x, sk.y);
+  check('a rakéta lerombolja a felhőkarcolót is', G.destroyedHouses.has(sk.id));
+  G.planes.length = 0; Object.assign(G.player, { x: G.C + 30000, y: G.C }); G.player.health = 100;
+}
+
+// --- telefonok, telefonboltok, Robi (MI) ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false; G.errands = false; G.warsOn = false;
+  const all = G.housesIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000);
+  const shops = all.filter(h => h.phoneShop);
+  check('vannak telefonboltok, ritkán', shops.length >= 2 && shops.length < all.length * 0.12);
+  check('egy ház csak egyféle lehet (a telefonbolt is)', all.every(h => [h.pub, h.bank, h.factory, h.shop, h.school, h.restaurant, h.mechanic, h.phoneShop].filter(Boolean).length <= 1));
+  const reset = () => { G.progress.phone = 0; G.progress.money = 1000; G.progress.pins = []; Object.assign(G.player, { x: G.C - 2000, y: G.C + 900, inCar: false, inHouse: null, riding: null, dead: 0, arrested: 0, passedOut: 0, health: 100, abduct: null, moon: null }); G.phone.log.length = 0; G.phone.open = false; };
+  reset();
+  press('KeyP');
+  check('telefon nélkül a P nem nyitja meg, hanem útmutatást ad', !G.phone.open);
+  // vásárlás
+  const sh = shops[0]; Object.assign(G.player, G.doorOf(sh)); press('KeyE');
+  check('a telefonboltba be lehet menni', G.player.inHouse && G.player.inHouse.hs.phoneShop && G.player.inHouse.furniture.some(f => f.k === 'ptable'));
+  G.player.inHouse.ix = 280; G.player.inHouse.iy = 100;
+  check('a pultnál kiírja a telefonokat', /telefon/.test(G.interactionPrompt().text));
+  press('KeyE');
+  check('E-re megnyílik a telefonbolt, a telefonokkal', G.shop.open && G.shop.items === G.PHONE_ITEMS);
+  const m0 = G.progress.money; press('Digit1');
+  check('az egyszerű telefon $60', G.progress.phone === 1 && G.progress.money === m0 - 60);
+  press('Digit1');
+  check('ugyanazt kétszer nem veheted meg (nem fizetsz)', G.progress.money === m0 - 60);
+  press('Digit2');
+  check('az okostelefon $200 (frissítés)', G.progress.phone === 2 && G.progress.money === m0 - 260);
+  press('Digit1');
+  check('rosszabb telefont nem vehetsz a jobb helyett', G.progress.phone === 2);
+  press('Escape'); G.exitHouse();
+  check('a telefon megmarad a mentésben, hibás érték kiszűrődik', G.sanitizeProgress({ phone: 2 }).phone === 2 && G.sanitizeProgress({ phone: 9 }).phone === 0 && G.sanitizeProgress({}).phone === 0);
+  // megnyitás, gépelés
+  Object.assign(G.player, { x: G.C - 2000, y: G.C + 900, inHouse: null });
+  press('KeyP');
+  check('a P megnyitja a telefont, Robi köszön', G.phone.open && G.phone.log.length === 1 && G.phone.log[0].from === 'ai');
+  const clk = G.clock; step(30);
+  check('telefonozás közben áll a játék', G.clock === clk);
+  check('a telefon főképernyőn nyílik meg (4 app)', G.phone.app === 'home' && G.phone.hits.filter(h => h.app).length === 4);
+  press('Digit1');
+  check('az 1-es a Robi appot nyitja (csevegés)', G.phone.app === 'chat');
+  const type = str => { for (const ch of str) { listeners.keydown({ code: 'Key' + ch.toUpperCase(), key: ch, repeat: false }); listeners.keyup({ code: 'Key' + ch.toUpperCase() }); } };
+  type('szia'); check('a billentyűk a beviteli sorba kerülnek (nem mozgatnak)', G.phone.input === 'szia' && G.player.x === G.C - 2000);
+  listeners.keydown({ code: 'Backspace', key: 'Backspace', repeat: false }); check('a Backspace töröl', G.phone.input === 'szi');
+  type('a'); listeners.keydown({ code: 'Quote', key: 'á', repeat: false });
+  check('az ékezetes betű is bekerül', G.phone.input === 'sziaá');
+  listeners.keydown({ code: 'Backspace', key: 'Backspace', repeat: false });
+  press('Enter');
+  check('az Enter elküldi az üzenetet, Robi „gépel”', G.phone.log[G.phone.log.length - 1].from === 'me' && G.phone.input === '' && !!G.phone.pending);
+  step(60);
+  check('Robi rövid idő múlva válaszol', !G.phone.pending && G.phone.log[G.phone.log.length - 1].from === 'ai' && /Robi|Szia/.test(G.phone.log[G.phone.log.length - 1].text));
+  // az MI válaszai
+  const ask = q => G.robiReply(q);
+  check('a névelemzés ékezet- és kisbetűfüggetlen', G.norm('Hol VAN a legközelebbi Benzinkút?!') === 'hol van a legkozelebbi benzinkut');
+  check('Robi tudja, mennyi pénzed van', new RegExp('\\$' + Math.floor(G.progress.money)).test(ask('mennyi pénzem van?').text));
+  check('Robi megmondja, merre és milyen messze van a legközelebbi benzinkút', /benzinkút kb\. \d+ m-re van, \S+ felé/.test(ask('Hol van a legközelebbi benzinkút?').text));
+  check('Robi a bankot, boltot, éttermet, szerelőt, iskolát, vonatot is megtalálja', ['bank', 'bolt', 'étterem', 'autószerelő', 'iskola', 'vasútállomás', 'telefonbolt'].every(w => new RegExp('legközelebbi ' + w + ' kb\\. \\d+ m').test(ask('hol van a ' + ({ 'bank': 'bank', 'bolt': 'bolt', 'étterem': 'étterem', 'autószerelő': 'szerelő', 'iskola': 'iskola', 'vasútállomás': 'vonat állomás', 'telefonbolt': 'telefonbolt' })[w] + '?').text)));
+  check('háború nélkül azt mondja, nincs háború', /nincs háború/.test(ask('van háború?').text));
+  G.callWar();
+  check('háborúnál megmondja az irányt és a távolságot', /Háború dúl \d+ m-re/.test(ask('van háború').text));
+  G.endWar('x');
+  check('tippet és viccet is ad', /^Tipp:/.test(ask('adj egy tippet').text) && ask('mondj egy viccet').text.length > 10);
+  check('ismeretlen kérdésre udvariasan visszakérdez (mindhárom válasz)', Array.from({ length: 30 }, () => ask('blabla xyzzy').text).every(t => /nem|Hmm|Erre/i.test(t)));
+  check('a „mit tudsz” felsorolja a lehetőségeket', /benzinkút/.test(ask('mit tudsz?').text));
+  check('a „ki vagy” válaszol', /Robi/.test(ask('ki vagy te').text));
+  // okostelefon: jelölés és taxi
+  G.progress.phone = 2; const pins0 = G.progress.pins.length;
+  const r1 = ask('jelöld meg a bankot'); check('okostelefonon a „jelöld meg a bankot” jelölést kér', !!r1.pin && /Megjelöltem/.test(r1.text));
+  G.phone.pending = { until: 0, reply: r1 }; G.tickPhone(0.01);
+  check('a jelölés bekerül a térképre (a taxi célok közé is)', G.progress.pins.length === pins0 + 1 && G.taxiDestinations().some(d => d.label.includes('jelölt pont')));
+  const r2 = ask('hívj taxit'); check('okostelefonon Robi taxit hív', r2.taxi === true);
+  G.phone.pending = { until: 0, reply: r2 }; G.tickPhone(0.01);
+  check('és tényleg érkezik a taxi', !!G.taxi);
+  G.aiCars.length = 0;
+  G.progress.phone = 1;
+  const r3 = ask('jelöld meg a bankot'); check('az egyszerű telefon nem jelöl, de megmondja, hol van', !r3.pin && /okostelefon/.test(r3.text) && /bank kb\. \d+ m/.test(r3.text));
+  check('egyszerű telefonon a taxi hívásához az X gombot ajánlja', !ask('taxi').taxi && /X gomb/.test(ask('taxi').text));
+  // bezárás
+  press('Escape');
+  check('az Esc a csevegésből a főképernyőre visz vissza', G.phone.open && G.phone.app === 'home');
+  press('Escape');
+  check('a főképernyőn az Esc bezárja a telefont (nem a menüt nyitja)', !G.phone.open && !G.menu.open);
+  press('KeyP'); const cl = G.phone.hits.find(h => h.close);
+  step(2); const hit = G.phone.hits.find(h => h.close);
+  listeners.mousedown({ button: 0, clientX: hit.x + 5, clientY: hit.y + 5 });
+  check('a ✕ gombra kattintva is bezárul', !G.phone.open);
+  // térkép
+  const types = new Set(G.poisIn(G.C + 60000, G.C - 600, G.C + 90000, G.C + 100).map(p => p.type));
+  check('a térképen a telefonboltok is látszanak', types.has('phone'));
+  check('a taxi a legközelebbi telefonboltba is elvisz', G.taxiDestinations().some(d => d.label.includes('telefonbolt')));
+  press('KeyK'); step(1); const pinOn = G.mapView.cats.pin; press('KeyP'); const pinOff = G.mapView.cats.pin; press('KeyP'); press('KeyK');
+  check('a térképen a P a saját jelölések ki/be kapcsolója', pinOn === true && pinOff === false && G.mapView.cats.pin === true);
+  G.progress.phone = 0; G.progress.pins = []; G.progress.money = 0; G.phone.log.length = 0;
+}
+
+// --- repülők: AI bombázók a háborúban, a játékos is vezetheti ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false; G.errands = false; G.warsOn = false;
+  const home = { x: G.C + 200000, y: G.C };
+  const reset = () => { G.aiCars.length = 0; G.npcs.length = 0; G.bullets.length = 0; G.soldiers.length = 0; G.bombers.length = 0; G.airBombs.length = 0; G.planes.length = 0; G.craters.length = 0; G.nukeFx = null; G.missiles.length = 0; G.endOccupation(); if (G.war) G.endWar('x'); G.clearWanted(); Object.assign(G.player, { ...home, inCar: false, inHouse: null, riding: null, dead: 0, arrested: 0, passedOut: 0, health: 100, abduct: null, moon: null }); Object.assign(G.car, { x: home.x - 20000, y: home.y, vx: 0, vy: 0 }); };
+  reset();
+  G.callWar(); step(3);
+  check('a háború kezdetén mindkét sereg mögött egy leparkolt bombázó áll', G.planes.filter(p => p.side === 'A').length >= 1 && G.planes.filter(p => p.side === 'B').length >= 1);
+  const pl = G.planes[0]; Object.assign(G.player, { x: pl.x + 40, y: pl.y });
+  check('a gép mellett kiírja: felszállás a bombázóra', /bombázóra/.test(G.interactionPrompt().text));
+  const carBefore = { x: G.car.x, y: G.car.y, type: G.car.type };
+  press('KeyE');
+  check('E-re felszállsz a bombázóra', G.player.inCar && G.car.plane && G.car.type === 'plane' && G.car.planeAmmo === G.PLANE_AMMO && !G.planes.includes(pl));
+  step(30); check('azonnal repül (nem áll meg)', Math.hypot(G.car.vx, G.car.vy) > 100);
+  // irányítás
+  key('KeyW', true); step(60 * 3); key('KeyW', false);
+  const spMax = Math.hypot(G.car.vx, G.car.vy);
+  check('W-re gyorsul a maximumig (' + G.PLANE_MAX + ' px/s)', spMax > G.PLANE_MAX - 5 && spMax <= G.PLANE_MAX + 0.5);
+  check('a gép sebessége nem lépi túl a körözési határt: nem üldöz a rendőrség (repülőn nincs gyorshajtás)', G.wanted.level === 0);
+  key('KeyS', true); step(60 * 4); key('KeyS', false);
+  const spMin = Math.hypot(G.car.vx, G.car.vy);
+  check('S-re lassul, de nem tud megállni (legalább ' + G.PLANE_MIN + ' px/s)', spMin >= G.PLANE_MIN - 0.5 && spMin < G.PLANE_MIN + 5);
+  const a0 = G.car.angle; key('KeyD', true); step(30); key('KeyD', false);
+  check('D-re jobbra fordul', G.car.angle > a0 + 0.2);
+  const a1 = G.car.angle; key('KeyA', true); step(30); key('KeyA', false);
+  check('A-ra balra fordul', G.car.angle < a1 - 0.2);
+  // átrepül a házak és az autók fölött
+  const hh = G.housesIn(G.C + 21000, G.C - 400, G.C + 23000, G.C)[0]; Object.assign(G.car, { x: hh.x - 300, y: hh.y, angle: 0 });
+  const ac = G.spawnAiCar('h', 1, G.C, 0); Object.assign(ac, { x: hh.x - 100, y: hh.y, vx: 0, vy: 0 }); const acx = ac.x; Object.assign(G.car, { vx: 500, vy: 0 });
+  step(60 * 2);
+  check('a gép átrepül a ház és az autók fölött (nincs ütközés)', G.car.x > hh.x + 200 && G.player.health === 100 && Math.abs(ac.x - acx) < 5);
+  G.aiCars.length = 0;
+  // bombázás
+  G.car.angle = 0; Object.assign(G.car, { x: G.C + 22000, y: G.C - 800, vx: 300, vy: 0 });
+  const ped = G.spawnNpc('ped', G.car.x + 60, G.car.y); ped.moving = false; ped.wanderT = 99;
+  const ammo0 = G.car.planeAmmo; key('KeyB', true); key('KeyB', false);
+  check('B-re bombát dobsz (légibomba indul), fogy a lőszer', G.airBombs.length === 1 && G.car.planeAmmo === ammo0 - 1);
+  key('KeyB', true); key('KeyB', false);
+  check('két gyors dobás között van tűzszünet (nem lehet szórni)', G.airBombs.length === 1);
+  G.car.x -= 0; Object.assign(ped, { x: G.airBombs[0].x, y: G.airBombs[0].y }); step(60 * 1.2);
+  check('a bomba földet ér és felrobban: megöli, aki alatta van – téged, fent a levegőben, nem', G.airBombs.length === 0 && ped.dead > 0 && G.player.health === 100);
+  G.car.planeAmmo = 0; G.car.bombCd = 0; key('KeyB', true); key('KeyB', false);
+  check('lőszer nélkül nem dobhatsz bombát', G.airBombs.length === 0);
+  G.car.planeAmmo = 5;
+  // ---- ballisztikus rakéta és atombomba a játékos gépén ----
+  check('a leparkolt háborús gépek tele vannak (30 bomba, 6 rakéta, 1 atombomba)', G.PLANE_MISSILES === 6 && G.PLANE_ATOMS === 1 && G.car.planeMissiles === 6 && G.car.planeAtoms === 1 && G.car.planeWeapon === 0);
+  press('KeyV');
+  check('V: fegyverváltás bomba → rakéta', G.car.planeWeapon === 1);
+  press('KeyV'); press('KeyV');
+  check('V: rakéta → atombomba → vissza a bombára', G.car.planeWeapon === 0);
+  const Hz = G.housesIn(G.C + 100000, G.C - 400, G.C + 110000, G.C), tgtH = Hz[0];
+  Object.assign(G.car, { x: tgtH.x - G.PLAYER_MISSILE_RANGE, y: tgtH.y, angle: 0, vx: 300, vy: 0, bombCd: 0 }); G.player.x = G.car.x; G.player.y = G.car.y;
+  press('KeyV'); G.clearWanted(); G.warsOn = false;
+  key('KeyB', true); key('KeyB', false);
+  check('rakétával B: ballisztikus rakéta indul a gép előtt (1700 px), -1 rakéta', G.missiles.some(m => m.side === 'P' && Math.abs(m.tx - (G.car.x + G.PLAYER_MISSILE_RANGE)) < 50 && Math.abs(m.ty - G.car.y) < 50) && G.car.planeMissiles === 5);
+  check('a rakéta kilövése körözést von maga után (★★)', G.wanted.level >= 2);
+  key('KeyB', true); key('KeyB', false);
+  check('a következő rakéta csak egy kis szünet után indulhat', G.missiles.filter(m => m.side === 'P').length === 1);
+  const mt = G.missiles.find(m => m.side === 'P'), tx = mt.tx, ty = mt.ty;
+  G.housesIn(tx - 5, ty - 5, tx + 5, ty + 5);
+  const hOnTarget = G.housesIn(tx - 200, ty - 200, tx + 200, ty + 200).find(h => Math.hypot(h.x - tx, h.y - ty) < 150);
+  step(60 * (G.MISSILE_FLIGHT + 0.5));
+  check('a rakéta becsapódik (békeidőben is repül), a repülőn ülő nem sérül', G.missiles.filter(m => m.side === 'P').length === 0 && G.player.health === 100 && !G.player.dead);
+  check('ha házra céloztál, az romba dől', !hOnTarget || G.destroyedHouses.has(hOnTarget.id));
+  G.car.planeMissiles = 0; G.car.bombCd = 0; key('KeyB', true); key('KeyB', false);
+  check('rakéta nélkül nem lőhetsz', G.missiles.filter(m => m.side === 'P').length === 0);
+  G.missiles.push({ x0: 0, y0: 0, tx: 5, ty: 5, t: 0, side: 'P' }, { x0: 0, y0: 0, tx: 9, ty: 9, t: 0, side: 'A' }); G.dropWarMissiles();
+  check('a háború vége a játékos rakétáit nem törli (csak a háborúsakat)', G.missiles.length === 1 && G.missiles[0].side === 'P'); G.missiles.length = 0;
+  // atombomba
+  Object.assign(G.car, { x: G.C + 120000, y: G.C - 800, angle: 0, vx: 620, vy: 0, bombCd: 0 }); G.player.x = G.car.x; G.player.y = G.car.y; G.craters.length = 0; G.nukeFx = null; G.clearWanted();
+  press('KeyV'); check('(előkészítés) atombomba a kiválasztott fegyver', G.car.planeWeapon === 2);
+  key('KeyW', true); key('KeyB', true); key('KeyB', false);
+  check('atombombával B: lassan eső atombomba, -1 atombomba, ★★ körözés', G.airBombs.some(a => a.side === 'N') && G.car.planeAtoms === 0 && G.wanted.level === 2);
+  step(60 * 1.2); check('az atombomba még nem robbant (esik)', G.craters.length === 0);
+  step(60 * (G.ATOM_FALL - 1.2 + 0.4)); key('KeyW', false);
+  check('az atombomba felrobban: kráter, vakító villanás', G.craters.length === 1 && !!G.nukeFx);
+  check('teljes sebességgel elmenekültél: életben maradtál (a sugáron belül megsebesülhetsz)', !G.player.dead);
+  G.car.bombCd = 0; key('KeyB', true); key('KeyB', false);
+  check('több atombombád nincs (egy darab van gépenként)', G.airBombs.filter(a => a.side === 'N').length === 0);
+  // leszállás / kiugrás
+  key('KeyS', true); step(60 * 3); key('KeyS', false);
+  const lx = G.car.x, ly = G.car.y; const np = G.planes.length;
+  check('lassan: a prompt a leszállást írja', /leszállás/.test(G.interactionPrompt().text));
+  press('KeyE');
+  check('lassan E-re leszállsz: a gép ott marad, az autód visszajön', !G.player.inCar && !G.car.plane && G.car.type !== 'plane' && G.planes.length === np + 1 && Math.hypot(G.planes[G.planes.length - 1].x - lx, G.planes[G.planes.length - 1].y - ly) < 5 && G.car.x === carBefore.x);
+  Object.assign(G.player, { x: lx + 40, y: ly }); press('KeyE');
+  check('a leszállt gépre újra felszállhatsz', G.car.plane);
+  key('KeyW', true); step(60 * 2); key('KeyW', false); const np2 = G.planes.length;
+  G.player.health = 100;
+  check('gyorsan a prompt a kiugrást írja', /kiugrás/.test(G.interactionPrompt().text));
+  press('KeyE');
+  check('gyorsan E-re kiugrasz: ejtőernyő (-15 élet), a gép lezuhan (nem marad), az autód visszajön', !G.player.inCar && G.player.health === 85 && !G.car.plane && G.planes.length === np2);
+  G.player.health = 100;
+  // halál repülés közben
+  Object.assign(G.player, { x: lx + 40, y: ly }); G.spawnParkedPlane(lx + 40, ly, 0, 'A'); press('KeyE');
+  check('(előkészítés) újra a levegőben', G.car.plane);
+  G.damagePlayer(10000); step(240 + 60 * 5);
+  check('ha meghalsz repülés közben, az autód rendben visszatér', !G.car.plane && G.car.type !== 'plane' && !G.player.inCar && G.player.dead === 0);
+  // autóváltás repülés közben
+  G.spawnParkedPlane(G.player.x + 40, G.player.y, 0, 'B'); press('KeyE'); const np3 = G.planes.length;
+  G.selectCar(0);
+  check('autóváltáskor a gép leparkol, az autó visszatér', !G.car.plane && G.planes.length === np3 + 1);
+  // lassan dobva te is meghalsz
+  Object.assign(G.player, { x: G.C + 125000, y: G.C, inCar: false, health: 100, dead: 0 }); G.planes.length = 0; G.spawnParkedPlane(G.player.x + 30, G.player.y, 0, 'A'); press('KeyE');
+  G.player.health = 100; G.car.planeAtoms = 1; G.car.bombCd = 0; G.car.planeWeapon = 2; Object.assign(G.car, { vx: 140, vy: 0, angle: 0 }); G.craters.length = 0;
+  key('KeyS', true); key('KeyB', true); key('KeyB', false); step(60 * (G.ATOM_FALL + 0.5)); key('KeyS', false);
+  check('ha lassan repülsz el a saját atombombádtól, a robbanás téged is megöl', G.player.dead > 0);
+  step(240 + 60 * 6);
+  // a lőszer a gépnél marad: leszállva és újra felszállva sem töltődik újra
+  Object.assign(G.player, { x: G.C + 130000, y: G.C, inCar: false }); G.planes.length = 0; G.spawnParkedPlane(G.player.x + 30, G.player.y, 0, 'A', { bomb: 2, missile: 0, atom: 0 }); press('KeyE');
+  check('a gép lőszere a gépnél marad (leszállva sem töltődik újra): 2 bomba, 0 rakéta, 0 atom', G.car.plane && G.car.planeAmmo === 2 && G.car.planeMissiles === 0 && G.car.planeAtoms === 0);
+  G.car.planeAmmo = 1; G.selectCar(0);
+  check('leparkoláskor a megmaradt lőszer (1 bomba) a géppel marad', G.planes[G.planes.length - 1].ammo.bomb === 1 && G.planes[G.planes.length - 1].ammo.atom === 0);
+  // AI bombázók
+  reset(); G.callWar(); step(3);
+  G.soldiers.forEach(s => { s.cd = 99; });
+  G.war.bomberT = 0.01; step(3);
+  check('a háborúban időnként AI bombázó indul', G.bombers.length >= 1);
+  const bb = G.bombers[0]; const bx0 = bb.x, by0 = bb.y; step(60 * 2);
+  check('a bombázó repül (átvonul a csatatér felé)', Math.hypot(bb.x - bx0, bb.y - by0) > 800);
+  const A = G.soldiers.find(s => s.side === 'A' && !s.tank), B = G.soldiers.find(s => s.side === 'B' && !s.tank);
+  Object.assign(A, { x: G.war.x + 4000, y: G.war.y }); Object.assign(B, { x: G.war.x + 4050, y: G.war.y });
+  G.airBombs.push({ x: G.war.x + 4020, y: G.war.y, t: 0, side: 'A' }); step(60 * 1.2);
+  check('a légibomba az ellenséges katonát öli, a saját oldalát kíméli', !G.soldiers.includes(B) && G.soldiers.includes(A));
+  Object.assign(bb, { x: G.war.x + 9000, y: G.war.y + 9000, vx: 520, vy: 520, angle: Math.PI / 4, cx: G.war.x, cy: G.war.y }); step(3);
+  check('a bombázó a csatatér után továbbrepül és eltűnik', !G.bombers.includes(bb));
+  G.bombers.push({ x: G.war.x, y: G.war.y, vx: 0, vy: 0, angle: 0, side: 'A', dropT: 0, cx: G.war.x, cy: G.war.y }); G.endWar('x');
+  check('a háború végén a bombázók hazamennek, a leparkolt gépek megmaradnak', G.bombers.length === 0 && G.planes.length >= 1);
+  G.planes.length = 0; reset();
+}
+
+// --- háborúk: néha két sereg csap össze ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false; G.errands = false;
+  const home = { x: G.C + 160000, y: G.C };
+  const reset = () => { G.player.shieldUntil = 0; G.aiCars.length = 0; G.npcs.length = 0; G.bullets.length = 0; G.soldiers.length = 0; G.fallen.length = 0; G.missiles.length = 0; G.craters.length = 0; G.nukeFx = null; G.endOccupation(); if (G.war) G.endWar('x'); Object.assign(G.player, { ...home, inCar: false, inHouse: null, riding: null, dead: 0, arrested: 0, passedOut: 0, health: 100, abduct: null, moon: null }); Object.assign(G.car, { x: home.x - 20000, y: home.y, vx: 0, vy: 0 }); };
+  reset();
+  check('háború csak engedélyezve indul (tesztben alapból nincs)', G.war === null);
+  G.warsOn = true; G.warClock.left = 0.05; step(5);
+  check('az időzítő lejártakor kitör a háború: 2 × ' + G.WAR_SOLDIERS + ' katona, 1500–2200 px-re', !!G.war && G.soldiers.filter(s => !s.tank).length === 2 * G.WAR_SOLDIERS && Math.hypot(G.war.x - G.player.x, G.war.y - G.player.y) > 1300 && Math.hypot(G.war.x - G.player.x, G.war.y - G.player.y) < 2400);
+  check('két oldal van (A: zöld, B: kék), egyformán sokan', G.soldiers.filter(s => s.side === 'A' && !s.tank).length === G.WAR_SOLDIERS && G.soldiers.filter(s => s.side === 'B' && !s.tank).length === G.WAR_SOLDIERS);
+  const start0 = G.soldiers.length; let died = false;
+  for (let i = 0; i < 60 * 60 && !died; i++) { step(1); if (G.fallen.length > 0) died = true; }
+  check('a katonák egymásra lőnek: elesnek páran', died && G.soldiers.length < start0);
+  check('egyik sem a másik oldal nélkül marad (a háború megy), a sereg a csatatér körül marad', !G.war || G.soldiers.every(s => Math.hypot(s.x - G.war.x, s.y - G.war.y) < 1200));
+  // Q: háború indítása
+  reset(); G.warsOn = false;
+  press('KeyQ');
+  check('a Q gombbal azonnal háború indítható (az időzítőtől függetlenül)', !!G.war && G.soldiers.filter(s => !s.tank).length === 2 * G.WAR_SOLDIERS);
+  const sol0 = G.soldiers.length, w00 = G.war; press('KeyQ');
+  check('ha már dúl háború, a Q nem indít újat', G.war === w00 && G.soldiers.length === sol0);
+  G.endWar('x'); G.player.inHouse = { hs: {}, ix: 0, iy: 0, furniture: [] }; press('KeyQ');
+  check('házban a Q nem indít háborút', G.war === null);
+  G.player.inHouse = null; G.warsOn = true;
+  // erősítés: a háború tovább tart akkor is, ha az egyik sereg elfogy
+  reset(); G.warClock.left = 0.01; step(3); G.soldiers.filter(s => s.side === 'B').forEach(s => G.killSoldier(s, false));
+  step(60 * (G.WAR_REINFORCE + 2));
+  check('ha az egyik sereg elesik, erősítés érkezik, és a háború megy tovább', !!G.war && G.soldiers.some(s => s.side === 'B') && G.soldiers.filter(s => s.side === 'B').length <= G.WAR_SOLDIERS);
+  step(60 * G.WAR_REINFORCE * 12);
+  check('az erősítés csak a hiányt pótolja (nem lesz több katona, mint ' + G.WAR_SOLDIERS + ' oldalanként)', G.soldiers.filter(s => s.side === 'B' && !s.tank).length <= G.WAR_SOLDIERS && G.soldiers.filter(s => s.side === 'A' && !s.tank).length <= G.WAR_SOLDIERS);
+  check('a háború 4 percig tart', G.WAR_LIFE === 240);
+  // ---- tankok ----
+  reset(); G.warClock.left = 0.01; step(3);
+  check('oldalanként ' + G.WAR_TANKS + ' tank van, nagy életerővel és erősebb páncéllal', ['A', 'B'].every(sd => G.soldiers.filter(s => s.tank && s.side === sd).length === G.WAR_TANKS) && G.soldiers.filter(s => s.tank).every(s => s.hp === G.TANK_HP && s.r > 20));
+  const tk = G.soldiers.find(s => s.tank && s.side === 'A'), foeT = G.soldiers.find(s => s.tank && s.side === 'B');
+  G.soldiers.forEach(s => { if (s !== tk) { s.cd = 99; s.x += 9000; } }); Object.assign(tk, { x: G.player.x + 3000, y: G.player.y, cd: 99 });
+  Object.assign(foeT, { x: tk.x + 300, y: tk.y }); foeT.cd = 99;
+  const tkhp0 = tk.hp; G.bullets.push({ x: tk.x - 40, y: tk.y, vx: 1100, vy: 0, life: 0.9, from: 'warB' }); step(5);
+  check('a puskagolyó alig sebzi a tankot (negyed életet visz el)', tk.hp === tkhp0 - 0.25);
+  const fdist = () => Math.hypot(tk.x - foeT.x, tk.y - foeT.y);
+  tk.cd = 0; foeT.x = tk.x + 400; foeT.y = tk.y; step(2);
+  check('a tank ágyúval lő: repülő lövedék indul az ellenség felé', G.warShells.length >= 1 && G.warShells[0].side === 'A');
+  const shells0 = G.warShells.length; step(60 * 1.5);
+  check('a lövedék becsapódik és eltűnik (nem marad a levegőben)', G.warShells.length < shells0 || G.warShells.every(w => w.t < 1));
+  const hf = foeT.hp; G.shell(foeT.x + 30, foeT.y, 'A');
+  check('a tanklövedék sebzi az ellenséges tankot (4 hp), a saját oldalt kíméli', foeT.hp === hf - 4 || !G.soldiers.includes(foeT));
+  const tkHp = tk.hp; G.shell(tk.x + 30, tk.y, 'A');
+  check('a saját oldali tank nem sérül a saját lövedékétől', tk.hp === tkHp);
+  G.shell(tk.x + 30, tk.y); G.shell(tk.x + 30, tk.y); G.shell(tk.x + 30, tk.y);
+  check('a tank három lövedéktől megsemmisül, roncsa marad', !G.soldiers.includes(tk) && G.fallen.some(f => f.tank));
+  // tank lelövése a játékostól: jutalom
+  reset(); G.warClock.left = 0.01; step(3); const pt = G.soldiers.find(s => s.tank); const mm = G.progress.money; G.killSoldier(pt, true);
+  check('a tank lelövéséért $' + G.TANK_BOUNTY + ' jár', G.progress.money === mm + G.TANK_BOUNTY);
+  // tank utánpótlás
+  reset(); G.warClock.left = 0.01; step(3); G.soldiers.filter(s => s.tank && s.side === 'B').forEach(s => G.killSoldier(s, false)); G.soldiers.forEach(s => { s.cd = 99; });
+  step(60 * 45);
+  check('az elpusztult tankokat egy idő után pótolja a sereg', G.soldiers.filter(s => s.tank && s.side === 'B').length >= 1);
+  // ---- nagyobb seregek, újraélesztés a háborúban ----
+  reset(); G.warClock.left = 0.01; step(3);
+  check('nagy háború: oldalanként ' + G.WAR_SOLDIERS + ' katona (összesen 40 + tankok)', G.WAR_SOLDIERS === 20 && G.soldiers.filter(s => !s.tank && s.side === 'A').length === 20 && G.soldiers.filter(s => !s.tank && s.side === 'B').length === 20);
+  const RZ = { x: G.war.x, y: G.war.y }; G.soldiers.forEach(s => { s.cd = 99; });
+  Object.assign(G.player, { x: RZ.x + 300, y: RZ.y, inCar: false, inHouse: null, health: 100, dead: 0 });
+  G.damagePlayer(10000); check('(előkészítés) meghaltál a háborúban', G.player.dead > 0);
+  step(60 * 3.5);
+  const dW = Math.hypot(G.player.x - RZ.x, G.player.y - RZ.y);
+  check('ha a háborúban halsz meg, ott éledsz újra (a csatatér szélén, a halálod irányában), nem a kezdőhelyen', !G.player.dead && G.player.health === 100 && dW > 500 && dW < 1100 && G.player.x > RZ.x + 400 && !!G.war);
+  check('az autód is melletted áll', Math.hypot(G.car.x - G.player.x, G.car.y - G.player.y) < 150);
+  check('3 mp védelmed van (a gyűrű): nem sebezhetnek', G.player.shieldUntil > G.clock);
+  G.damagePlayer(50); check('védelem alatt a találat nem sebez', G.player.health === 100);
+  step(60 * (G.RESPAWN_SHIELD + 0.3)); G.damagePlayer(30);
+  check('a védelem lejárta után újra sebezhető vagy', G.player.health === 70);
+  // távol / atombomba-figyelmeztetés közben / háború nélkül a kezdőhelyen élsz újra
+  const atStart = () => Math.hypot(G.player.x - G.START_X, G.player.y - G.START_Y) < 5;
+  G.player.health = 100; Object.assign(G.player, { x: RZ.x + G.WAR_RESPAWN_RANGE + 500, y: RZ.y, dead: 0 }); G.player.shieldUntil = 0; G.damagePlayer(10000); step(60 * 3.5);
+  check('ha messze (' + G.WAR_RESPAWN_RANGE + ' px-nél távolabb) haltál meg, a kezdőhelyen éledsz újra', atStart() && !G.player.dead);
+  G.war.nukeArmed = true; Object.assign(G.player, { x: RZ.x + 300, y: RZ.y, health: 100, dead: 0 }); G.damagePlayer(10000); step(60 * 3.5);
+  check('az atombomba-figyelmeztetés alatt nem éledsz a csatatéren (a kezdőhelyen)', atStart());
+  G.war.nukeArmed = false; G.endWar('x'); Object.assign(G.player, { x: RZ.x + 300, y: RZ.y, health: 100, dead: 0 }); G.damagePlayer(10000); step(60 * 3.5);
+  check('háború nélkül a kezdőhelyen éledsz újra', atStart());
+  G.player.shieldUntil = 0;
+  // ---- a saját sereg ----
+  reset(); G.warClock.left = 0.01; step(3);
+  const AZ = { x: G.war.x, y: G.war.y }; G.soldiers.forEach(s2 => { s2.cd = 99; });
+  check('a saját sereg még nincs ott, ha messze vagy a háborútól', !G.war.army && G.soldiers.filter(s2 => s2.side === 'P').length === 0);
+  Object.assign(G.player, { x: AZ.x + G.ARMY_JOIN + 500, y: AZ.y }); step(5);
+  check('900 px-nél távolabb (a körzeten kívül) még nincs sereg', !G.war.army && G.soldiers.filter(s2 => s2.side === 'P').length === 0);
+  Object.assign(G.player, { x: AZ.x + G.ARMY_JOIN - 100, y: AZ.y }); step(3);
+  const a_army = () => G.soldiers.filter(s2 => s2.side === 'P');
+  check('a háború 900 px-es körzetébe érve azonnal megjelenik a saját sereg: ' + G.ARMY_SIZE + ' katona + ' + G.ARMY_TANKS + ' tank, a játékos körül', G.war.army && a_army().filter(s2 => !s2.tank).length === G.ARMY_SIZE && a_army().filter(s2 => s2.tank).length === G.ARMY_TANKS && a_army().every(s2 => Math.hypot(s2.x - G.player.x, s2.y - G.player.y) < 900));
+  const a_armyN = a_army().length; Object.assign(G.player, { x: AZ.x + 3000, y: AZ.y }); step(3); Object.assign(G.player, { x: AZ.x + G.ARMY_JOIN - 100, y: AZ.y }); step(3);
+  check('a sereg csak egyszer érkezik (visszatérve sem duplázódik)', a_army().length <= a_armyN + 1);
+  // a saját sereg nem lő rád, és nem sebzi a polgárokat
+  const a_pHealth = G.player.health; const a_pp = a_army().find(s2 => !s2.tank);
+  G.bullets.push({ x: G.player.x - 8, y: G.player.y, vx: 1100, vy: 0, life: 0.9, from: 'warP' }); step(3);
+  check('a saját sereg golyója nem sebez téged', G.player.health === a_pHealth);
+  const a_ped2 = G.spawnNpc('ped', G.player.x + 200, G.player.y + 300); a_ped2.moving = false; a_ped2.wanderT = 99;
+  G.bullets.push({ x: a_ped2.x - 8, y: a_ped2.y, vx: 1100, vy: 0, life: 0.9, from: 'warP' }); step(3);
+  check('és a polgárokat sem', !(a_ped2.dead > 0));
+  // az ellenség a saját sereget is támadja, a saját sereg az ellenséget
+  const a_foe = G.soldiers.find(s2 => s2.side === 'A' && !s2.tank), a_fhp = a_foe.hp; Object.assign(a_foe, { x: G.player.x + 600, y: G.player.y + 900, cd: 99 });
+  G.bullets.push({ x: a_foe.x - 8, y: a_foe.y, vx: 1100, vy: 0, life: 0.9, from: 'warP' }); step(3);
+  check('a saját sereg golyója az ellenséget sebzi', a_foe.hp === a_fhp - 1);
+  const a_me2 = a_army().find(s2 => !s2.tank), mhp = a_me2.hp; Object.assign(a_me2, { x: G.player.x + 700, y: G.player.y + 1200 });
+  G.bullets.push({ x: a_me2.x - 8, y: a_me2.y, vx: 1100, vy: 0, life: 0.9, from: 'warA' }); step(3);
+  check('az ellenség golyója a saját sereget is sebzi', a_me2.hp === mhp - 1);
+  // a te lövésed / bombád a saját seregedet nem bántja
+  const a_my3 = a_army().find(s2 => !s2.tank && s2 !== a_me2), a_hp3 = a_my3.hp; Object.assign(a_my3, { x: G.player.x + 300, y: G.player.y });
+  G.bullets.push({ x: a_my3.x - 8, y: a_my3.y, vx: 1100, vy: 0, life: 0.9, from: 'player' }); step(3);
+  check('a te lövésed nem találja el a saját seregedet', a_my3.hp === a_hp3);
+  G.explode(a_my3.x, a_my3.y);
+  check('a bomba megkíméli a saját seregedet', G.soldiers.includes(a_my3));
+  // a saját tank gránátja kímél
+  const a_hpS = G.player.health; G.shell(G.player.x + 5, G.player.y, 'P');
+  check('a saját tank lövedéke téged és a polgárokat nem éri', G.player.health === a_hpS);
+  // követ
+  Object.assign(G.player, { x: G.player.x + 1500, y: G.player.y }); G.soldiers.forEach(s2 => { s2.cd = 99; }); step(60 * 30);
+  const a_near = a_army().filter(s2 => Math.hypot(s2.x - G.player.x, s2.y - G.player.y) < G.ARMY_FOLLOW + 250).length;
+  check('a saját sereg követ téged: ha elmész, utánad megy', a_army().length > 0 && a_near >= a_army().length * 0.6);
+  // erősítés
+  a_army().filter(s2 => !s2.tank).slice(0, 6).forEach(s2 => G.killSoldier(s2, false)); const a_lowN = a_army().filter(s2 => !s2.tank).length;
+  step(60 * (G.ARMY_REINFORCE * 4 + 1));
+  check('a saját sereg erősítést kap (' + G.ARMY_REINFORCE + ' mp-enként egy katona), a létszámnál többet nem', a_army().filter(s2 => !s2.tank).length > a_lowN && a_army().filter(s2 => !s2.tank).length <= G.ARMY_SIZE);
+  G.endWar('x');
+  check('a háború végén a saját sereg is hazamegy', a_army().length === 0 && G.soldiers.length === 0);
+  G.player.shieldUntil = 0;
+  // ---- ballisztikus rakéták ----
+  reset(); G.warClock.left = 0.01; step(3); G.soldiers.forEach(s => { s.cd = 99; });
+  Object.assign(G.player, { x: G.war.x + 6000, y: G.war.y });
+  G.war.missileT = 0.01; step(3);
+  check('a háború alatt ballisztikus rakéták indulnak', G.missiles.length >= 1 && G.missiles[0].t < G.MISSILE_FLIGHT);
+  const mm0 = G.missiles[0];
+  check('a rakéta távolról (2800 px-re) indul, és a célja a csatatér környékén van (lakott terület / csatatér)', Math.hypot(mm0.x0 - G.war.x, mm0.y0 - G.war.y) > 2500 && Math.hypot(mm0.tx - G.war.x, mm0.ty - G.war.y) < 2400);
+  const n0 = G.missiles.length; step(60 * (G.MISSILE_FLIGHT + 0.5));
+  check('a rakéta becsapódik (eltűnik a levegőből, robbanás marad)', G.missiles.length < n0 + 1 && G.missiles.every(m => m.t < G.MISSILE_FLIGHT));
+  const tg = G.housesIn(G.C + 80000, G.C - 400, G.C + 95000, G.C), mh = tg[0], mh2 = tg.find(h => Math.hypot(h.x - mh.x, h.y - mh.y) > 500);
+  const carM = G.spawnAiCar('h', 1, G.C, 0); Object.assign(carM, { x: mh.x + 100, y: mh.y + 150 });
+  const carF = G.spawnAiCar('h', 1, G.C, 0); Object.assign(carF, { x: mh.x + 600, y: mh.y + 600 });
+  Object.assign(G.player, { x: mh.x + 1500, y: mh.y + 1500, health: 100, dead: 0, inHouse: null });
+  G.missileImpact(mh.x + 40, mh.y);
+  check('a rakéta romba dönti a célba vett házat, a távolabbit (500+ px) nem', G.destroyedHouses.has(mh.id) && !!mh2 && !G.destroyedHouses.has(mh2.id));
+  check('a közeli autót roncsá lövi, a távolabbit nem', carM.wrecked && !carF.wrecked);
+  check('messze (1500 px) a játékos épségben marad', G.player.health === 100);
+  Object.assign(G.player, { x: mh.x + 100, y: mh.y, health: 100, dead: 0, inHouse: null }); G.missileImpact(mh.x + 40, mh.y);
+  check('a becsapódás közelében megsebesülsz / meghalsz', G.player.health < 100 || G.player.dead > 0);
+  step(240 + 60 * 5);
+  Object.assign(G.player, { x: mh.x + 1200, y: mh.y + 1200, health: 100, dead: 0 });
+  reset(); G.warClock.left = 0.01; step(3); const tkM = G.soldiers.find(s => s.tank); const thp = tkM.hp; Object.assign(tkM, { x: G.war.x, y: G.war.y }); G.missileImpact(tkM.x + 20, tkM.y);
+  check('a rakéta a tankot is erősen sebzi (8 hp)', tkM.hp === thp - 8 || !G.soldiers.includes(tkM));
+  // ---- megszállás ----
+  reset(); G.warClock.left = 0.01; step(3); const WZ = { x: G.war.x, y: G.war.y }; G.war.lost.A = 2; G.war.lost.B = 9; G.war.t = G.WAR_LIFE + 1; Object.assign(G.player, { x: WZ.x + 6000, y: WZ.y }); step(3);
+  check('a háború után a győztes sereg (kevesebb veszteség) megszállja a területet', G.war === null && !!G.occupation && G.occupation.side === 'A' && G.garrison.length === G.GARRISON);
+  check('a megszálló katonák a csatatér körül állnak', G.garrison.every(s => Math.hypot(s.x - WZ.x, s.y - WZ.y) < 400));
+  Object.assign(G.player, { x: G.garrison[0].x + 200, y: G.garrison[0].y, health: 100, dead: 0, inHouse: null, riding: null });
+  G.garrison.forEach(s => { s.cd = 0; }); let hurtO = false;
+  for (let i = 0; i < 60 * 15 && !hurtO; i++) { step(1); if (G.player.health < 100) hurtO = true; }
+  check('a megszállt területre lépőt a helyőrség lövi', hurtO);
+  Object.assign(G.player, { x: WZ.x + 3000, y: WZ.y, health: 100, dead: 0 });
+  const mm1 = G.progress.money; G.garrison.slice().forEach(s => G.killSoldier(s, true)); step(3);
+  check('ha mind a megszállót leverted, felszabadul a terület (+$' + G.LIBERATE_BOUNTY + ')', G.occupation === null && G.progress.money === mm1 + G.GARRISON * G.SOLDIER_BOUNTY + G.LIBERATE_BOUNTY);
+  G.startOccupation(WZ.x, WZ.y, 'B'); G.occupation.until = G.clock + 0.5; step(60 * 2);
+  check('' + G.OCCUPY_TIME + ' mp után (itt: lejáratva) a megszálló sereg elvonul', G.occupation === null && G.garrison.length === 0);
+  G.startOccupation(WZ.x, WZ.y, 'B'); G.warClock.left = 0.01; G.warsOn = true; step(5);
+  check('az új háború lezárja az előző megszállást', G.occupation === null && !!G.war);
+  reset(); G.warClock.left = 0.01; step(3); G.war.lost.A = 4; G.war.lost.B = 4; G.war.t = G.WAR_LIFE + 1; Object.assign(G.player, { x: G.war.x + 6000, y: G.war.y }); step(3);
+  check('döntetlen háború után nincs megszállás', G.occupation === null && G.garrison.length === 0);
+  // ---- atombomba ----
+  reset(); G.warClock.left = 0.01; step(3); const wx = G.war.x, wy = G.war.y;
+  G.war.t = G.WAR_LIFE - G.NUKE_WARN - 1; step(70);
+  check('az atombomba előtt 12 mp-pel figyelmeztetés van, és fut a visszaszámlálás', G.war && G.war.nukeArmed);
+  check('a robbanás előtt van még idő menekülni', !G.nukeFx && G.craters.length === 0);
+  // a robbanás: sebzés a távolság szerint
+  reset(); G.warClock.left = 0.01; step(3);
+  const W = G.war;
+  const hz = G.housesIn(G.C + 70000, G.C - 400, G.C + 90000, G.C), nearH = hz[0], farH = hz.find(h => Math.hypot(h.x - nearH.x, h.y - nearH.y) > 2300);
+  const car1 = G.spawnAiCar('h', 1, G.C, 0); Object.assign(car1, { x: W.x + 800, y: W.y });
+  const car2 = G.spawnAiCar('h', 1, G.C, 0); Object.assign(car2, { x: W.x + 3000, y: W.y });
+  Object.assign(G.player, { x: W.x + 3000, y: W.y, inHouse: null, health: 100, dead: 0 });
+  G.nuke(W.x, W.y);
+  check('az atombomba kráter marad, és villanás / lökéshullám látszik', G.craters.length === 1 && !!G.nukeFx);
+  check('a robbanás közelében az autók roncsok lesznek, messze nem', car1.wrecked && !car2.wrecked);
+  check('3000 px-re a játékos épségben marad', G.player.health === 100 && !G.player.dead);
+  G.nuke(nearH.x + 60, nearH.y);
+  check('az atombomba a közeli házat romba dönti, a távolit (2300 px-re) nem', G.destroyedHouses.has(nearH.id) && !!farH && !G.destroyedHouses.has(farH.id));
+  Object.assign(G.player, { x: W.x + 500, y: W.y, health: 100, dead: 0 }); G.nuke(W.x, W.y);
+  check('a robbanás közelében (500 px) meghalsz', G.player.dead > 0);
+  step(240 + 60 * 5);
+  Object.assign(G.player, { x: W.x + 1400, y: W.y, health: 100, dead: 0, inHouse: null }); G.nuke(W.x, W.y);
+  check('1400 px-re megsebesülsz, de életben maradsz', G.player.dead === 0 && G.player.health < 100 && G.player.health > 0);
+  Object.assign(G.player, { x: W.x + 1500, y: W.y, health: 100, dead: 0, inHouse: { hs: { id: 'x' }, ix: 0, iy: 0, furniture: [] } }); G.nuke(W.x, W.y);
+  check('házban 1100 px-en túl biztonságban vagy', G.player.dead === 0 && G.player.health === 100);
+  G.player.inHouse = null;
+  // a háború vége az atombomba: kitör a robbanás, a háború véget ér
+  reset(); G.warClock.left = 0.01; step(3); const cr0 = G.craters.length; G.war.t = G.WAR_LIFE + 1; Object.assign(G.player, { x: G.war.x + 5000, y: G.war.y }); step(3);
+  check('4 perc után az atombomba robban, és véget ér a háború', G.war === null && G.craters.length === cr0 + 1 && G.soldiers.length === 0);
+  // vége: idő
+  G.warClock.left = 0.01; step(3); const w0 = G.war; w0.lost.A = 2; w0.lost.B = 7; w0.t = G.WAR_LIFE + 1; step(3);
+  check('' + G.WAR_LIFE + ' mp után vége a háborúnak, a katonák hazamennek, új háború csak később', G.war === null && G.soldiers.length === 0 && G.warClock.left >= G.WAR_GAP_MIN - 5);
+  // a játékos lő
+  reset(); G.warClock.left = 0.01; step(3);
+  const t = G.soldiers[0]; const m0 = G.progress.money;
+  Object.assign(t, { x: G.player.x + 300, y: G.player.y, cd: 99 });
+  for (let k = 0; k < 3; k++) { G.bullets.push({ x: t.x - 6, y: t.y, vx: 100, vy: 0, life: 1, from: 'player' }); step(2); }
+  check('a katonát 3 lövés leteríti (+$' + G.SOLDIER_BOUNTY + ')', !G.soldiers.includes(t) && G.fallen.length >= 1 && G.progress.money === m0 + G.SOLDIER_BOUNTY);
+  // a katonák rád is lőnek
+  reset(); G.warClock.left = 0.01; step(3);
+  const sd = G.soldiers.find(s => s.side === 'A'); Object.assign(sd, { x: G.player.x + 250, y: G.player.y, cd: 0 });
+  G.soldiers.filter(s => s !== sd).forEach(s => Object.assign(s, { x: s.x + 9000, y: s.y }));
+  let hurt = false; for (let i = 0; i < 60 * 25 && !hurt; i++) { step(1); if (G.player.health < 100) hurt = true; }
+  check('a közelben álló játékost a katonák is lövik', hurt);
+  // házban biztonságban vagy
+  reset(); G.warClock.left = 0.01; step(3);
+  const hh = G.housesIn(G.C + 21000, G.C - 400, G.C + 23000, G.C)[0];
+  Object.assign(G.player, G.doorOf(hh)); press('KeyE'); const s2 = G.soldiers[0]; Object.assign(s2, { x: G.player.x + 200, y: G.player.y, cd: 0 });
+  step(60 * 5);
+  check('házban nem érnek a golyók', !!G.player.inHouse && G.player.health === 100);
+  G.exitHouse();
+  // a lövedék csak az ellenséget találja (saját oldalt nem)
+  reset(); G.warClock.left = 0.01; step(3);
+  const ally = G.soldiers.filter(s => s.side === 'A'), shooter = ally[0], mate = ally[1]; G.soldiers.forEach(s => { s.cd = 99; s.x += 9000; });
+  Object.assign(mate, { x: G.player.x + 300, y: G.player.y - 800 }); const hp0 = mate.hp;
+  G.bullets.push({ x: mate.x - 8, y: mate.y, vx: 1100, vy: 0, life: 0.9, from: 'warA' }); step(5);
+  check('a saját oldal golyója nem sebzi a sajátjait', mate.hp === hp0 && G.soldiers.includes(mate));
+  const foe = G.soldiers.find(s => s.side === 'B'); Object.assign(foe, { x: G.player.x + 300, y: G.player.y - 800 }); const fh = foe.hp;
+  G.bullets.push({ x: foe.x - 8, y: foe.y, vx: 1100, vy: 0, life: 0.9, from: 'warA' }); step(5);
+  check('az ellenség golyója sebzi', foe.hp === fh - 1);
+  // polgárok menekülnek, a gránát öl
+  reset(); G.warClock.left = 0.01; step(3);
+  const ped = G.spawnNpc('ped', G.war.x + 200, G.war.y); G.soldiers.forEach(s => { s.cd = 99; s.x += 9000; });
+  G.shell(G.war.x + 190, G.war.y); 
+  check('a gránát megöli a közelében lévő embert, és a többiek menekülnek', ped.dead > 0 || ped.flee > 0);
+  const near = G.soldiers[0]; Object.assign(near, { x: G.war.x, y: G.war.y }); G.shell(near.x + 30, near.y);
+  check('a gránát megöli a katonákat (nem romboltat házat)', !G.soldiers.includes(near));
+  Object.assign(G.player, { x: G.war.x + 40, y: G.war.y, inHouse: null }); const hp1 = G.player.health; G.shell(G.war.x, G.war.y);
+  check('a gránát a közeli játékost is megsebzi', G.player.health < hp1);
+  G.warsOn = false; reset(); step(5); G.player.health = 100; Object.assign(G.player, { x: G.C + 170000, y: G.C });
+}
+
+// --- élet a városban: az AI autók tankolnak, a gyalogosok dolgoznak és szolgáltatást használnak ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false;
+  const reset = () => { G.aiCars.length = 0; G.npcs.length = 0; G.indoor.length = 0; Object.assign(G.player, { x: G.C - 1500, y: G.C + 900, inCar: false, inHouse: null, riding: null, dead: 0, arrested: 0, passedOut: 0, health: 100, abduct: null, moon: null }); Object.assign(G.car, { x: G.C - 20000, y: G.C, vx: 0, vy: 0 }); };
+  // --- AI autók ---
+  reset();
+  const ai1 = G.spawnAiCar('h', 1, G.C, G.C - 380);                          // a kezdőhely melletti kereszteződésben mindig van kút
+  Object.assign(ai1, { x: G.C - 380, y: G.C + 40, fuel: 30 });
+  let sawFill = false, sawPit = false; for (let i = 0; i < 60 * 40 && ai1.fuel < 99; i++) { step(1); if (ai1.ai.pit) sawPit = true; if (ai1.ai.pit && ai1.ai.pit.phase === 'fill') sawFill = true; }
+  check('a fogyó benzinű AI autó behajt a kúthoz, megáll és tankol', sawPit && sawFill && ai1.fuel > 99);
+  step(60 * 2);
+  check('tankolás után tele tankkal megy tovább (nincs többé a kútnál)', !ai1.ai.pit && ai1.fuel > 90 && Math.hypot(ai1.vx, ai1.vy) > 100);
+  reset();
+  const ai2 = G.spawnAiCar('h', 1, G.C, G.C - 380); Object.assign(ai2, { x: G.C - 380, y: G.C + 40, fuel: 90 });
+  let detour = false; for (let i = 0; i < 60 * 8; i++) { step(1); if (ai2.ai.pit) detour = true; }
+  check('a tele tankú AI autó nem hajt be a kúthoz', !detour);
+  reset();
+  const ai3 = G.spawnAiCar('h', 1, G.C, G.C - 380); Object.assign(ai3, { x: G.C - 2500, y: G.C + 40, fuel: 60 });
+  const f0 = ai3.fuel; step(60 * 5);
+  check('menet közben fogy az AI autók benzinje', ai3.fuel < f0 - 0.5);
+  ai3.fuel = G.AI_FUEL_FLOOR + 0.1; step(60 * 10);
+  check('a benzin sosem fogy ki teljesen (nem akad el a forgalom)', ai3.fuel >= G.AI_FUEL_FLOOR);
+  check('az új AI autók benzinje 25–100% között van', (() => { G.aiCars.length = 0; const v = []; for (let i = 0; i < 60; i++) v.push(G.spawnAiCar('h', 1, G.C, 8000 + i * 40).fuel); return v.every(f => f >= 25 && f <= 100) && Math.max(...v) - Math.min(...v) > 30; })());
+  // --- gyalogosok ---
+  reset();
+  const all = G.housesIn(G.C + 60000, G.C - 400, G.C + 64000, G.C);
+  const svc = all.filter(h => G.houseService(h));
+  check('vannak szolgáltató épületek a környéken', svc.length >= 1);
+  const shopH = all.find(h => h.shop) || svc[0];
+  const mk = () => { const p = G.spawnNpc('ped', G.doorOf(shopH).x, G.doorOf(shopH).y + (shopH.side > 0 ? 20 : -20)); p.moving = false; p.wanderT = 99; return p; };
+  const c1 = G.pickErrand(mk(), [shopH], () => 0.9), c2 = G.pickErrand(mk(), [shopH], () => 0.1);
+  check('az ügy tiszta választása: dolgozni vagy ügyfélként menni', c1 && c1.hs === shopH && c1.work === false && c2 && c2.work === true && G.pickErrand(mk(), [{}], () => 0) === null);
+  check('az iskolába / gyárba csak dolgozni járnak', (() => { const fake = { school: true }; const c = G.pickErrand(mk(), [fake], () => 0.99); return c && c.work === true; })());
+  reset(); G.errands = true;
+  const pp = mk(); Object.assign(G.player, { x: pp.x, y: pp.y + 400 });
+  pp.errand = G.pickErrand(pp, [shopH], () => 0.9); pp.errandCd = 99;
+  check('az ügyet intéző gyalogos fölött látszik az ikon (nincs összeomlás)', (step(2), true));
+  for (let i = 0; i < 60 * 12 && G.npcs.includes(pp); i++) step(1);
+  check('a gyalogos odamegy az ajtóhoz és bemegy az épületbe (eltűnik az utcáról)', !G.npcs.includes(pp) && G.indoor.length === 1 && G.indoor[0].p === pp && G.indoor[0].hs === shopH);
+  check('bent van: a bolt belsejében látszik (a játékos bemegy)', (() => { G.indoor[0].until = G.clock + 99; Object.assign(G.player, G.doorOf(shopH)); press('KeyE'); step(3); const ok = !!G.player.inHouse; if (G.player.inHouse) G.exitHouse(); return ok; })());
+  G.indoor[0].until = G.clock + 0.2; step(30);
+  check('idő után kijön az ajtón, és megy tovább a járdán', G.indoor.length === 0 && G.npcs.includes(pp) && pp.errand === null && Math.hypot(pp.x - G.doorOf(shopH).x, pp.y - G.doorOf(shopH).y) < 80 && pp.errandCd > 20);
+  // a dolgozó tovább van bent, mint az ügyfél
+  const sw = []; for (let i = 0; i < 40; i++) { reset(); G.errands = true; const q = mk(); q.errand = { hs: shopH, kind: 'shop', work: i % 2 === 0, until: G.clock + 40 }; Object.assign(q, { x: G.doorOf(shopH).x, y: G.doorOf(shopH).y }); Object.assign(G.player, { x: q.x, y: q.y + 300 }); q.errandCd = 99; step(2); if (G.indoor[0]) sw.push([G.indoor[0].work, G.indoor[0].until - G.clock]); }
+  const avg = f => { const v = sw.filter(f).map(x => x[1]); return v.reduce((a, b) => a + b, 0) / v.length; };
+  check('a dolgozó (40–70 mp) tovább marad bent, mint az ügyfél (12–25 mp)', sw.length > 20 && avg(x => x[0]) > 38 && avg(x => !x[0]) < 26);
+  reset(); G.errands = true;
+  const sc = mk(); sc.errand = { hs: shopH, kind: 'shop', work: false, until: G.clock + 40 }; sc.errandCd = 99; Object.assign(sc, { x: G.doorOf(shopH).x, y: G.doorOf(shopH).y }); Object.assign(G.player, { x: sc.x, y: sc.y + 300 }); step(2);
+  G.destroyHouse(shopH); step(2);
+  check('ha a házat lerombolják, a bent lévők kiesnek (nem ragadnak bent)', G.indoor.length === 0 && !G.npcs.includes(sc));
+  const lost = mk(); lost.errand = { hs: svc[0], kind: 'shop', work: true, until: G.clock + 0.5 }; lost.errandCd = 99; Object.assign(lost, { x: lost.x + 500, y: lost.y }); step(60 * 2);
+  check('ha nem ér oda időben, feladja az ügyet', lost.errand === null);
+  const sc2 = mk(); sc2.errand = { hs: svc[0], kind: 'shop', work: false, until: G.clock + 40 }; sc2.errandCd = 99; Object.assign(sc2, { x: sc2.x + 300, y: sc2.y });
+  step(1); sc2.flee = 3; sc2.fx = sc2.x - 50; sc2.fy = sc2.y; step(2);
+  check('ha megijed (lövés / robbanás), elfelejti az ügyét', sc2.errand === null);
+  G.errands = false; G.indoor.length = 0; G.npcs.length = 0; G.aiCars.length = 0; Object.assign(G.player, { x: G.C + 150000, y: G.C });
+}
+
+// --- vonatok: $4 jegy, állomások 10 000 px-enként, 30 mp-enként érkezik vonat ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false;
+  check('a vonatjegy $4, 30 mp-enként érkezik vonat', G.TRAIN_FARE === 4 && G.TRAIN_PERIOD === 30);
+  const S = G.STOP_SPACE, X0 = G.STOP_X0, PE = (sec, k = 0, dir = 1, i = 0) => G.trainPose(k, dir, i, sec - (((k * 7) % 30) + (dir < 0 ? 15 : 0)));   // sec: a 30 mp-es ciklusbeli idő
+  const q0 = PE(3), q1 = PE(25), q2 = PE(31);
+  check('a vonat az állomáson áll (az első 10 mp)', q0.vx === 0 && q0.state === 'dwell' && q0.x === X0);
+  check('utána a következő állomásig megy, simán, és ott megint megáll', q1.vx > 100 && PE(30.5).x > X0 + S - 200 && Math.abs(PE(30.001).x - (X0 + S)) < 1 && q2.state === 'dwell' && q2.x === X0 + S);
+  let maxV = 0, monotone = true, last = -1, inside = true;
+  for (let u = 10; u < 30; u += 0.1) { const q = PE(u); maxV = Math.max(maxV, q.vx); if (q.x < last - 1e-6) monotone = false; last = q.x; if (q.x < X0 || q.x > X0 + S) inside = false; }
+  check('a vonat két állomás között marad, simán gyorsul és lassul (max. ~750 px/s)', monotone && inside && maxV > 600 && maxV < 900);
+  const W = PE(3, 0, -1);
+  check('a másik sín vonata nyugat felé megy, a szigetperon túloldalán, ugyanazokon az állomásokon áll meg', W.y === G.RAIL_Y0 + G.RAIL_GAP && PE(25, 0, -1).vx < -100 && ((W.x - X0) % S + S) % S === 0);
+  check('a két irány nem egyszerre érkezik (15 mp eltolás)', PE(3, 0, 1).state === 'dwell' && PE(3, 0, -1).state === 'dwell' !== (PE(18, 0, 1).state === 'dwell' && PE(18, 0, -1).state === 'dwell'));
+  // minden állomásra 30 mp-enként ér egy vonat (több vonat lépcsőzik)
+  let stopT = []; for (let t = 0; t < 300; t += 0.5) { let here = false; for (let i = -12; i <= 12; i++) { const q = G.trainPose(1, 1, i, t); if (q.state === 'dwell' && q.x === 5 * S + X0) here = true; } stopT.push(here); }
+  let starts = 0; for (let j = 1; j < stopT.length; j++) if (stopT[j] && !stopT[j - 1]) starts++;
+  check('egy állomásra 5 perc alatt 10 vonat ér (30 mp-enként), egyszerre legfeljebb egy áll ott', starts === 10 || starts === 9);
+  check('az állomások az utak között vannak (x: 2500 mod 10 000, y: 2500 mod 20 000)', X0 % 5000 === 2500 && G.RAIL_Y0 % 5000 === 2500 && G.STOP_SPACE % 5000 === 0 && G.RAIL_SPACE % 5000 === 0);
+  const stops = G.railStopsIn(0, G.RAIL_Y0 - 50, 3 * S, G.RAIL_Y0 + 150);
+  check('3 × 10 000 px-en 3 vasútállomás van', stops.length === 3 && stops.every(s => s.k === 0));
+  // felszállás
+  const k = 3, n = 6, sx = n * S + X0, ty = G.RAIL_Y0 + k * G.RAIL_SPACE;
+  const setSec = (dir, sec) => { const ph = ((k * 7) % 30) + (dir < 0 ? 15 : 0); G.trainShift = ((sec - ph - G.clock) % 30 + 30) % 30; };   // a ciklusbeli idő beállítása
+  setSec(1, 2); step(1);
+  Object.assign(G.player, { x: sx + 80, y: ty + 70, inCar: false, inHouse: null, riding: null, dead: 0, arrested: 0, passedOut: 0, health: 100, abduct: null, moon: null });
+  Object.assign(G.car, { x: sx - 9000, y: ty + 70 }); G.progress.money = 3;
+  check('a peronon áll a vonat: kiírja a jegyárat', /felszállás a vonatra.*\$4/.test((G.interactionPrompt() || {}).text || ''));
+  press('KeyE');
+  check('$4 nélkül nem lehet felszállni', !G.player.riding && G.progress.money === 3);
+  G.progress.money = 10; press('KeyE');
+  check('felszállsz a vonatra: -$4', G.player.riding && G.player.riding.train && G.progress.money === 6);
+  check('keletre menő vonaton ülsz (a peron felé, a másik oldalról is szállhatnál)', G.player.riding.dir === 1);
+  step(60 * 20);                                    // 2 mp + 20 mp = 22 mp: úton
+  check('menet közben a játékos együtt mozog a vonattal', G.player.riding && Math.abs(G.player.x - G.player.riding.x) < 1 && G.player.x > sx + 100);
+  press('KeyE');
+  check('menet közben nem lehet leszállni', !!G.player.riding);
+  G.trainsIn(-4000000, -2000000, 4000000, 2000000);   // sok vonat → a gyorsítótár kitisztul, de a vonat, amin ülsz, megmarad
+  step(2);
+  check('a gyorsítótár tisztítása után sem szakad el a vonattól', G.player.riding && Math.abs(G.player.x - G.player.riding.x) < 1 && G.getTrain(k, G.player.riding.dir, G.player.riding.i) === G.player.riding);
+  step(60 * 11);                                    // 22 mp + 11 mp = 33 mp: a következő állomáson áll
+  check('a következő állomásnál a vonat megáll', Math.abs(G.player.riding.vx) < 5 && Math.abs(G.player.riding.x - (sx + S)) < 2);
+  press('KeyE');
+  check('ott leszállsz a peronra', !G.player.riding && Math.abs(G.player.x - (sx + S)) < G.PLATFORM.half && G.player.y > ty + G.PLATFORM.dy0 && G.player.y < ty + G.PLATFORM.dy1 && G.player.dead === 0 && !!G.onPlatform(G.player.x, G.player.y));
+  check('a peronon várakozva kiírja, mikor jön a következő vonat', /Vasútállomás|vonat/.test((G.interactionPrompt() || {}).text || ''));
+  // nyugat felé menő vonat: a peron túloldaláról is, és a leszállás is a peronra esik
+  setSec(-1, 2); step(1);
+  Object.assign(G.player, { x: sx + 60, y: ty + 60, riding: null }); G.progress.money = 10; press('KeyE');
+  check('a nyugatra menő vonatra is fel lehet szállni a peronról', G.player.riding && G.player.riding.dir === -1);
+  step(60 * 31);                                    // 2 mp + 31 mp = 33 mp: a következő állomáson áll
+  press('KeyE');
+  check('nyugatra menve is a peronra szállsz le', !G.player.riding && !!G.onPlatform(G.player.x, G.player.y));
+  // a mozgó vonat elgázol
+  setSec(1, 20); step(1); const mv = G.trainsIn(sx - 5000, ty - 30, sx + 5000, ty + 30).find(t => t.dir === 1 && Math.abs(t.vx) > 300);
+  Object.assign(G.player, { x: mv.x, y: mv.y, riding: null, dead: 0, health: 100 }); step(2);
+  check('a mozgó vonat elgázolja, aki a sínen áll', G.player.dead > 0);
+  step(240 + 60 * 5);
+  // térkép és taxi
+  const types = new Set(G.poisIn(0, G.RAIL_Y0 - 300, 3 * S, G.RAIL_Y0 + 300).map(p => p.type));
+  check('a térképen a vasútállomások is látszanak', types.has('train'));
+  check('a taxi a legközelebbi vasútállomásra is elvisz', G.taxiDestinations().some(d => d.label.includes('vasútállomás')));
+  G.trainShift = 0; G.progress.money = 0; G.player.riding = null;
+}
+
+// --- szökés a Holdról: Fordított Világ, démogorgonok ---
+{
+  G.npcs.length = 0; G.aiCars.length = 0; G.aliens.length = 0; G.clearWanted(); G.tornado = null; G.police = false;
+  const home = { x: G.C + 130000, y: G.C };
+  const jail = () => { Object.assign(G.player, { ...home, inCar: false, inHouse: null, riding: null, dead: 0, arrested: 0, passedOut: 0, health: 100, abduct: null });
+    G.player.moon = { t: G.MOON_TERM, ix: 280, iy: 180, from: { ...home }, guard: 60, walk: 0 }; };
+  jail(); G.player.moon.ix = 280; G.player.moon.iy = 180;
+  press('KeyE');
+  check('a cella közepén az E nem csinál semmit (nincs rés)', !G.player.moon.horror);
+  G.player.moon.ix = G.ESCAPE_SPOT.x; G.player.moon.iy = G.ESCAPE_SPOT.y;
+  press('KeyE');
+  check('a cella sarkában a résen át a Fordított Világba jutsz', !!G.player.moon.horror && G.player.moon.horror.kills === 0);
+  const Hh = G.player.moon.horror, t0 = G.player.moon.t;
+  step(60 * 3);
+  check('a démogorgonok jönnek (legfeljebb ' + G.MAX_DEMOS + ' egyszerre), a büntetési idő közben áll', Hh.demos.length >= 1 && Hh.demos.length <= G.MAX_DEMOS && G.player.moon.t === t0);
+  check('az életcsík töltöttsége a megmaradt életet mutatja (3/3, 2/3, 1/3, 0)', G.hpFraction(3, 3) === 1 && Math.abs(G.hpFraction(2, 3) - 2 / 3) < 1e-9 && Math.abs(G.hpFraction(1, 3) - 1 / 3) < 1e-9 && G.hpFraction(0, 3) === 0 && G.hpFraction(-2, 3) === 0);
+  // védekezés nélkül megsebeznek
+  Hh.px = 380; Hh.py = 230; const d = Hh.demos[0]; Object.assign(d, { x: Hh.px + 15, y: Hh.py, hitCd: 0 });
+  const hp0 = G.player.health; step(3);
+  check('a démogorgon megsebez (érintésre -' + G.DEMO_HIT + ')', G.player.health <= hp0 - G.DEMO_HIT);
+  // lelövöd őket: 3 lövés egy démogorgon, 3 démogorgon a szabadulás
+  const kill = () => {
+    let guard = 0;
+    while (Hh.kills < before + 1 && guard++ < 600) {
+      const dm = Hh.demos[0]; if (!dm) { step(5); continue; }
+      Hh.px = 380; Hh.py = 230; Object.assign(dm, { x: Hh.px + 120, y: Hh.py, hitCd: 5 }); G.player.angle = 0; G.player.health = 100;
+      key('KeyF', true); step(8); key('KeyF', false); step(2);
+    }
+  };
+  let before = 0; kill();
+  check('3 lövéssel lelősz egy démogorgont', Hh.kills === 1);
+  before = 1; kill(); 
+  check('2/3 lelőve, még a Fordított Világban vagy', Hh.kills === 2 && !!G.player.moon && !!G.player.moon.horror);
+  before = 2; kill();
+  check('a 3. démogorgon után kiszabadulsz: visszakerülsz a normál világba, ahol elraboltak', !G.player.moon && Math.hypot(G.player.x - home.x, G.player.y - home.y) < 100 && G.player.health === 100);
+  check('szabadulás után a játék normálisan megy (lehet mozogni)', (() => { const x0 = G.player.x; key('KeyD', true); step(30); key('KeyD', false); return G.player.x > x0; })());
+  // ha a démogorgonok elkapnak: vissza a cellába, újra teljes büntetés
+  jail(); G.player.moon.t = 12; G.player.moon.ix = G.ESCAPE_SPOT.x; G.player.moon.iy = G.ESCAPE_SPOT.y; press('KeyE');
+  const H2 = G.player.moon.horror; G.player.health = 15; H2.px = 380; H2.py = 230; H2.spawnT = 0; step(3);
+  H2.demos.forEach(dm => Object.assign(dm, { x: H2.px + 10, y: H2.py, hitCd: 0 })); step(10);
+  check('ha elkapnak, vissza a cellába kerülsz, újra a teljes ' + G.MOON_TERM + ' mp büntetéssel', !G.player.moon.horror && G.player.moon.t > G.MOON_TERM - 1 && G.player.health === 100);
+  G.player.moon = null; G.aliens.length = 0; Object.assign(G.player, { x: G.C + 140000, y: G.C });
+}
+
+// --- csalókód: Ctrl+S = +$10 000 ---
+{
+  G.progress.money = 5;
+  let prevented = false;
+  listeners.keydown({ code: 'KeyS', ctrlKey: true, repeat: false, preventDefault() { prevented = true; } }); listeners.keyup({ code: 'KeyS' });
+  check('Ctrl+S: +$10 000, és a böngésző mentés-ablaka nem jön fel', G.CHEAT_MONEY === 10000 && G.progress.money === 10005 && prevented);
+  listeners.keydown({ code: 'KeyS', metaKey: true, repeat: false, preventDefault() {} }); listeners.keyup({ code: 'KeyS' });
+  check('Mac-en a Cmd+S is működik', G.progress.money === 20005);
+  listeners.keydown({ code: 'KeyS', ctrlKey: true, repeat: true, preventDefault() {} });
+  check('a nyomva tartott gomb nem ismétel', G.progress.money === 20005);
+  const y0 = G.player.y; Object.assign(G.player, { inCar: false, inHouse: null, riding: null });
+  listeners.keydown({ code: 'KeyS', ctrlKey: true, repeat: false, preventDefault() {} }); step(30); listeners.keyup({ code: 'KeyS' });
+  check('Ctrl+S közben a karakter nem indul el lefelé', Math.abs(G.player.y - y0) < 1);
+  G.progress.money = 0;
 }
 
 // --- telepítés: a böngésző ne a régi, tárolt game.js-t futtassa ---

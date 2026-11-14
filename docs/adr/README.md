@@ -36,3 +36,13 @@ Itt van naplózva minden architekturális döntés: mit, miért és milyen alter
 | [0029](0029-taxi-hivhato-uti-cel-valasztassal.md) | Taxi: hívható, úti cél választással, az utazás átugorható | Elfogadva | 2026-11-07 |
 | [0030](0030-terkep-elemzett-poi-k-es-mentett-jelolesek.md) | Térkép: képletből számolt nevezetes helyek és mentett saját jelölések | Elfogadva | 2026-11-07 |
 | [0031](0031-tuning-es-fenyezes-autonkent-a-mentesben.md) | Tuning és fényezés autómodellenként, a mentésben | Elfogadva | 2026-11-07 |
+| [0032](0032-lovak-az-auto-helyere-lepo-jarmu.md) | Lovak: vadlovak képletből, a ló ideiglenesen az autó helyére lép | Elfogadva | 2026-11-13 |
+| [0033](0033-urlenyek-idozitett-uldozes-elrablas-es-holdborton.md) | Űrlények: időzített üldözés, elrablás, a Hold-börtön külön állapot | Elfogadva | 2026-11-13 |
+| [0034](0034-vonatok-kepletbol-szamolt-ingajaratok.md) | Vonatok: képletből számolt, 30 mp-enként érkező járatok, a busz utas-rendszerén | Elfogadva | 2026-11-13 |
+| [0035](0035-varoslakok-ai-autok-tankolnak-gyalogosok-dolgoznak.md) | Élő város: az AI autók tankolnak, a gyalogosok dolgoznak és szolgáltatást használnak | Elfogadva | 2026-11-13 |
+| [0036](0036-haboruk-idozitett-esemeny-sajat-katona-listaval.md) | Háborúk: időzített esemény, külön katonalistával | Elfogadva | 2026-11-13 |
+| [0037](0037-telefon-robi-beepitett-mi-kulso-szolgaltatas-nelkul.md) | Telefon és Robi: beépített, szabályalapú „MI” külső szolgáltatás nélkül | Elfogadva | 2026-11-14 |
+| [0038](0038-repulok-ai-bombazok-es-a-jatekos-gepe.md) | Repülők: AI bombázók a háborúban, a játékos is vezetheti | Elfogadva | 2026-11-14 |
+| [0039](0039-felhokarcolok-belvarosban-parallaxissal.md) | Felhőkarcolók: a házak egy típusa, belvárosi fürtökben, parallaxissal rajzolva | Elfogadva | 2026-11-14 |
+| [0040](0040-eldobhato-telefon-es-mentett-heverő-targyak.md) | Eldobható telefon: a földön heverő tárgyak a mentésben | Elfogadva | 2026-11-14 |
+| [0041](0041-telefon-appok-jatekok-videok-hirek.md) | Telefon-appok: főképernyő, mini játékok, videók és a játék hírcsatornája | Elfogadva | 2026-11-14 |

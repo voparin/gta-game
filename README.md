@@ -22,6 +22,9 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 | B | bomba lerakása (3 mp múlva robban) |
 | K | térkép (pontok jelölése kattintással) |
 | T | gyorsított idő (60x) |
+| Q | háború indítása (azonnal, a környéken) |
+| P | telefon (ha van): csetelés Robival |
+| Ctrl+S | csalókód: +$10 000 |
 | Esc | menü: szünet, szkin- és autóváltás, szkin- és autóbolt (a választás megmarad) |
 
 ## Rendőrség
@@ -60,7 +63,7 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Az összes adományod az Esc menüben, a rekordok között látszik.
 
 ## Tornádó
-- Erős homokviharban tornádó támadhat (🌪, piros nyíl és pötty a térképen). Beszív és megpörget; a közepén felszippantja a házakat, autókat, embereket – téged is. Menekülj előle!
+- Erős homokviharban tornádó támadhat (🌪, piros nyíl és pötty a térképen). Beszív és megpörget; a közepén felszippantja a házakat, autókat, embereket – téged is. Menekülj előle! A tornádó **utánad ered**: sétálva utolér, futva (Shift) vagy autóval elmenekülhetsz előle, és a házban sem vagy biztonságban.
 
 ## Házak
 - A ház ajtajánál **E**: bemész. Bent nem talál meg a rendőrség (12 mp után leráztad őket), és gyorsabban gyógyulsz. Kimenni az ajtónál **E**-vel lehet.
@@ -118,6 +121,67 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 ## Alexek
 - Az utcán sok **Alex** sétál (zöld póló, narancs haj, névtábla). Mellette **E**: beszélget veled.
 
+## Lovak
+- A pusztán **vadlovak** legelnek (barna, fekete, világos – kb. 1000 px-enként találsz egyet, bőven vannak). Mellettük **E**: felülsz, és lovagolhatsz – ingyen van, és **benzin sem kell** hozzá. **Nem autóként megy:** a WASD közvetlenül az irányt adja, mint gyaloglásnál, a ló gyorsan fordul és megáll. Ügetés kb. 42 km/h, **Shift**: vágta kb. 85 km/h.
+- **E** újra: leszállsz, a ló ott marad (később újra felülhetsz rá), az autód pedig visszakerül oda, ahol hagytad.
+
+## Űrlények
+- **3 percenként** 3 zöld 👽 **űrlény** bukkan fel a közeledben, és üldözőbe vesz. Sétálva elérnek, **futva (Shift)** vagy **gyors autóval** elmenekülhetsz; házban nem kapnak el, 75 mp után feladják.
+- Ha **elkapnak**, a fénynyalábjuk felszív és a **Holdra** visznek, ahol **40 mp-re börtönbe zárnak** (WASD: sétálgatás a cellában). Utána oda tesznek vissza, ahol elraboltak.
+- **Szökés:** a cella sarkában van egy **rés** – menj oda, és nyomj **E**-t. A **Fordított Világba** jutsz, ahol **démogorgonok** támadnak rád: **WASD** mozgás, **egér / F** lövés, mindegyikhez 3 találat kell – a fejük fölött **életcsík** mutatja, mennyi élete maradt. Ha **3 démogorgont lelősz**, visszakerülsz a normál világba. Ha elkapnak (elfogy az életed), vissza a cellába, újra a teljes 40 mp-re.
+- Az űrlényt le lehet lőni (3 találat, **+$50**) vagy fel lehet robbantani (B).
+
+## Vonatok
+- A pusztán **vasútvonalak** futnak az utak között, vonalanként **két sínnel** (kelet és nyugat felé), a kettő között **szigetperonnal**. **Vasútállomás 10 000 pixelenként** van („🚆 VASÚTÁLLOMÁS” tábla).
+- **Minden állomásra 30 másodpercenként érkezik vonat**, és 10 mp-ig áll. Utána sima gyorsulással indul a következő állomásra (max. ~270 km/h).
+- Állj a peronra a vonat mellé, **E**: felszállsz, a **jegy $4**. Bármelyik következő állomáson, amikor a vonat megáll, **E**: leszállsz. A peronon kiírja, hány mp múlva jön a következő vonat.
+- ⚠️ **Ne állj a sínre**, amikor a vonat jön: a mozgó vonat elgázol! Az utakat keresztezi, vigyázz az átjárókon.
+
+## Élő város
+- Az **AI autóknak** is van benzinjük: ha fogyóban van, és kútnál lévő kereszteződéshez érnek, behajtanak a **benzinkúthoz**, megállnak a töltő mellett (⛽), tele tankkal mennek tovább.
+- A **gyalogosok** dolgoznak és szolgáltatást használnak: a boltokba, éttermekbe, kocsmákba, bankokba és szerelőkhöz ügyfélként járnak, az iskolába és a gyárba dolgozni. Útközben ikon látszik a fejük fölött (💼 munka, 🛒🍽🍺🏦🔧 szolgáltatás), bent vannak egy ideig, aztán kijönnek. Ha bemész az épületbe, látod a bent lévőket.
+
+## Háborúk
+- **Q gomb:** azonnal háborút indít a közeledben. Egyébként **néha magától is kitör** a környéken (az első kb. 4 perc után, aztán 5–9 percenként): két sereg – zöld és kék, **20-20 katona** – csap össze 1500–2200 pixelre tőled. Egy narancs nyíl (⚔) mutatja a csatateret.
+- Egymásra lőnek, **gránátok** csapkodnak, és mindkét oldalon **2-2 tank** gurul: az ágyújuk repülő lövedéket lő, ami becsapódáskor robban. A tank 12 életű, a puskagolyó alig sebzi (1/4), 3 tanklövedéktől megsemmisül, **$100** jár érte, 40 mp múlva újat küldenek. Aki a csatatérre téved (te is), a katonák és a golyók célpontja. A polgárok menekülnek. **Házban biztonságban vagy.**
+- A katonákat le lehet lőni (3 találat, **+$20**) vagy fel lehet robbantani. A háború **4 percig tart**: ha egy sereg fogyatkozik, erősítést kap (3 mp-enként egy katonát).
+- **Ha a háborúban halsz meg, ott éledsz újra:** a csatatér szélén, a halálod irányában (az autód melletted áll), **3 másodperc védelemmel** (kék villogó gyűrű). A kezdőhelyen éledsz újra, ha messze haltál meg (4000 px-nél távolabb), ha az atombomba-figyelmeztetés már megy, vagy ha nincs háború.
+- 🚀 **Ballisztikus rakéták:** kb. 22 másodpercenként a seregek távolról rakétát lőnek ki – a házakra, a csatatérre, néha rád. A rakéta 4,5 mp-ig repül, a becsapódás helyét **piros pulzáló célkör** és visszaszámláló jelzi: menekülj ki belőle! A robbanás 220 px-en belül öl, a házakat romba dönti, a tankot is erősen sebzi.
+- 🏴 **Megszállás:** a háború végén a győztes sereg (akinek kevesebb vesztesége volt) **megszállja a területet**: zászló és 5 katona 150 másodpercig. Aki közel megy, azt lövik. Ha mindet leveri, **felszabadítja** a területet (**+$200**).
+- ☢ **Atombomba:** a háború végén, **12 mp-es figyelmeztetés** után (nagy piros visszaszámlálás) atombomba robban a csatatér közepén! **1000 px-en belül meghalsz, 1800 px-ig megsebesülsz.** Házba bújva a csatatértől 1100 px-nél messzebb biztonságban vagy. Romba dönti a közeli házakat, kráter marad. **Menekülj messzire, vagy ne menj a háború közelébe!**
+
+## Telefonok és Robi
+- A házak egy része **telefonbolt** (kék tető, „TELEFONBOLT” tábla): a pultnál **E** – **egyszerű telefon $60**, **okostelefon $200**. A telefon megmarad a mentésben.
+- **P**: megnyílik a telefon **főképernyője**, 4 appal (**1–4** vagy kattintás; **Esc**: egy szint vissza, a főképernyőn bezár; közben a játék áll):
+  - 💬 **Robi** – csetelés a telefon beépített „MI”-jével (gépelj, **Enter** a küldés)
+  - 🎮 **Játékok** – 🐍 **Kígyó** (nyilak / WASD, Enter: újra) és 🛩 **Repülő** (Space / kattintás: repülj át a csövek között); a rekordjaid megmaradnak
+  - 📺 **Videók** – 6 rövid klip (híradó, Peppa a sárban, gólgála, nagydíj, tornádó-felvétel, az utolsó atombomba); 1–6 vagy ←→ a váltás
+  - 📰 **Hírek** – a játék hírcsatornája: élő állapotsorok (háború, tornádó, űrlények, pénzed) és a legfrissebb események (háború, atombomba, megszállás, tornádó, rakéta, űrlény-elrablás, szintlépés…)
+  - A **Robi**-csevegésről: Robi **nem igazi nagy nyelvi modell** (nincs külső szolgáltatás) – a játék állapotát ismeri, és kulcsszavakból érti a kérdéseket:
+  - „hol van a legközelebbi benzinkút / bank / bolt / étterem / kocsma / szerelő / iskola / vonat?” – megmondja, merre és hány méterre
+  - „mennyi pénzem van?”, „van háború?”, „van vihar / tornádó / űrlény?”, „hány óra van?”, „mit tudsz?”
+  - „adj tippet”, „mondj egy viccet”
+  - **okostelefonon még**: „jelöld meg a bankot” (felteszi a térképre, K) és „hívj taxit”
+
+- **Eldobható telefon:** az **O** gombbal eldobhatod a telefont (előre esik, gyalog), és **a földre esve összetörik a kijelzője** 💥. **E**-vel felveheted (a hely a mentésben is megmarad). A repedt telefon használható, de Robi válaszainak egy része nem látszik (▒), és repedés látszik a kijelzőn. A telefonbolt **$30**-ért megjavítja; az új telefon ép.
+
+## Saját sereg
+- Amint a **háború 900 pixeles körzetébe érsz**, azonnal megjelenik körülötted a **saját sereged** (piros egyenruha): **14 katona és 1 tank**. Követnek, minden ellenséget lőnek – a zöld és a kék sereg is rájuk lő –, és erősítést kapnak (5 mp-enként egy katona). A képernyő tetején látszik a létszámuk.
+- A saját sereged golyója és tanklövedéke **téged és a polgárokat nem bántja**, és a te lövésed, bombád sem bántja őket. A háború végén hazamennek.
+
+## Felhőkarcolók
+- A világban **felhőkarcolók** is állnak (14–49 emeletesek), főleg **belvárosi fürtökben**, máshol ritkán. Magasnak látszanak: a tetejük elhajlik a kamerától, oldalfalakkal, ablaksorokkal; a magasabbakon helikopter-leszállóhely, villogó antenna.
+- Szilárdak, **bemenni nem lehet**. A rakéta, az atombomba és a tornádó ledönti őket.
+- ⚠️ **Bombázóval ne repülj nekik:** a gép lezuhan (-70 élet).
+
+## Repülők
+- A háborúban **bombázó repülők** húznak el a csatatér fölött: kb. 38 másodpercenként egy, és bombákat szór az ellenséges katonákra és tankokra (a saját oldalát kíméli).
+- **Te is vezethetsz egyet:** a háború kezdetén mindkét sereg mögött áll egy leparkolt bombázó. Állj mellé, **E**: felszállsz.
+  - **W / S**: gáz és fék (a gép nem tud megállni, kb. 35–155 km/h között repül), **A / D**: kormány.
+  - **B**: tűz, **V**: fegyverváltás – három fegyver: 💣 **bomba** (30 db, a házakat is romba dönti, körözés jár érte), 🚀 **ballisztikus rakéta** (6 db, a gép orra előtt 1700 pixelre csapódik be, piros célkör jelzi, 4,5 mp-ig repül) és ☢ **atombomba** (csak 1 db! 2,5 mp-ig esik, aztán igazi atombomba robban: **1000 pixelen belül te is meghalsz, ezért gyorsíts el: W!**). A rakéta és az atombomba ★★ körözést von maga után. A lőszer a géppel marad. Repülés közben a saját bombád, rakétád nem sebez, az atombomba azonban igen.
+  - **E**: ha lassú vagy (kb. 65 km/h alatt), **leszállsz**, a gép ott marad; ha gyors, **kiugrasz** (ejtőernyő, -15 élet, a gép lezuhan).
+  - A gép átrepül a házak és az autók fölött.
+
 ## Bomba
 - **B**: lerakod (autóból hátra ejted), **3 mp** múlva felrobban: a közeli autókból roncs lesz, a házak ledőlnek, az emberek meghalnak – és téged is megsebez, ha túl közel vagy. Robbantásért ★★ körözés jár.
 - Legfeljebb 5 bombád lehet, percenként kapsz egy újat (a HUD-on: 💣 3/5).
@@ -127,6 +191,6 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Ha beülsz az autódba, vagy a taxi 45 mp alatt nem ér oda, lemond. A tönkrement taxi nem visz. A szállítási célpontra nem visz el (a szállítást vezetned kell).
 
 ## Térkép
-- **K**: megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák, 🛒 boltok, 🏫 iskolák, 🍽 éttermek, 🔧 autószerelők. Az **1–9** gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
+- **K**: megnyílik a nagy térkép a környékkel: ⛽ benzinkutak, 🏭 gyárak, 🏦 bankok, 🍺 kocsmák, 🛒 boltok, 🏫 iskolák, 🍽 éttermek, 🔧 autószerelők, 🚆 vasútállomások, 📱 telefonboltok. Az **1–9** és **0** (a saját jelölések: **P**) gombokkal (vagy a jelmagyarázatra kattintva) elrejtheted / megmutathatod őket.
 - **Kattints a térképre:** saját pontot jelölsz 📍 (legfeljebb 10, megmaradnak). Egy jelölésre kattintva törlöd, a **Delete** gomb mindet törli.
 - A jelölések a radaron és a világban is látszanak, a képernyő szélén nyíl mutat a legközelebbire, és a **taxi** is elvisz oda (a 3 legközelebbihez).

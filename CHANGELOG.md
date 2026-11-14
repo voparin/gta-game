@@ -5,6 +5,60 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.33.0 – 2026-11-14
+- **Saját sereg** 🪖 (ADR-0036): amint a háború 900 px-es körzetébe érsz, azonnal megjelenik körülötted a saját seregeid (piros egyenruha): 14 katona és 1 tank. Követnek, minden ellenséget lőnek (a zöld és a kék sereg is rájuk lő), erősítést kapnak (5 mp-enként egy katona). A saját sereg golyója és tanklövedéke téged és a polgárokat nem bánt, a te lövésed és bombád őket nem. A HUD-on látszik a létszámuk. A háború végén hazamennek
+- **Telefon-appok** (ADR-0041): a telefon főképernyővel indul, 4 appal: 💬 Robi (a csevegés), 🎮 **Játékok** (🐍 Kígyó – nyilak / WASD, 🛩 Repülő – Space / kattintás; rekordok a mentésben), 📺 **Videók** (6 rövid klip: híradó, Peppa a sárban, gólgála, nagydíj, tornádó-felvétel, atomgomba), 📰 **Hírek** (élő állapotsorok és a játék legfrissebb eseményei: háború, atombomba, megszállás, tornádó, homokvihar, űrlények, rakéta, repülőbaleset, szintlépés). Esc: egy szint vissza
+- **Eldobható telefon** 📱💥 (ADR-0040): **O** – eldobod a telefont (előre esik), és **összetörik a kijelzője**. **E** – felveheted (a mentésben is megmarad a helye, ha újratöltöd a játékot). A repedt telefon használható, de Robi válaszainak egy része nem látszik (▒), és a kijelzőn repedés látszik. A telefonbolt $30-ért megjavítja, az új telefon vásárlása ép kijelzőt ad
+- **Felhőkarcolók** 🏙 (ADR-0039): 14–49 emeletes tornyok, belvárosi fürtökben (a térkép kb. harmadán sok, máshol ritka). Magasnak látszanak (a tetejük elhajlik a kamerától, oldallapok, ablaksorok, helikopter-leszállóhely, villogó antenna). Szilárdak, bemenni nem lehet; a rakéta, az atombomba, a tornádó ledönti őket. **Bombázóval nekirepülve lezuhansz** (-70 élet, a gép elvész)
+
+## 0.32.0 – 2026-11-14
+- Bombázó repülők ✈ (ADR-0038): a háborúban kb. 38 másodpercenként AI bombázó húz el a csatatér fölött, és bombákat szór az ellenséges katonákra, tankokra (a saját oldalát kíméli). A háború kezdetén mindkét sereg mögött egy leparkolt bombázó áll
+- **A játékos is vezetheti**: a gép mellett E – felszállsz; W/S: gáz és fék (nem tud megállni, 140–620 px/s), A/D: kormány, **B: bomba** (30 db, igazi bomba: házak is dőlnek, körözés jár), **E**: lassan leszállsz (a gép ott marad), gyorsan kiugrasz (ejtőernyő, -15 élet, a gép lezuhan). A gép a házak és autók fölött repül, a rendőrség nem üldöz a sebessége miatt
+- **Három fegyver** a játékos gépén (**V**: váltás, **B**: tűz): 💣 bomba (30 db), 🚀 **ballisztikus rakéta** (6 db, a gép orra előtt 1700 px-re csapódik be, célkör jelzi, 4,5 mp-es repülés), ☢ **atombomba** (1 db, 2,5 mp-ig esik, aztán igazi atombomba robban: 1000 px-en belül te is meghalsz, ezért gyorsíts el!). A rakéta és az atombomba ★★ körözést von maga után. A lőszer a géppel marad (leszállva sem töltődik újra)
+- A HUD-on látszik a fegyver, a bomba/rakéta/atom készlet és a sebesség
+
+- **Ha a háborúban halsz meg, ott éledsz újra**: a csatatér szélén, a halálod irányában (az autód melletted áll), **3 mp védelemmel** (kék villogó gyűrű), így nem lősznek le azonnal. Ha messze (4000 px-nél távolabb) haltál meg, az atombomba-figyelmeztetés alatt, vagy háború nélkül, továbbra is a kezdőhelyen éledsz újra
+
+## 0.31.0 – 2026-11-14
+- Telefonok és telefonboltok (📱, a házak ~5%-a, kék tető, „TELEFONBOLT” tábla): a pultnál E – egyszerű telefon $60, okostelefon $200 (megmarad a mentésben)
+- **P**: a telefon – csetelés Robival, a telefon beépített „MI”-jével (ADR-0037): kérdezhetsz tőle (hol a legközelebbi benzinkút, bank, bolt, étterem, kocsma, vonat…, mennyi pénzem van, van-e háború / vihar / tornádó / űrlény, hány óra van), kérhetsz tippet vagy viccet. Az okostelefonon „jelöld meg a bankot” (térképjelölés) és „hívj taxit” is megy
+- Robi nem igazi nyelvi modell (nincs külső szolgáltatás), hanem a játék állapotát ismerő, kulcsszavas partner
+- A telefonboltok a térképen (📱, 0-s gomb; a saját jelölések kapcsolója most a **P**) és a taxi úti céljai között is ott vannak
+
+## 0.30.0 – 2026-11-13
+- Háborúk (⚔, ADR-0036): néha (4 perc után, aztán 5–9 percenként) két sereg – zöld és kék, **20-20 katona** és 2-2 **tank** – csap össze a közeledben (1500–2200 px-re). Egymásra lőnek, tüzérségi gránátok csapkodnak; aki a csatatérre téved, a katonák és a golyók célpontja. A polgárok menekülnek, az autókat és embereket eltalálhatják a golyók. Nyíl mutatja a csatateret
+- Tankok (oldalanként 2): lassan gurulnak, forgó toronnyal, ágyúval lőnek (repülő lövedék, ami becsapódáskor robban; a saját oldalt kíméli); 12 életük van, a puskagolyó alig sebzi őket (1/4), három tanklövedéktől megsemmisülnek; lelövésükért $100 jár; az elpusztultakat 40 mp múlva pótolják
+- **Ballisztikus rakéták** 🚀: a háború alatt kb. 22 másodpercenként a seregek távolról (2800 px-ről) rakétát lőnek ki – a házakra (lakott területre), a csatatérre, néha rád; a rakéta 4,5 mp-ig repül, a becsapódás helyét piros pulzáló célkör jelzi (visszaszámlálással). A robbanás 220 px-en belül öl és autókat roncsol, 170 px-en belül romba dönti a házakat, a tankot is erősen sebzi (8 hp)
+- **Megszállás** 🏴: a háború végén (az atombomba után) a győztes sereg (akinek kevesebb veszteség esett) megszállja a területet: zászló, 5 katonából álló helyőrség, 150 mp-ig; aki az 450 px-es körzetbe lép, tűz alá kerül. Ha mindet leverted, **felszabadítod** a területet (+$200)
+- **Atombomba** ☢: a háború 4. percében, 12 mp-es figyelmeztetéssel (visszaszámlálás + piros felirat) atombomba robban a csatatér közepén. 1000 px-en belül meghalsz, 1800 px-ig megsebesülsz, házban 1100 px-en túl biztonságban vagy; romba dönti a 1100 px-en belüli házakat, elpusztítja az autókat, embereket; kráter marad, vakító villanás és lökéshullám látszik
+- **Q**: azonnal háborút indít a közeledben (nem kell várni az időzítőre)
+- A katonákat lelőheted (+$20 darabja) vagy bombázhatod; a háború **4 percig tart**: a fogyatkozó sereg erősítést kap (3 mp-enként egy katonát), a végén az nyer, akinek kevesebb katonája esett el. Házban biztonságban vagy
+
+## 0.29.0 – 2026-11-13
+- Élő város (ADR-0035): az AI autóknak is van benzinjük, fogy; amikor fogyóban van (45% alatt) és kútnál lévő kereszteződéshez érnek, behajtanak a kúthoz, megállnak a töltő mellett (⛽ látszik), tele tankkal mennek tovább
+- A gyalogosok dolgoznak és szolgáltatást használnak: a boltokba, éttermekbe, kocsmákba, bankokba, szerelőkhöz ügyfélként, ezeken kívül az iskolába és a gyárba is dolgozni járnak. Az épület felé menet ikon látszik a fejük fölött (💼 munka, 🛒🍽🍺🏦🔧 szolgáltatás), bent van egy ideig (dolgozó 40–70 mp, ügyfél 12–25 mp), aztán kijön. Ha bemész az épületbe, látod a bent lévőket
+
+## 0.28.0 – 2026-11-13
+- Vonatok (🚆): a pusztán vasútvonalak futnak az utak között, vonalanként két sínnel (kelet és nyugat felé), a kettő között szigetperonnal. Vasútállomás **10 000 px-enként** van, és minden állomásra **30 másodpercenként** érkezik vonat (10 mp-ig áll). A peronon a vonat mellett **E** – jegy **$4**, bármelyik következő állomáson **E** – leszállás (ADR-0034)
+- A peronon kiírja, hány mp múlva jön a következő vonat
+- Ne állj a sínre: a mozgó vonat elgázol! (kb. 120 px/s fölött)
+- A vasútállomások a térképen (🚆, 9-es gomb; a saját jelölések most a 0-s gombon) és a taxi úti céljai között is ott vannak
+
+## 0.27.0 – 2026-11-13
+- Űrlények (👽): 3 percenként 3 zöld űrlény bukkan fel és üldözőbe vesz (175 px/s: sétálót elérnek, futva vagy gyors autóval elmenekülhetsz; házban nem kapnak el; 75 mp után feladják). Ha elkapnak, a fénynyalábjuk felszív, és a Holdra visznek, ahol 40 mp-re börtönbe zárnak (ADR-0033); utána oda tesznek vissza, ahol elraboltak
+- Szökés a Holdról: a cella sarkában egy résen (E) át a Fordított Világba jutsz, ahol démogorgonok támadnak – ha 3-at lelősz (3 lövés darabonként), visszakerülsz a Földre; ha elkapnak, vissza a cellába, újra a teljes büntetéssel
+- A démogorgonok fölött életcsík látszik (zöld → sárga → piros, ahogy lövöd őket)
+- Az űrlényeket lehet lőni (3 találat, +$50) vagy bombázni
+- Csalókód: Ctrl+S (Mac-en Cmd+S) – +$10 000 (és nem jön fel a böngésző „oldal mentése” ablaka)
+
+## 0.26.0 – 2026-11-13
+- Lovak: a pusztán vadlovak legelnek (különböző színűek); mellettük E – felülsz (ingyen, benzin sem kell hozzá), újra E – leszállsz, a ló ott marad, az autód pedig visszakerül oda, ahol hagytad (ADR-0032)
+- Sok ló van (kb. 1000 px-enként egy), nem kell sokat keresni
+- A ló nem autóként megy: a WASD közvetlenül az irányt adja (mint gyaloglásnál), gyorsan fordul és megáll, nincs csúszás; Shift: vágta (kb. 85 km/h), enélkül ügetés (kb. 42 km/h); közben ott van rajta a szkined
+
+## 0.25.0 – 2026-11-13
+- A tornádók a játékosra vadásznak: felé tartanak (150 px/s), házban is – ilyenkor a házat viszik el. Sétálva (130 px/s) utolérnek, futva (220 px/s) vagy autóval el lehet menekülni
+
 ## 0.24.0 – 2026-11-07
 - Alexek: a járókelők egy része Alex (zöld póló, narancs haj, „Alex” névtábla); mellette E – beszélget veled
 - 8 új autó: Fehér limuzin, Narancs sportkocsi, Rózsaszín kisautó, Szürke furgon, Mentőautó (villogó fénnyel), Fekete versenyautó, Barna dzsip, Arany autó – és egy Bicikli ($100, nem kell bele benzin)
