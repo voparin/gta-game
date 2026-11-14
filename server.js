@@ -50,6 +50,7 @@ function fileStore(dir = process.env.PROFILE_DIR || path.join(ROOT, 'data')) {
     async get(id) { return db.profiles[id] || null; },
     async create(id, doc) { if (db.profiles[id]) return false; db.profiles[id] = doc; flush(); return true; },
     async update(id, fields) { if (!db.profiles[id]) return false; Object.assign(db.profiles[id], fields); flush(); return true; },
+    async remove(id) { delete db.profiles[id]; flush(); return true; },
     async secret() { if (!db.secret) { db.secret = crypto.randomBytes(32).toString('hex'); flush(); } return db.secret; },
   };
 }
@@ -74,6 +75,7 @@ function firestoreStore() {                         // Firestore REST API; a hoz
       const mask = Object.keys(f).map(k => 'updateMask.fieldPaths=' + encodeURIComponent(k)).join('&');
       const r = await doc('PATCH', 'profiles/' + encodeURIComponent(id) + '?currentDocument.exists=true&' + mask, toF(f)); return r.ok;
     },
+    async remove(id) { const r = await doc('DELETE', 'profiles/' + encodeURIComponent(id)); return r.ok || r.status === 404; },
     async secret() {
       const r = await doc('GET', 'config/secret');
       if (r.ok) return fromF(await r.json()).value;
@@ -86,7 +88,43 @@ function firestoreStore() {                         // Firestore REST API; a hoz
 }
 const defaultStore = () => (process.env.K_SERVICE && !process.env.PROFILE_DIR ? firestoreStore() : fileStore());   // K_SERVICE: a Cloud Run állítja be
 
-function accounts(store) {                          // regisztráció, belépés, bejelentkezési jegy (HMAC-aláírt), mentés
+// ===== Google-fiókos belépés (ADR-0048): a Google által aláírt azonosító-jegyet (ID token) ellenőrizzük, függőség nélkül =====
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '568950307806-sh54rus06ml8gvakscq4f0tcp1186tn1.apps.googleusercontent.com';
+const GOOGLE_ISS = ['accounts.google.com', 'https://accounts.google.com'];
+let gKeys = null, gKeysUntil = 0, gLast = 0, gFlight = null;
+async function fetchGoogleKeys(force = false) {     // a Google nyilvános kulcsai (óránként frissítve; kényszerített frissítés legfeljebb percenként – ne lehessen a Google felé árasztani)
+  if (gKeys && Date.now() < gKeysUntil && (!force || Date.now() - gLast < 60e3)) return gKeys;
+  if (gFlight) return gFlight;                      // egyszerre csak egy letöltés
+  gFlight = (async () => {
+    try {
+      const r = await fetch('https://www.googleapis.com/oauth2/v3/certs', { signal: AbortSignal.timeout ? AbortSignal.timeout(IO_TIMEOUT) : undefined });
+      if (!r.ok) throw new Error('google certs ' + r.status);
+      gKeys = (await r.json()).keys || []; gKeysUntil = Date.now() + 3600e3; gLast = Date.now();
+      return gKeys;
+    } finally { gFlight = null; }
+  })();
+  return gFlight;
+}
+// visszaadja a Google-fiók belső azonosítóját (sub), ha a jegy valódi, nekünk szól és nem járt le; különben null
+function googleVerifier(clientId = GOOGLE_CLIENT_ID, getKeys = fetchGoogleKeys) {
+  return async idToken => {
+    if (typeof idToken !== 'string' || idToken.length > 4096) return null;
+    const parts = idToken.split('.');
+    if (parts.length !== 3) return null;
+    let head, body;
+    try { head = JSON.parse(Buffer.from(parts[0], 'base64url').toString()); body = JSON.parse(Buffer.from(parts[1], 'base64url').toString()); } catch (e) { return null; }
+    if (!head || head.alg !== 'RS256' || !body) return null;
+    let keys = await getKeys(), jwk = keys.find(k => k.kid === head.kid);
+    if (!jwk) { keys = await getKeys(true); jwk = keys.find(k => k.kid === head.kid); }   // a Google időnként kulcsot cserél
+    if (!jwk) return null;
+    let good = false;
+    try { good = crypto.verify('RSA-SHA256', Buffer.from(parts[0] + '.' + parts[1]), crypto.createPublicKey({ key: jwk, format: 'jwk' }), Buffer.from(parts[2], 'base64url')); } catch (e) { return null; }
+    if (!good || body.aud !== clientId || !GOOGLE_ISS.includes(body.iss) || !(body.exp * 1000 > Date.now()) || typeof body.sub !== 'string' || !/^\d{1,40}$/.test(body.sub)) return null;
+    return { sub: body.sub };
+  };
+}
+
+function accounts(store, verifyGoogle = googleVerifier()) {   // regisztráció, belépés (jelszó vagy Google), bejelentkezési jegy (HMAC-aláírt), mentés
   let secret = null;
   const getSecret = async () => (secret = secret || await store.secret());
   async function makeToken(id) {
@@ -121,9 +159,34 @@ function accounts(store) {                          // regisztráció, belépés
       const id = nameId(name);
       if (locked(id)) return { t: 'auth_err', msg: 'Túl sok hibás jelszó – ez a profil 15 percre zárolva' };
       const d = typeof pass === 'string' && pass.length <= PASS_MAX ? await store.get(id) : null;
+      if (d && !d.hash) return { t: 'auth_err', msg: 'Ehhez a profilhoz a „Bejelentkezés Google-fiókkal” gombbal lehet belépni' };
       const h = await hashPass(typeof pass === 'string' ? pass : '', d ? d.salt : 'nincs-ilyen');   // ismeretlen névnél is számol (ne lehessen időből kitalálni)
       if (!d || !crypto.timingSafeEqual(Buffer.from(h), Buffer.from(d.hash.length === h.length ? d.hash : h.replace(/./g, '0')))) { failed(id); return { t: 'auth_err', msg: 'Hibás név vagy jelszó' }; }
       fails.delete(id);
+      return { ...(await ok(id, d)), id };
+    },
+    // Google: a jegy alapján megkeressük a profilt (gsub_<sub> → a profil azonosítója); első alkalommal játékbeli nevet kér
+    async google(credential, name, progress) {
+      const g = await verifyGoogle(credential);
+      if (!g) return { t: 'auth_err', msg: 'A Google-belépés nem sikerült – próbáld újra' };
+      const mapId = 'gsub_' + g.sub, map = await store.get(mapId);
+      if (map && map.ref) { const d = await store.get(map.ref); if (d) return { ...(await ok(map.ref, d)), id: map.ref }; }
+      if (!name) return { t: 'auth_need', msg: 'Válassz egy játékbeli nevet – ezt látják a többiek' };
+      name = normName(name);
+      if (!NAME_RE.test(name)) return { t: 'auth_err', msg: 'A név 3–16 betű, szám, szóköz, _ . - lehet' };
+      if (/^vend[ée]g\b/i.test(name)) return { t: 'auth_err', msg: 'Ez a név foglalt – válassz másikat' };
+      const pt = progress ? cleanProgress(progress) : '';
+      if (pt === null) return { t: 'auth_err', msg: 'A játékállás túl nagy – szólj a fejlesztőnek' };
+      const id = nameId(name), d = { name, google: '1', progress: pt, rev: +(progress && progress.rev) || 0, created: Date.now() };   // nincs jelszó: csak Google-lel lehet belépni
+      if (!(await store.create(mapId, { ref: id }))) {                                            // előbb a hozzárendelés: közben egy másik lapról már létrehozta?
+        const m2 = await store.get(mapId), d2 = m2 && await store.get(m2.ref);
+        if (d2) return { ...(await ok(m2.ref, d2)), id: m2.ref };
+        if (m2) await store.remove(mapId);                                                      // félbemaradt hozzárendelés (profil nélkül): újrakezdjük
+        if (!(await store.create(mapId, { ref: id }))) return { t: 'auth_err', msg: 'Próbáld újra' };
+      }
+      let made = false;
+      try { made = await store.create(id, d); } catch (e) { await store.remove(mapId).catch(() => {}); throw e; }
+      if (!made) { await store.remove(mapId); return { t: 'auth_err', msg: 'Ez a név már foglalt – válassz másikat' }; }   // a név foglalt: a hozzárendelés visszavonva (nem marad árva)
       return { ...(await ok(id, d)), id };
     },
     async resume(token) {
@@ -172,8 +235,8 @@ function decodeFrames(buf) {
   return { frames, rest: buf.slice(off) };
 }
 
-function createServer(store = defaultStore()) {
-  const acc = accounts(store);
+function createServer(store = defaultStore(), verifyGoogle = googleVerifier()) {
+  const acc = accounts(store, verifyGoogle);
   const ipTries = new Map();                        // IP-címenként a belépési kísérletek (10 percenként legfeljebb 40)
   const players = new Map();                       // id → { sock, state, seen }
   let nextId = 1;
@@ -193,7 +256,7 @@ function createServer(store = defaultStore()) {
     const accept = crypto.createHash('sha1').update(req.headers['sec-websocket-key'] + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
     sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
     sock.setNoDelay(true);
-    const ip = String(req.headers['x-forwarded-for'] || sock.remoteAddress || '').split(',')[0].trim();   // a Cloud Run az eredeti címet az X-Forwarded-For-ban adja
+    const ip = String(req.headers['x-forwarded-for'] || sock.remoteAddress || '').split(',').pop().trim();   // az utolsó elem a Cloud Run által látott cím (az elejét a kliens írhatja)
     const id = nextId++, p = { sock, state: null, seen: Date.now(), user: null, tries: [], lastSave: 0, ip };
     players.set(id, p);
     const send = obj => { const f = encodeFrame(JSON.stringify(obj)); if (f && !sock.destroyed) sock.write(f); };
@@ -209,15 +272,16 @@ function createServer(store = defaultStore()) {
         if (f.op === 8) { sock.write(Buffer.from([0x88, 0])); sock.end(); return; }   // bezárás (visszaigazolva)
         if (f.op === 9) { sock.write(Buffer.from([0x8a, 0])); continue; }        // ping → pong
         if (f.op !== 1) continue;
-        if (f.text.length > MAX_STATE && !/^\{"t":"(save|register)"/.test(f.text)) continue;   // a nagy üzenet csak mentés lehet
+        if (f.text.length > MAX_STATE && !/^\{"t":"(save|register|google)"/.test(f.text)) continue;   // a nagy üzenet csak mentés lehet
         let msg; try { msg = JSON.parse(f.text); } catch (e) { continue; }
         if (msg && msg.t === 'state') { const st = cleanState(msg.s); if (st) { st.name = p.user ? p.user.name : 'Vendég ' + id; p.state = st; } }   // a név a fiókból jön (ne lehessen másnak kiadni magad)
-        else if (msg && ['register', 'login', 'auth'].includes(msg.t)) {
+        else if (msg && ['register', 'login', 'auth', 'google'].includes(msg.t)) {
           const now = Date.now(); p.tries = p.tries.filter(t => now - t < 60000);
           const it = (ipTries.get(p.ip) || []).filter(t => now - t < 600000);
           if (p.tries.length >= AUTH_PER_MIN || it.length >= IP_PER_10MIN) { send({ t: 'auth_err', msg: 'Túl sok próbálkozás – várj egy kicsit' }); continue; }
           p.tries.push(now); it.push(now); ipTries.set(p.ip, it); if (ipTries.size > 5000) ipTries.clear();
-          const job = msg.t === 'register' ? acc.register(msg.name, msg.pass, msg.progress) : msg.t === 'login' ? acc.login(msg.name, msg.pass) : acc.resume(msg.token);
+          const job = msg.t === 'register' ? acc.register(msg.name, msg.pass, msg.progress) : msg.t === 'login' ? acc.login(msg.name, msg.pass)
+            : msg.t === 'google' ? acc.google(msg.credential, msg.name, msg.progress) : acc.resume(msg.token);
           job.then(r => { if (r.t === 'auth_ok') p.user = { id: r.id, name: r.name }; delete r.id; send(r); })
             .catch(e => { console.error('fiókhiba', e.message); send({ t: 'auth_err', msg: 'A szerver most nem éri el a fiókokat – próbáld újra' }); });
         } else if (msg && msg.t === 'save' && p.user) {
@@ -249,7 +313,7 @@ function createServer(store = defaultStore()) {
   return { server, players };
 }
 
-module.exports = { createServer, encodeFrame, decodeFrames, cleanState, fileStore, accounts, normName, nameId };
+module.exports = { createServer, encodeFrame, decodeFrames, cleanState, fileStore, accounts, normName, nameId, googleVerifier, GOOGLE_CLIENT_ID };
 
 if (require.main === module) {
   const port = +process.env.PORT || 8080;

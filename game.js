@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.40.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.41.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -2830,12 +2830,55 @@ const BACKUP_KEY = 'gta.progress.vendeg';           // a vendégként elért já
 const nonTrivial = p => p && ((p.money || 0) > 0 || (p.xp || 0) > 0 || (p.owned || []).length > 1);
 const getToken = () => { try { return window.localStorage.getItem(TOKEN_KEY); } catch (e) { return null; } };
 const setToken = t => { try { if (t) window.localStorage.setItem(TOKEN_KEY, t); else window.localStorage.removeItem(TOKEN_KEY); } catch (e) { /* nincs tárhely */ } };
-function openAccount(mode = 'register', msg = '') { Object.assign(account, { open: true, mode, msg, busy: false, field: account.name ? 1 : 0, pass: '' }); for (const k in keys) keys[k] = false; mouse.down = false; }
+function openAccount(mode = 'register', msg = '') { Object.assign(account, { open: true, mode, msg, busy: false, field: account.name ? 1 : 0, pass: '' }); for (const k in keys) keys[k] = false; mouse.down = false; loadGoogle(); }
+// ===== Google-fiókos belépés (ADR-0048): a Google hivatalos gombja (Google Identity Services), a vászon fölé helyezve =====
+const GOOGLE_CLIENT_ID = '568950307806-sh54rus06ml8gvakscq4f0tcp1186tn1.apps.googleusercontent.com';   // nyilvános azonosító (nem titok)
+const gsi = { loading: false, ready: false, div: null };
+const googleAllowed = () => { const loc = window.location; return !!loc && /github\.io$|\.run\.app$/.test(loc.hostname || ''); };   // csak az engedélyezett címeken működik
+function loadGoogle() {
+  if (gsi.loading || !googleAllowed() || typeof document === 'undefined' || !document.head || !document.body) return false;
+  gsi.loading = true;
+  const sc = document.createElement('script');
+  sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
+  sc.onerror = () => { gsi.loading = false; gsi.failed = true; };   // hálózati hiba / reklámblokkoló: a következő megnyitáskor újra próbálja
+  sc.onload = () => {
+    const g = window.google && window.google.accounts && window.google.accounts.id;
+    if (!g) return;
+    g.initialize({ client_id: GOOGLE_CLIENT_ID, callback: r => googleCredential(r && r.credential) });
+    const d = document.createElement('div');
+    d.style.position = 'fixed'; d.style.zIndex = '10'; d.style.display = 'none';
+    document.body.appendChild(d);
+    g.renderButton(d, { theme: 'filled_blue', size: 'large', text: 'signin_with', shape: 'rectangular', width: 300, locale: 'hu' });
+    gsi.div = d; gsi.ready = true;
+  };
+  document.head.appendChild(sc);
+  return true;
+}
+function syncGoogleButton() {                       // a gomb csak a profil-ablakban látszik, a helyén
+  if (!gsi.div) return;
+  const r = account.open && account.mode !== 'gname' && !account.busy ? account.gRect : null;
+  if (r) { gsi.div.style.display = 'block'; gsi.div.style.left = r.x + 'px'; gsi.div.style.top = r.y + 'px'; }
+  else gsi.div.style.display = 'none';
+}
+function googleCredential(cred) {                   // a Google visszaadta az azonosító-jegyet: a szerver ellenőrzi
+  if (!cred) return false;
+  account.gcred = cred;
+  if (!net.online) { account.msg = 'Még nincs kapcsolat a szerverrel – pár másodperc…'; return false; }
+  account.busy = true; account.msg = 'Belépés Google-lel…';
+  netSendRaw({ t: 'google', credential: cred });
+  return true;
+}
 function netSendRaw(obj) { if (!net.online || !net.ws) return false; try { net.ws.send(JSON.stringify(obj)); return true; } catch (e) { return false; } }
 function submitAccount() {
   if (account.busy) return false;
   const name = account.name.trim();
   if (name.length < 3) { account.msg = 'A név legalább 3 karakter legyen'; return false; }
+  if (account.mode === 'gname') {                    // Google-profil: csak a játékbeli név kell
+    if (!net.online) { account.msg = 'Még nincs kapcsolat a szerverrel – pár másodperc…'; return false; }
+    account.busy = true; account.msg = 'Profil létrehozása…';
+    netSendRaw({ t: 'google', credential: account.gcred, name, progress });
+    return true;
+  }
   if (account.pass.length < 6) { account.msg = 'A jelszó legalább 6 karakter legyen'; return false; }
   if (!net.online) { account.msg = 'Még nincs kapcsolat a szerverrel – pár másodperc…'; return false; }
   account.busy = true; account.msg = account.mode === 'register' ? 'Profil létrehozása…' : 'Belépés…';
@@ -2874,7 +2917,8 @@ function chooseProgress(name, server, serverRev, local) {
 function accountKey(e) {
   if (e.code === 'Escape') { playAsGuest(); return; }
   if (e.code === 'Enter') { submitAccount(); return; }
-  if (e.code === 'Tab' || e.code === 'ArrowDown' || e.code === 'ArrowUp') { account.field = 1 - account.field; if (e.preventDefault) e.preventDefault(); return; }
+  if (e.code === 'Tab' || e.code === 'ArrowDown' || e.code === 'ArrowUp') { if (account.mode !== 'gname') account.field = 1 - account.field; if (e.preventDefault) e.preventDefault(); return; }
+  if (account.mode === 'gname') account.field = 0;   // Google-profilnál nincs jelszó
   const f = account.field ? 'pass' : 'name';
   if (e.code === 'Backspace') { account[f] = account[f].slice(0, -1); return; }
   if (e.key && e.key.length === 1 && !e.ctrlKey && !e.metaKey && account[f].length < (account.field ? 64 : 16)) account[f] += e.key;
@@ -2889,17 +2933,20 @@ function accountClick(x, y) {
 }
 function drawAccount(w, h) {
   ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0, 0, w, h);
-  const PW = 420, PH = 360, px = Math.round((w - PW) / 2), py = Math.round((h - PH) / 2), reg = account.mode === 'register';
-  account.hits = [];
+  const gname = account.mode === 'gname', PW = 420, PH = gname ? 320 : 430, px = Math.round((w - PW) / 2), py = Math.round((h - PH) / 2), reg = account.mode === 'register';
+  account.hits = []; account.gRect = null;
   ctx.fillStyle = 'rgba(28,24,18,0.97)'; ctx.fillRect(px, py, PW, PH); ctx.strokeStyle = '#e2c27d'; ctx.lineWidth = 3; ctx.strokeRect(px, py, PW, PH);
   ctx.textAlign = 'center'; ctx.fillStyle = '#e2c27d'; ctx.font = 'bold 24px sans-serif'; ctx.fillText('🌐 Sivatagi GTA – profil', w / 2, py + 38);
-  [['register', 'Új profil'], ['login', 'Belépés']].forEach(([m, label], i) => {                       // fülek
+  if (gname) {                                                                                        // Google: játékbeli név
+    ctx.fillStyle = '#fff'; ctx.font = '15px sans-serif'; ctx.fillText('Google-fiókkal lépsz be. Válassz egy játékbeli nevet:', w / 2, py + 80);
+  } else [['register', 'Új profil'], ['login', 'Belépés']].forEach(([m, label], i) => {               // fülek
     const bx = px + 30 + i * 185, on = account.mode === m;
     ctx.fillStyle = on ? 'rgba(226,194,125,0.3)' : 'rgba(255,255,255,0.06)'; ctx.fillRect(bx, py + 56, 175, 34);
     ctx.fillStyle = on ? '#fff' : '#aaa'; ctx.font = 'bold 16px sans-serif'; ctx.fillText(label, bx + 87, py + 79);
     account.hits.push({ x: bx, y: py + 56, w: 175, h: 34, mode: m });
   });
-  [['Név', account.name], ['Jelszó', '•'.repeat(account.pass.length)]].forEach(([label, val], i) => {   // mezők
+  const fields = gname ? [['Játékbeli név', account.name]] : [['Név', account.name], ['Jelszó', '•'.repeat(account.pass.length)]];
+  fields.forEach(([label, val], i) => {                                                               // mezők
     const fy = py + 112 + i * 70, on = account.field === i;
     ctx.textAlign = 'left'; ctx.fillStyle = '#ccc'; ctx.font = '13px sans-serif'; ctx.fillText(label, px + 30, fy);
     ctx.fillStyle = '#fff'; ctx.fillRect(px + 30, fy + 6, PW - 60, 36); ctx.strokeStyle = on ? '#3b82f6' : '#999'; ctx.lineWidth = on ? 3 : 1; ctx.strokeRect(px + 30, fy + 6, PW - 60, 36);
@@ -2907,14 +2954,25 @@ function drawAccount(w, h) {
     account.hits.push({ x: px + 30, y: fy + 6, w: PW - 60, h: 36, field: i });
   });
   ctx.textAlign = 'center';
-  ctx.fillStyle = account.busy ? '#666' : '#22c55e'; ctx.fillRect(px + 30, py + 252, PW - 60, 40);
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 18px sans-serif'; ctx.fillText(reg ? 'Profil létrehozása' : 'Belépés', w / 2, py + 279);
-  account.hits.push({ x: px + 30, y: py + 252, w: PW - 60, h: 40, go: true });
-  if (account.msg) { ctx.fillStyle = /…|Kijelentkeztél/.test(account.msg) ? '#9fd8ff' : '#ff8a8a'; ctx.font = '13px sans-serif'; ctx.fillText(account.msg, w / 2, py + 312); }
+  const by = gname ? py + 182 : py + 252;
+  ctx.fillStyle = account.busy ? '#666' : '#22c55e'; ctx.fillRect(px + 30, by, PW - 60, 40);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 18px sans-serif'; ctx.fillText(gname ? 'Profil létrehozása' : reg ? 'Profil létrehozása' : 'Belépés', w / 2, by + 27);
+  account.hits.push({ x: px + 30, y: by, w: PW - 60, h: 40, go: true });
+  let y = by + 60;
+  if (!gname) {                                                                                       // vagy: Google-fiókkal
+    ctx.fillStyle = '#888'; ctx.font = '13px sans-serif'; ctx.fillText('— vagy —', w / 2, y); y += 10;
+    account.gRect = { x: Math.round(w / 2 - 150), y, w: 300, h: 44 };
+    if (!gsi.ready) {                                                                                 // amíg a Google gombja betölt (vagy ha itt nem érhető el)
+      ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(account.gRect.x, y, 300, 40);
+      ctx.fillStyle = '#aaa'; ctx.font = '14px sans-serif'; ctx.fillText(!googleAllowed() ? 'Google-belépés: a voparin.github.io oldalon' : gsi.failed ? 'A Google-belépés most nem érhető el' : 'Bejelentkezés Google-fiókkal…', w / 2, y + 25);
+    }
+    y += 64;
+  }
+  if (account.msg) { ctx.fillStyle = /…|Kijelentkeztél|Válassz/.test(account.msg) ? '#9fd8ff' : '#ff8a8a'; ctx.font = '13px sans-serif'; ctx.fillText(account.msg, w / 2, y - 6); }
   ctx.fillStyle = '#aaa'; ctx.font = '12px sans-serif';
-  ctx.fillText(reg ? 'Az eddigi játékállásod átkerül az új profilba.' : 'Tab: mező váltás · Enter: mehet', w / 2, py + 332);
-  ctx.fillStyle = '#7fe0ff'; ctx.fillText('Esc: vendégként játszom (profil nélkül)', w / 2, py + 350);
-  account.hits.push({ x: px, y: py + 338, w: PW, h: 20, guest: true });
+  ctx.fillText(gname ? 'Az eddigi játékállásod átkerül az új profilba.' : reg ? 'Az eddigi játékállásod átkerül az új profilba.' : 'Tab: mező váltás · Enter: mehet', w / 2, y + 14);
+  ctx.fillStyle = '#7fe0ff'; ctx.fillText('Esc: vendégként játszom (profil nélkül)', w / 2, y + 32);
+  account.hits.push({ x: px, y: y + 20, w: PW, h: 20, guest: true });
   ctx.textAlign = 'left';
 }
 function netConnect() {                             // a GitHub Pages-en (statikus oldal) nincs szerver: ott egyjátékos marad
@@ -2953,7 +3011,7 @@ function netReceive(text) {                         // a szerver üzenetei: hell
     const local = sanitizeProgress(progress);
     if (!local.owner && nonTrivial(local)) { try { window.localStorage.setItem(BACKUP_KEY, JSON.stringify(local)); } catch (e) { /* nincs */ } }   // a vendég-állás megmarad
     const pick = chooseProgress(msg.name, msg.progress, msg.rev, local);
-    account.user = msg.name; account.authed = true; account.name = msg.name; account.busy = false; account.open = false; account.guest = false;
+    account.user = msg.name; account.authed = true; account.name = msg.name; account.busy = false; account.open = false; account.guest = false; account.gcred = null;
     setToken(msg.token);
     if (pick.use !== local) applyProfile(pick.use ? { ...pick.use, owner: msg.name, rev: msg.rev || pick.use.rev || 0 } : { owner: msg.name });
     else progress.owner = msg.name;
@@ -2963,6 +3021,9 @@ function netReceive(text) {                         // a szerver üzenetei: hell
   if (msg.t === 'saved' && msg.stale) {             // egy másik gépen / lapon frissebb a profil: azt töltjük be
     popup('🌐 A profilod máshol frissebb – betöltöm', '#ffb040');
     const tok = getToken(); if (tok) netSendRaw({ t: 'auth', token: tok });
+  }
+  if (msg.t === 'auth_need') {                      // első Google-belépés: játékbeli nevet kér
+    Object.assign(account, { open: true, busy: false, mode: 'gname', field: 0, msg: msg.msg || 'Válassz egy játékbeli nevet' });
   }
   if (msg.t === 'auth_err') {
     account.busy = false;
@@ -5913,6 +5974,7 @@ function render() {
   if (tv.open) drawTv(w, h);
   if (phone.open) drawPhone(w, h);
   if (account.open) drawAccount(w, h);
+  syncGoogleButton();                               // a Google-gomb (DOM) a profil-ablakkal együtt látszik / tűnik el
   if (taxiMenu.open) drawTaxiMenu(w, h);
   if (mapView.open) drawBigMap(w, h);
   if (taxiTrip) {                                    // utazás: elsötétül, felirat

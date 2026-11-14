@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.41.0 – 2026-11-14
+- **Belépés Google-fiókkal** 🔑 (ADR-0048): a profil-ablakban a Google hivatalos „Bejelentkezés Google-fiókkal” gombja; első alkalommal egy játékbeli nevet választasz (ezt látják a többiek), utána egy kattintással belépsz bármelyik gépről, jelszó nélkül. A Google e-mail-címedet és valódi nevedet a játék nem tárolja. A név + jelszavas belépés is megmarad
+
 ## 0.40.0 – 2026-11-14
 - **Saját profil** 👤 (ADR-0047): első belépéskor megnyílik a profil-ablak – megadod a neved és a jelszavad, és onnantól a saját profilodban játszol: a pénzed, autóid, szkined, rekordjaid a szerveren vannak, bármelyik gépről belépve folytathatod. A böngésző megjegyzi a belépést (90 napig); máshol a **Belépés** fülön a neveddel és jelszavaddal lépsz be
 - Az eddigi játékállásod az új profilba kerül. A többi játékos a profilod nevét látja

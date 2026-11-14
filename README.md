@@ -46,7 +46,8 @@ Nyisd meg az `index.html`-t a böngészőben – nincs szükség telepítésre.
 - Első belépéskor (a többjátékos szerverhez csatlakozva) megnyílik a **profil-ablak**: **Új profil** – megadod a neved és a jelszavad. Onnantól a **saját profilodban** játszol: a pénz, az autók, a szkin, a rekordok a szerveren vannak, bármelyik gépről folytathatod.
 - Másik gépen / böngészőben: **Belépés** fül, név + jelszó. Ugyanazon a gépen a játék 90 napig megjegyzi a belépést.
 - **Esc** menü → **L**: kijelentkezés. A profil-ablakban **Esc**: vendégként játszol (profil nélkül, csak ebben a böngészőben ment).
-- Az elfelejtett jelszót nem lehet visszaállítani – ilyenkor új profilt kell létrehozni.
+- **Belépés Google-fiókkal:** a profil-ablakban a „Bejelentkezés Google-fiókkal” gombbal is beléphetsz. Első alkalommal egy játékbeli nevet választasz, utána egy kattintás – jelszó nem kell. A Google e-mail-címed és valódi neved nem kerül a játékba.
+- Az elfelejtett jelszót nem lehet visszaállítani – ilyenkor új profilt kell létrehozni (vagy használd a Google-belépést).
 
 ## Rendőrség
 - Az utakon (és járdán) **145 km/h** a sebességkorlát – a táblák is jelzik. Ha túlléped, körözni kezdenek (★), rendőrre lövésért ★★.

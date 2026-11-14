@@ -2,7 +2,16 @@
 // A többjátékos szerver tesztje (ADR-0044): elindítja a szervert egy szabad porton, két WebSocket-klienssel
 // ellenőrzi, hogy kiszolgálja a játékot, és a játékosok látják egymás helyzetét.
 // Futtatás: node tests/server.test.js   (Node 22+, a beépített WebSocket-kliens miatt)
-const { createServer, encodeFrame, decodeFrames, cleanState, fileStore, normName, nameId } = require('../server.js');
+const { createServer, encodeFrame, decodeFrames, cleanState, fileStore, normName, nameId, googleVerifier, GOOGLE_CLIENT_ID } = require('../server.js');
+const crypto = require('crypto');
+// kamu Google: saját kulcspárral aláírt azonosító-jegyek (a valódi Google-t a teszt nem hívja)
+const { publicKey: G_PUB, privateKey: G_PRIV } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+const G_JWK = { ...G_PUB.export({ format: 'jwk' }), kid: 'k1', alg: 'RS256', use: 'sig' };
+const gToken = (claims, key = G_PRIV, kid = 'k1') => {
+  const h = Buffer.from(JSON.stringify({ alg: 'RS256', kid, typ: 'JWT' })).toString('base64url');
+  const p = Buffer.from(JSON.stringify({ iss: 'https://accounts.google.com', aud: GOOGLE_CLIENT_ID, sub: '1234567890', exp: Math.floor(Date.now() / 1000) + 3600, ...claims })).toString('base64url');
+  return h + '.' + p + '.' + crypto.sign('RSA-SHA256', Buffer.from(h + '.' + p), key).toString('base64url');
+};
 const os = require('os'), fs = require('fs'), path = require('path');
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'gta-profiles-'));
 
@@ -29,7 +38,7 @@ const until = async (cond, ms = 3000) => { const end = Date.now() + ms; while (D
   check('a túl nagy vezérlőkeretet elutasítja', decodeFrames(Buffer.concat([Buffer.from([0x89, 0x80 | 126, 0, 200, 1, 2, 3, 4]), Buffer.alloc(200)])).bad === true);
 
   // élő szerver két klienssel
-  const { server, players } = createServer(fileStore(DIR));
+  const { server, players } = createServer(fileStore(DIR), googleVerifier(GOOGLE_CLIENT_ID, async () => [G_JWK]));
   await new Promise(r => server.listen(0, r));
   const port = server.address().port, base = `http://127.0.0.1:${port}`;
   const html = await (await fetch(base + '/')).text(), js = await fetch(base + '/game.js'), nf = await fetch(base + '/nincs');
@@ -63,7 +72,7 @@ const until = async (cond, ms = 3000) => { const end = Date.now() + ms; while (D
   pages.close(); await until(() => players.size === 1, 2000);
   // ---- fiókok: regisztráció, belépés, jegy, mentés ----
   check('a név szabályai: kis- és nagybetű egyforma, szóköz összevonva', nameId('  Kis  Pista ') === nameId('kis pista') && normName('  Kis  Pista ') === 'Kis Pista');
-  const ask = (c, msg) => new Promise(res => { const prev = c.ws.onmessage; c.ws.onmessage = ev => { const m = JSON.parse(ev.data); if (m.t === 'auth_ok' || m.t === 'auth_err' || m.t === 'saved') { c.ws.onmessage = prev; res(m); } else prev(ev); }; c.ws.send(JSON.stringify(msg)); });
+  const ask = (c, msg) => new Promise(res => { const prev = c.ws.onmessage; c.ws.onmessage = ev => { const m = JSON.parse(ev.data); if (m.t === 'auth_ok' || m.t === 'auth_err' || m.t === 'auth_need' || m.t === 'saved') { c.ws.onmessage = prev; res(m); } else prev(ev); }; c.ws.send(JSON.stringify(msg)); });
   const c1 = mk(); await until(() => c1.id);
   const r1 = await ask(c1, { t: 'register', name: 'Vadim', pass: 'titok1', progress: { money: 123, xp: 5 } });
   check('regisztráció: jegyet kap, és a magával hozott mentés megmarad', r1.t === 'auth_ok' && r1.name === 'Vadim' && typeof r1.token === 'string' && r1.progress && r1.progress.money === 123);
@@ -103,6 +112,32 @@ const until = async (cond, ms = 3000) => { const end = Date.now() + ms; while (D
   check('a nem ASCII karakteres hamis jegy sem okoz hibát (szabályos elutasítás)', (await ask(c4, { t: 'auth', token: r1.token.split('.')[0] + '.' + 'é'.repeat(22) })).expired === true);
   c4.ws.close();
   c1.ws.close(); c2.ws.close(); await until(() => players.size === 1, 3000);
+  // ---- Google-fiókos belépés ----
+  const gv = googleVerifier(GOOGLE_CLIENT_ID, async () => [G_JWK]);
+  check('a valódi (aláírt, nekünk szóló, érvényes) Google-jegyet elfogadja', (await gv(gToken({}))).sub === '1234567890');
+  const other = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
+  check('a hamis aláírású / más alkalmazásnak szóló / lejárt / idegen kiadójú jegyet elutasítja', (await gv(gToken({}, other))) === null && (await gv(gToken({ aud: 'mas.apps.googleusercontent.com' }))) === null
+    && (await gv(gToken({ exp: Math.floor(Date.now() / 1000) - 10 }))) === null && (await gv(gToken({ iss: 'https://gonosz.example' }))) === null && (await gv('nem.jegy')) === null && (await gv(gToken({}, G_PRIV, 'ismeretlen'))) === null);
+  const hs = (() => { const h = Buffer.from(JSON.stringify({ alg: 'HS256', kid: 'k1' })).toString('base64url'), p = Buffer.from(JSON.stringify({ iss: 'https://accounts.google.com', aud: GOOGLE_CLIENT_ID, sub: '1', exp: 9e9 })).toString('base64url'); return h + '.' + p + '.' + crypto.createHmac('sha256', 'x').update(h + '.' + p).digest('base64url'); })();
+  check('a más algoritmusú (HS256) és a nem számjegyes azonosítójú jegyet is elutasítja', (await gv(hs)) === null && (await gv(gToken({ sub: '../x' }))) === null && (await gv(gToken({ exp: 'holnap' }))) === null);
+  const g1 = mk(); await until(() => g1.id);
+  const ga = await ask(g1, { t: 'google', credential: gToken({}) });
+  check('első Google-belépéskor játékbeli nevet kér', ga.t === 'auth_need');
+  const gtaken = await ask(g1, { t: 'google', credential: gToken({}), name: 'vadim' });
+  check('a jelszavas profil neve foglalt a Google-profilnak is', gtaken.t === 'auth_err' && /foglalt/.test(gtaken.msg));
+  check('foglalt névnél nem marad árva hozzárendelés (utána más névvel létrehozható)', !JSON.parse(fs.readFileSync(path.join(DIR, 'profiles.json'), 'utf8')).profiles['gsub_1234567890']);
+  const gb = await ask(g1, { t: 'google', credential: gToken({}), name: 'Gugli Géza', progress: { money: 55, rev: 1 } });
+  check('névvel létrejön a Google-profil (a helyi állással), jegyet kap', gb.t === 'auth_ok' && gb.name === 'Gugli Géza' && gb.progress.money === 55 && typeof gb.token === 'string');
+  check('a Google e-mail-címe / valódi neve nincs tárolva, csak a játékbeli név', !/@|1234567890.*@/.test(fs.readFileSync(path.join(DIR, 'profiles.json'), 'utf8')) && JSON.parse(fs.readFileSync(path.join(DIR, 'profiles.json'), 'utf8')).profiles['gsub_1234567890'].ref === nameId('Gugli Géza'));
+  g1.ws.close();
+  const g2 = mk(); await until(() => g2.id);
+  const gc = await ask(g2, { t: 'google', credential: gToken({}) });
+  check('újra Google-lel (más gépről): ugyanaz a profil, név kérdezése nélkül', gc.t === 'auth_ok' && gc.name === 'Gugli Géza' && gc.progress.money === 55);
+  const gp = await ask(g2, { t: 'login', name: 'Gugli Géza', pass: 'akarmi12' });
+  check('a Google-profilba jelszóval nem lehet belépni (útmutatást ad)', gp.t === 'auth_err' && /Google/.test(gp.msg));
+  const gd = await ask(g2, { t: 'google', credential: gToken({ sub: '999' }) });
+  check('egy másik Google-fiók külön profil (nevet kér)', gd.t === 'auth_need');
+  g2.ws.close(); await until(() => players.size === 1, 3000);
   const status = await (await fetch(base + '/status')).json();
   check('a /status kiírja, hányan játszanak', status.players === 1);
   b.ws.close(); await wait(100);
