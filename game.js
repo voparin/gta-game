@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.43.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.43.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -5559,7 +5559,7 @@ function helpClick(x, y) {                          // jobb fele: következő ol
   help.page = (help.page + (x > window.innerWidth / 2 ? 1 : HELP_PAGES.length - 1)) % HELP_PAGES.length;
 }
 function drawHelp(w, h) {
-  const pg = HELP_PAGES[help.page], pw = Math.min(w - 20, 820), ph = 110 + pg.lines.length * 30;
+  const pg = HELP_PAGES[help.page], pw = Math.min(w - 20, 820), ph = 110 + Math.max(...HELP_PAGES.map(q => q.lines.length)) * 30;   // minden oldal ugyanakkora ablakban
   const x = (w - pw) / 2, y = Math.max(10, (h - ph) / 2);
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, w, h);
