@@ -30,6 +30,7 @@ function cleanState(s) {
 // ===== Játékosprofilok (ADR-0047): név + jelszó, a mentés a szerveren =====
 // Tárhely: a Google Cloud Runon a Firestore (REST, függőség nélkül, a gép saját fiókjával); máshol (otthoni gép, teszt) egy JSON-fájl.
 const NAME_RE = /^[\p{L}\p{N} _.-]{3,16}$/u, PASS_MIN = 6, PASS_MAX = 64, MAX_PROGRESS = 50000, TOKEN_DAYS = 90, AUTH_PER_MIN = 10;
+const HIT_RANGE = 1600, HIT_MAX = 120, HIT_PER_SEC = 30, HIT_DMG_PER_SEC = 150, FRAG_MIN_DMG = 50, FRAG_GAP_MS = 15000;   // játékosok közötti harc: lőtávolság, legnagyobb sebzés, találat / mp
 const LOCK_FAILS = 5, LOCK_MS = 15 * 60000, IP_PER_10MIN = 40, SAVE_GAP_MS = 1000, MAX_STATE = 2048, IO_TIMEOUT = 8000;
 const normName = n => (typeof n === 'string' ? n.normalize('NFKC').trim().replace(/\s+/g, ' ') : '');   // NFKC: a széles / összetett alakok egyformák
 const nameId = n => 'u_' + encodeURIComponent(normName(n).toLowerCase());   // kis- és nagybetű nem számít
@@ -240,6 +241,26 @@ function createServer(store = defaultStore(), verifyGoogle = googleVerifier()) {
   const ipTries = new Map();                        // IP-címenként a belépési kísérletek (10 percenként legfeljebb 40)
   const players = new Map();                       // id → { sock, state, seen }
   let nextId = 1;
+  // ---- játékosok közötti harc: a lövő kliens jelzi a találatot, a szerver ellenőrzi és továbbítja a sérültnek ----
+  function combatHit(p, msg) {
+    const now = Date.now(); p.hits = p.hits.filter(h => now - h.t < 1000);
+    if (p.hits.length >= HIT_PER_SEC) return;                                     // másodpercenként legfeljebb ennyi találat
+    const q = players.get(Math.floor(+msg.to));
+    if (!q || q === p || !p.state || !q.state || p.state.dead || q.state.dead || !q.send) return;
+    if (Math.hypot(p.state.x - q.state.x, p.state.y - q.state.y) > HIT_RANGE) return;   // messzire nem lehet lőni
+    const dmg = Math.max(1, Math.min(HIT_MAX, Math.round(+msg.dmg) || 0));
+    if (p.hits.reduce((s, h) => s + h.d, 0) + dmg > HIT_DMG_PER_SEC) return;       // és legfeljebb ennyi összsebzés másodpercenként (egy hamis kliens ne ölhessen egy üzenettel sorozatban)
+    p.hits.push({ t: now, d: dmg });
+    q.hitBy = q.hitBy && q.hitBy.from === p.id && now - q.hitBy.t < 10000 ? { from: p.id, t: now, dmg: q.hitBy.dmg + dmg } : { from: p.id, t: now, dmg };
+    q.send({ t: 'hit', from: q.hitBy.from, name: p.state.name, dmg });
+  }
+  function combatFrag(p, msg) {                                                   // a sérült jelzi, hogy meghalt: a lövő megkapja az ölést
+    const now = Date.now(), k = players.get(Math.floor(+msg.to));
+    if (!k || !k.send || !p.hitBy || p.hitBy.from !== Math.floor(+msg.to) || now - p.hitBy.t > 10000) return;   // csak annak, aki tényleg lőtte
+    if (p.hitBy.dmg < FRAG_MIN_DMG || now - p.lastFrag < FRAG_GAP_MS) return;    // meg is kellett halnia (a kapott sebzés elérte az életerőt), és nem sorozatban
+    p.hitBy = null; p.lastFrag = now;
+    k.send({ t: 'frag', name: p.state ? p.state.name : '?' });
+  }
   const server = http.createServer((req, res) => {
     const url = (req.url || '/').split('?')[0], file = FILES[url];
     if (url === '/status') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ players: players.size })); return; }
@@ -257,9 +278,10 @@ function createServer(store = defaultStore(), verifyGoogle = googleVerifier()) {
     sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
     sock.setNoDelay(true);
     const ip = String(req.headers['x-forwarded-for'] || sock.remoteAddress || '').split(',').pop().trim();   // az utolsó elem a Cloud Run által látott cím (az elejét a kliens írhatja)
-    const id = nextId++, p = { sock, state: null, seen: Date.now(), user: null, tries: [], lastSave: 0, ip };
+    const id = nextId++, p = { sock, state: null, seen: Date.now(), user: null, tries: [], lastSave: 0, ip, hits: [], hitBy: null, lastFrag: 0, send: null };
     players.set(id, p);
     const send = obj => { const f = encodeFrame(JSON.stringify(obj)); if (f && !sock.destroyed) sock.write(f); };
+    p.send = send; p.id = id;
     send({ t: 'hello', id });
     let buf = Buffer.alloc(0);
     sock.on('data', chunk => {
@@ -289,7 +311,9 @@ function createServer(store = defaultStore(), verifyGoogle = googleVerifier()) {
           if (now - p.lastSave < SAVE_GAP_MS) { send({ t: 'saved', ok: false, slow: true }); continue; }   // másodpercenként legfeljebb egy mentés
           p.lastSave = now;
           acc.save(p.user.id, msg.progress).then(r => send({ t: 'saved', ...r })).catch(e => { console.error('mentési hiba', e.message); send({ t: 'saved', ok: false }); });
-        } else if (msg && msg.t === 'logout') p.user = null;
+        } else if (msg && msg.t === 'hit') combatHit(p, msg);
+        else if (msg && msg.t === 'frag') combatFrag(p, msg);
+        else if (msg && msg.t === 'logout') p.user = null;
       }
     });
     const drop = () => players.delete(id);

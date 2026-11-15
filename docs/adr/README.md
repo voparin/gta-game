@@ -53,3 +53,4 @@ Itt van naplózva minden architekturális döntés: mit, miért és milyen alter
 | [0046](0046-szerver-a-google-cloud-runon-alvo-uzemmodban.md) | A többjátékos szerver a Google Cloud Runon, alvó üzemmódban | Elfogadva | 2026-11-14 |
 | [0047](0047-jatekosprofilok-nev-jelszo-mentes-a-szerveren.md) | Játékosprofilok: név + jelszó, a játékállás a szerveren (Firestore) | Elfogadva | 2026-11-14 |
 | [0048](0048-google-fiokos-belepes-id-token-ellenorzessel.md) | Google-fiókos belépés: a Google azonosító-jegyét a szerver ellenőrzi | Elfogadva | 2026-11-14 |
+| [0049](0049-jatekos-jatekos-elleni-talalat-a-szerveren-at.md) | Játékos a játékos ellen: a találatot a lövő jelzi, a szerver ellenőrzi és továbbítja | Elfogadva | 2026-11-15 |

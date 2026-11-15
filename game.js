@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.44.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.45.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -3035,6 +3035,8 @@ function netReceive(text) {                         // a szerver üzenetei: hell
     else if (account.open) account.msg = msg.msg;
     else openAccount(account.mode, msg.msg);
   }
+  if (msg.t === 'hit') { pvpReceive(msg); return; }
+  if (msg.t === 'frag') { player.kills++; earn(PVP_BOUNTY, 'játékos'); popup(`🎯 Kiiktattad: ${String(msg.name || '?').slice(0, 16)} (+$${PVP_BOUNTY})`, '#7f7'); return; }
   if (msg.t === 'players' && Array.isArray(msg.list)) {
     const seen = new Set();
     for (const o of msg.list) {
@@ -3185,6 +3187,37 @@ function callOwnPlane() {
   return true;
 }
 
+// ===== Játékosok közötti harc (ADR-0049): a lövő gépe észleli a találatot, a szerver ellenőrzi és továbbítja a sérültnek =====
+const PVP_FOOT = 10, PVP_CAR = 5, PVP_ROCKET_CAP = 30, PVP_MAX = 120, PVP_BOUNTY = 100;   // golyó-sebzés: gyalogos / autóban ülő; rakéta felső korlátja; legnagyobb sebzés; jutalom egy ölésért
+function pvpTargetable(o) { return !!o && !o.dead && Number.isFinite(o.dx); }
+function pvpShot(b) {                              // a golyó eltalált-e egy másik játékost? (tiszta ellenőrzés + küldés)
+  if (!net.online) return false;
+  for (const [id, o] of net.others) {
+    if (!pvpTargetable(o)) continue;
+    if (Math.hypot(o.dx - b.x, o.dy - b.y) < (o.car ? Math.max(o.len || 60, o.wid || 30) / 2 : 12)) {
+      if (!b.rocket) netSendRaw({ t: 'hit', to: id, dmg: o.car ? PVP_CAR : PVP_FOOT });   // a rakéta a robbanásával sebez (pvpBlast)
+      return true;
+    }
+  }
+  return false;
+}
+function pvpBlast(x, y, rocket) {                  // a saját bomba / rakéta robbanása a többi játékost is sebzi (a távolsággal csökkenve)
+  if (!net.online) return;
+  for (const [id, o] of net.others) {
+    if (!pvpTargetable(o)) continue;
+    const d = Math.hypot(o.dx - x, o.dy - y);
+    if (d >= BOMB_RADIUS) continue;
+    const dmg = Math.round((o.car ? 60 : 120) * (1 - d / BOMB_RADIUS));
+    if (dmg > 0) netSendRaw({ t: 'hit', to: id, dmg: rocket ? Math.min(PVP_ROCKET_CAP, dmg) : dmg });
+  }
+}
+function pvpReceive(m) {                           // a szerver szerint valaki eltalált minket
+  if (!(m.dmg > 0) || player.dead || player.inHouse || player.moon || player.abduct || player.riding || player.passedOut > 0) return false;   // házban, buszon, Holdon, ájultan nem sebezhető
+  const alive = player.health > 0;
+  damagePlayer(Math.min(PVP_MAX, m.dmg));
+  if (alive && player.dead) { popup(`💀 ${String(m.name || '?').slice(0, 16)} lelőtt`, '#f66'); netSendRaw({ t: 'frag', to: m.from }); addNews(`${String(m.name || '?').slice(0, 16)} lelőtte egy másik játékost`); }
+  return true;
+}
 function updateBullets(dt) {
   const STEPS = 3;
   for (let i = bullets.length - 1; i >= 0; i--) {
@@ -3204,6 +3237,7 @@ function updateBullets(dt) {
         if (!hit && side !== 'P') for (const c of aiCars) if (!c.wrecked && Math.hypot(c.x - b.x, c.y - b.y) < c.r) { damageCar(c); hit = true; break; }
       }
       if (b.from === 'player') {
+        if (!hit && pvpShot(b)) { hit = true; break; }
         for (const p of npcs) {
           if (!p.dead && Math.hypot(p.x - b.x, p.y - b.y) < p.r + 3) {
             p.health -= 1;
@@ -3230,7 +3264,7 @@ function updateBullets(dt) {
       }
     }
     b.life -= dt;
-    if (hit || b.life <= 0) { bullets.splice(i, 1); if (b.rocket) explode(b.x, b.y, true); }   // a rakétavető lövedéke felrobban
+    if (hit || b.life <= 0) { bullets.splice(i, 1); if (b.rocket) { explode(b.x, b.y, true); pvpBlast(b.x, b.y, true); } }   // a rakétavető lövedéke felrobban
   }
   for (let i = flashes.length - 1; i >= 0; i--) if (flashes[i].until < clock) flashes.splice(i, 1);
 }
@@ -4424,7 +4458,7 @@ function explode(x, y, rocket = false) {           // rocket: a rakétavető rob
 function updateBombs(dt) {
   for (let i = bombs.length - 1; i >= 0; i--) {
     bombs[i].fuse -= dt;
-    if (bombs[i].fuse <= 0) { const b = bombs.splice(i, 1)[0]; explode(b.x, b.y); }
+    if (bombs[i].fuse <= 0) { const b = bombs.splice(i, 1)[0]; explode(b.x, b.y); pvpBlast(b.x, b.y, false); }
   }
   for (let i = explosions.length - 1; i >= 0; i--) if (clock - explosions[i].born > 0.8) explosions.splice(i, 1);
   if (bombInv.count < BOMB_MAX) {                   // percenként egy új bomba
@@ -5547,6 +5581,7 @@ const HELP_PAGES = [
     ['Repülő', 'leparkolt gépnél E: felszállás; S: lassítás, E: leszállás vagy kiugrás'],
     ['Tenger', 'a pálya közepén; hidak az utakon, úszás közben cápák és halak'],
     ['Többjátékos', 'profil (név + jelszó vagy Google); a mentésed a szerveren van, L: kijelentkezés'],
+    ['Játékos ellen', 'a többi játékost lövéssel, bombával, rakétával megölheted (+$100); házban és buszon nem sebezhető'],
   ] },
 ];
 function toggleHelp() { help.open = !help.open; help.page = 0; for (const k in keys) keys[k] = false; mouse.down = false; }

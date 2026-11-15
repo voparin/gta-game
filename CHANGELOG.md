@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.45.0 – 2026-11-15
+- Új: a többjátékos módban a másik játékost meg lehet ölni – lövéssel (pisztoly, sörétes, gépfegyver), rakétával és bombával. Aki megöl valakit, +$100-t és egy ölést kap; az áldozat látja, ki ölte meg. Házban, a Holdon és újraéledés után 3 másodpercig nem sebezhető.
+
 ## 0.44.0 – 2026-11-15
 - A háborúban a saját sereg sokkal nagyobb: 60 katona és 4 tank (eddig 14 és 1), és 2 másodpercenként érkezik az erősítés (eddig 5).
 
