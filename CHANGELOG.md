@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.44.0 – 2026-11-15
+- A háborúban a saját sereg sokkal nagyobb: 60 katona és 4 tank (eddig 14 és 1), és 2 másodpercenként érkezik az erősítés (eddig 5).
+
 ## 0.43.1 – 2026-11-14
 - Javítás: a súgó mind a hat oldalon ugyanakkora ablakban jelenik meg.
 

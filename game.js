@@ -1,6 +1,6 @@
 'use strict';
 
-const VERSION = '0.43.1';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
+const VERSION = '0.44.0';         // minden kiadásnál léptetni kell (lásd CHANGELOG.md)
 
 // ===== Beállítások =====
 // A pálya végtelen (ADR-0019): nincs széle, a chunkok bármely koordinátán generálódnak.
@@ -3865,7 +3865,7 @@ const WAR_TANKS = 2, TANK_HP = 12, TANK_BOUNTY = 100, TANK_RELOAD = 3.5, TANK_SP
 const NUKE_WARN = 12, NUKE_KILL = 1000, NUKE_RADIUS = 1800, NUKE_HOUSES = 1100;
 const MISSILE_EVERY = 22, MISSILE_FLIGHT = 4.5, MISSILE_RADIUS = 220, MISSILE_HOUSES = 170;               // ballisztikus rakéta: 4,5 mp-es repülés, piros célkör figyelmeztet
 const OCCUPY_TIME = 150, GARRISON = 5, LIBERATE_BOUNTY = 200, OCCUPY_RADIUS = 450;                        // a győztes sereg megszállja a területet
-const ARMY_JOIN = 900, ARMY_SIZE = 14, ARMY_TANKS = 1, ARMY_REINFORCE = 5, ARMY_FOLLOW = 650;       // a saját sereg: azonnal megérkezik, ha a háború közelébe érsz
+const ARMY_JOIN = 900, ARMY_SIZE = 60, ARMY_TANKS = 4, ARMY_REINFORCE = 2, ARMY_FOLLOW = 650;       // a saját sereg: azonnal megérkezik, ha a háború közelébe érsz
 const WAR_COLORS = { P: { shirt: '#a83232', legs: '#6a1f1f', hat: '#5a1a1a', head: '#2a1a10', hull: '#a83a3a', dark: '#6a2020' }, A: { shirt: '#5a6a3a', legs: '#4a5a2a', hat: '#46552a', head: '#3a2a1a', hull: '#586b36', dark: '#3c4a24' }, B: { shirt: '#6a7a9a', legs: '#3a4a6a', hat: '#2a3a5a', head: '#2a1a10', hull: '#566a8e', dark: '#38496a' } };
 let warsEnabled = true;                            // teszteléshez kikapcsolható
 let war = null;                                    // { x, y, t, axis, shellT, reinT, tankT, lost, nukeArmed }
@@ -3890,7 +3890,7 @@ function spawnArmySoldier(x, y, tank = false) {     // a játékos serege: a meg
 function callArmy() {                                // megérkeztél a háborúhoz: a saját sereged azonnal megjelenik körülötted
   war.army = true;
   for (let i = 0; i < ARMY_SIZE; i++) { const a = i / ARMY_SIZE * Math.PI * 2, d = 110 + rand() * 150; spawnArmySoldier(player.x + Math.cos(a) * d, player.y + Math.sin(a) * d); }
-  for (let i = 0; i < ARMY_TANKS; i++) spawnArmySoldier(player.x - Math.cos(player.angle) * 260, player.y - Math.sin(player.angle) * 260, true);
+  for (let i = 0; i < ARMY_TANKS; i++) { const a = player.angle + Math.PI + (i - (ARMY_TANKS - 1) / 2) * 0.5; spawnArmySoldier(player.x + Math.cos(a) * 280, player.y + Math.sin(a) * 280, true); }   // a tankok legyezőben a játékos mögött
   popup(`🪖 Megérkezett a saját seregem: ${ARMY_SIZE} katona és ${ARMY_TANKS} tank – követnek, és minden ellenséget lőnek!`, '#ff9a9a');
   message = { text: '🪖 A SAJÁT SEREGED MEGÉRKEZETT!', until: clock + 2.5, color: '#ff9a9a' };
   addNews('🪖 Megérkezett a játékos serege a csatatérre');
