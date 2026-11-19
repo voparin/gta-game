@@ -5,6 +5,9 @@ A verziószám formája `FŐ.KISEBB.JAVÍTÁS`:
 - **JAVÍTÁS** (pl. 0.8.0 → 0.8.1): hibajavítás, beállítás finomítása
 - **FŐ** (pl. 0.9.0 → 1.0.0): nagy mérföldkő
 
+## 0.46.0 – 2026-11-19
+- Új: az autóknak csomagtartója van. Kiszállva az autó hátuljánál E-vel nyitható. A boltban a 🧳 gombbal tárgyakat (csoki, elsősegély, benzin, bomba, sorsjegy) tehetsz bele, és később kiveheted – a tartalom az adott autóhoz kötve, a mentésben.
+
 ## 0.45.0 – 2026-11-15
 - Új: a többjátékos módban a másik játékost meg lehet ölni – lövéssel (pisztoly, sörétes, gépfegyver), rakétával és bombával. Aki megöl valakit, +$100-t és egy ölést kap; az áldozat látja, ki ölte meg. Házban, a Holdon és újraéledés után 3 másodpercig nem sebezhető.
 

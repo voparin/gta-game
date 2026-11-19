@@ -43,7 +43,7 @@ eval(src + `
   get message(){return message}, parkingLot, lotsIn, RENT_PRICE, RENTAL_MODEL, HU_FLAG, rentedLots, donate, DONATE_MIN, DONATE_MAX, homelessSpot, housesIn, collideTest: o => collide(o),
   get tornado(){return tornado}, set tornado(v){tornado=v}, spawnTornado, destroyedHouses, set tornadoes(v){tornadoEnabled=v}, TORNADO_CORE, TORNADO_CHASE, horsesIn, nearestHorse, usedHorses, droppedHorses, fish, spawnFishSchool, updateFish, FISH_COUNT, FISH_SCARE, sharks, spawnShark, updateSharks, hurtShark, playerSwimming, SHARK_BITE, SHARK_HP, SHARK_BOUNTY, SHARK_SIGHT, SHARK_COUNT, set sharksOn(v){sharksEnabled=v}, inSea, inWater, seaRadius, SEA_X, SEA_Y, SEA_R, openAccount, pvpShot, pvpBlast, pvpReceive, PVP_BOUNTY, onlinePlayers, help, HELP_PAGES, toggleHelp, helpKey, googleCredential, loadGoogle, gsi, GOOGLE_CLIENT_ID, saveProgress, chooseProgress, account, applyProfile, submitAccount, playAsGuest, logout, netSaveNow, netSendRaw, TOKEN_KEY, netSend, net, netConnect, netReceive, netState, updateNet, NET_SEND, TROLLEY_FARE, TROLLEY_OFFSET, TROLLEY_INTERVAL, trolleyRoad, trolleyStopsIn, nearestTrolleyStop, spawnTrolley, dispatchTrolley, trolleySchedule, WEAPONS, arsenal, cycleWeapon, fireWeapon, nukeDevices, callOwnPlane, curWeapon, NUKE_FUSE, MISSILE_MAX_RANGE, OWN_PLANE_CD, dropPhone, pickUpPhone, nearestDroppedPhone, crackText, DROPPED_PHONE_MAX, explode, phoneBack, openApp, phoneClick, snakeNew, snakeStep, snakeSteer, snakeFood, SNAKE_N, SNAKE_STEP, flappyNew, flappyFlap, flappyStep, FLAP_H, FLAP_GAP, FLAP_SPACE, FLAP_BIRD_X, PHONE_APPS, PHONE_VIDEOS, newsLog, addNews, newsLive, downtown, planeCrash, callArmy, ARMY_JOIN, ARMY_SIZE, ARMY_TANKS, ARMY_REINFORCE, ARMY_FOLLOW, RESPAWN_SHIELD, WAR_RESPAWN_DIST, WAR_RESPAWN_RANGE, PLANE_MISSILES, PLANE_ATOMS, ATOM_FALL, PLAYER_MISSILE_RANGE, PLANE_WEAPONS, cyclePlaneWeapon, dropWarMissiles, planes, bombers, airBombs, spawnParkedPlane, sendBomber, mountPlane, leavePlane, nearestPlane, PLANE_MIN, PLANE_MAX, PLANE_LAND, PLANE_AMMO, BOMBER_EVERY, AIRBOMB_FALL, AIRBOMB_RADIUS, phone, robiReply, openPhone, closePhone, sendPhone, tickPhone, norm, compass, PHONE_ITEMS, missiles, garrison, get occupation(){return occupation}, launchMissile, missileImpact, startOccupation, endOccupation, updateOccupation, MISSILE_EVERY, MISSILE_FLIGHT, MISSILE_RADIUS, MISSILE_HOUSES, OCCUPY_TIME, GARRISON, LIBERATE_BOUNTY, OCCUPY_RADIUS, callWar, WAR_REINFORCE, WAR_TANKS, TANK_HP, TANK_BOUNTY, TANK_RELOAD, NUKE_WARN, NUKE_KILL, NUKE_RADIUS, NUKE_HOUSES, warShells, craters, get nukeFx(){return nukeFx}, set nukeFx(v){nukeFx=v}, nuke, spawnSoldier, callWar, get war(){return war}, soldiers, fallen, warClock, startWar, endWar, shell, killSoldier, set warsOn(v){warsEnabled=v}, WAR_FIRST, WAR_LIFE, WAR_SOLDIERS, SOLDIER_HP, SOLDIER_BOUNTY, WAR_GAP_MIN, indoor, pickErrand, houseService, updateIndoor, set errands(v){errandsEnabled=v}, AI_REFUEL_BELOW, AI_FUEL_FLOOR, AI_FUEL_USE, ERRAND_EVERY, ERRAND_TIMEOUT, stationsIn, trainPose, nextTrainIn, getTrain, trainsIn, railStopsIn, onPlatform, TRAIN_FARE, TRAIN_DWELL, TRAIN_PERIOD, STOP_SPACE, STOP_X0, RAIL_Y0, RAIL_SPACE, RAIL_GAP, TRAIN_LEN, PLATFORM, set trainShift(v){trainShift=v}, hpFraction, ESCAPE_SPOT, HORROR_KILLS, DEMO_HIT, DEMO_HP, MAX_DEMOS, aliens, alienClock, spawnAliens, shootAlien, set aliensOn(v){aliensEnabled=v}, ALIEN_INTERVAL, ALIEN_COUNT, ALIEN_SPEED, ALIEN_CHASE_TIME, ALIEN_BOUNTY, ABDUCT_TIME, MOON_TERM, CHEAT_MONEY, HORSE_CELL, HORSE_TROT, HORSE_GALLOP, skidMarks, doorOf, ROOM_W, ROOM_H, furnitureOf, destroyHouse, interactionPrompt, roomLayout, enterHouse, exitHouse,
   get activeSkin(){return activeSkin}, buySkin, radio, makeSong, SCALES, BEER_PRICE, WINE_PRICE, DRUNK_DRIVE, drunkK, ownsSkin: i => progress.ownedSkins.includes(i), menu, SKINS, CAR_MODELS, ROAD_W, SIDEWALK_W, WALK_OFF, EDGE, spawnPedOnSidewalk,
-  school, makeQuestion, TEACHER_HOME, SHOUT, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, nearestAlex, talkToAlex, ALEX_LINES, selectCar, tv, TV_CHANNELS, atTv, RESTAURANT_ITEMS, MECHANIC_ITEMS, TUNE_MAX, TUNE_SPEED, PAINTS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
+  school, makeQuestion, TEACHER_HOME, SHOUT, WRONG_FINE, RUN_FINE, QUESTION_TIME, TAUNTS, answerQuestion, atBlackboard, LESSON_LEN, ANSWER_PAY, LESSON_BONUS, nearestAlex, talkToAlex, ALEX_LINES, selectCar, tv, TV_CHANNELS, atTv, RESTAURANT_ITEMS, MECHANIC_ITEMS, TUNE_MAX, TUNE_SPEED, PAINTS, shop, SHOP_ITEMS, buyItem, lotteryPrize, LOTTERY_PRIZE, atShopCounter, openShop, drawShop, trunk, trunkOf, trunkAdd, trunkTake, TRUNK_SLOTS, STORABLE, openTrunk, drawTrunk, atCarTrunk, carRear, mapView, poisIn, worldToMap, mapToWorld, radarPois, PIN_MAX, get clock(){return clock} };`);
 
 const step = n => { for (let i = 0; i < n; i++) { now += 16.7; rafCb(now); } };
 const key = (code, down) => listeners[down ? 'keydown' : 'keyup']({ code, repeat: false });
@@ -75,7 +75,7 @@ const x0 = G.player.x;
 key('KeyD', true); step(60); key('KeyD', false);
 check('a karakter tud gyalogolni', G.player.x - x0 > 100);
 
-G.player.x = G.car.x - 50; G.player.y = G.car.y;
+G.player.x = G.car.x; G.player.y = G.car.y - 50;      // az autó oldalához lépünk (a hátuljánál a csomagtartó nyílik, ADR-0050)
 key('KeyE', true); key('KeyE', false);
 check('be lehet szállni az autóba', G.player.inCar === true);
 
@@ -1433,7 +1433,7 @@ G.npcs.length = 0; G.aiCars.length = 0;
   press('KeyE');
   check('házban az E nem a taxit nyitja', !G.taxiMenu.open && !!G.player.inHouse);
   G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
-  Object.assign(G.car, { x: G.player.x + 40, y: G.player.y, vx: 0, vy: 0 });
+  Object.assign(G.car, { x: G.player.x, y: G.player.y + 40, angle: 0, vx: 0, vy: 0 });   // az autó a játékos mellett (nem a hátuljánál, hogy a beszállás nyíljon)
   press('KeyE');
   step(2);
   check('autóba ülve a taxit lemondod', G.player.inCar && !G.taxi);
@@ -1595,6 +1595,59 @@ G.npcs.length = 0; G.aiCars.length = 0;
   check('kattintással is lehet vásárolni', G.progress.money === 0 && G.player.health === 70);
   press('Escape');
   check('Esc: kilépés a boltból', !G.shop.open);
+  // --- csomagtartó (ADR-0050) ---
+  const savedHouse = G.player.inHouse;
+  {
+    const mi = G.progress.activeCar; G.progress.trunks = {};
+    check('trunkAdd betesz egy tárgyat, trunkOf visszaadja', G.trunkAdd(mi, 'choc') && G.trunkOf(mi).length === 1 && G.trunkOf(mi)[0].n === 1);
+    G.trunkAdd(mi, 'choc'); check('ugyanabból a tárgyból a darabszám nő, nem új hely', G.trunkOf(mi).length === 1 && G.trunkOf(mi)[0].n === 2);
+    for (const id of ['sandwich', 'medkit', 'coffee', 'fuel', 'bomb']) G.trunkAdd(mi, id);
+    check('a csomagtartó megtelik (TRUNK_SLOTS fajta), újat nem vesz be', G.trunkOf(mi).length === G.TRUNK_SLOTS && G.trunkAdd(mi, 'ticket') === false);
+    check('nem tárolható tárgyat nem vesz be', G.trunkAdd(mi, 'tune') === false && G.trunkAdd(mi, 'phone1') === false);
+    G.progress.trunks = {}; G.trunkAdd(mi, 'medkit'); G.player.health = 10;
+    G.trunkTake(mi, 'medkit');
+    check('trunkTake kivesz és a hatás érvényesül (medkit → tele élet), a sor törlődik', G.player.health === 100 && G.trunkOf(mi).length === 0);
+    G.trunkAdd(mi, 'bomb'); G.bombInv.count = 0; G.trunkTake(mi, 'bomb');
+    check('a csomagtartóból kivett bomba a készletbe kerül', G.bombInv.count === 1);
+    G.trunkAdd(mi, 'medkit'); G.player.health = 100; G.trunkTake(mi, 'medkit');
+    check('teljes életnél a medkit nem vész el (marad a csomagtartóban)', G.trunkOf(mi).some(e => e.id === 'medkit'));
+    G.progress.trunks = {}; G.trunkAdd(mi, 'choc'); G.trunkOf(mi)[0].n = 99;
+    check('99 darabnál a trunkAdd nem vesz be többet (false)', G.trunkAdd(mi, 'choc') === false && G.trunkOf(mi)[0].n === 99);
+  }
+  // bolt: „csomagtartóba” vétel (az autót a bolt ajtaja elé tesszük, a pultnál újranyitjuk a boltot)
+  {
+    const mi = G.progress.activeCar; G.progress.trunks = {}; G.progress.money = 100;
+    const d = G.doorOf(G.player.inHouse.hs);
+    Object.assign(G.car, { rental: false, horse: false, type: 'car', x: d.x, y: d.y });
+    G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = 60; G.openShop();
+    const i = idx('medkit'); G.player.health = 30; G.drawShop(800, 600);
+    const hitT = G.shop.hits.find(h => h.i === i && h.toTrunk);
+    check('a bolti sorban van 🧳 (csomagtartóba) gomb a tárolható tárgynál', !!hitT);
+    G.buyItem(i, 0.5, true);
+    check('boltból a csomagtartóba vétel: levonja a pénzt, a trunksba teszi, nem hat azonnal', G.progress.money === 85 && G.trunkOf(mi).some(e => e.id === 'medkit') && G.player.health === 30);
+    press('Escape');
+  }
+  // geometria: a hátsó pont és atCarTrunk
+  {
+    Object.assign(G.car, { x: 2000, y: G.C, angle: 0, rental: false, horse: false, type: 'car' });
+    G.player.inCar = false; G.player.inHouse = null; G.player.riding = null;
+    const r = G.carRear();
+    check('a hátsó pont az autó mögött van (−len/2 irányban)', Math.abs(r.x - (G.car.x - G.car.len / 2)) < 0.01 && Math.abs(r.y - G.car.y) < 0.01);
+    G.player.x = r.x; G.player.y = r.y;
+    check('a hátsó pontnál állva a csomagtartó elérhető', G.atCarTrunk() === true);
+    G.player.x = G.car.x + G.car.len / 2; G.player.y = G.car.y;
+    check('az autó elejénél nem a csomagtartó (ott a beszállás)', G.atCarTrunk() === false);
+    G.player.x = r.x - 200;
+    check('messzebbről a csomagtartó nem érhető el', G.atCarTrunk() === false);
+    G.player.x = r.x; G.car.horse = true;
+    check('lovon nincs csomagtartó', G.atCarTrunk() === false); G.car.horse = false;
+    G.openTrunk(); check('drawTrunk üres csomagtartóval nem hibázik', (G.drawTrunk(800, 600), true)); G.trunk.open = false;
+    G.progress.trunks = {}; for (const id of ['choc', 'bomb']) G.trunkAdd(G.progress.activeCar, id);
+    G.openTrunk(); check('drawTrunk tartalommal nem hibázik', (G.drawTrunk(800, 600), true)); G.trunk.open = false;
+  }
+  check('régi mentésben (nincs trunks) üres csomagtartó', Object.keys(G.sanitizeProgress({ owned: [] }).trunks).length === 0);
+  check('a mentés kiszűri a rossz csomagtartó-adatot', (() => { const t = G.sanitizeProgress({ trunks: { 0: [{ id: 'choc', n: 3 }, { id: 'xxx', n: 1 }, { id: 'bomb', n: 999 }], 99999: [{ id: 'choc', n: 1 }] } }).trunks; return t[0].length === 1 && t[0][0].id === 'choc' && t[0][0].n === 3 && !t[99999]; })());
+  G.player.inHouse = savedHouse;   // a csomagtartó-geometria tesztjei után vissza a bolti házba
   check('a térképen a boltok is látszanak', G.poisIn(G.C - 30000, G.C - 30000, G.C + 30000, G.C + 30000).some(p => p.type === 'shop'));
   check('a taxi a legközelebbi boltba is elvisz', G.taxiDestinations().some(d => d.label.includes('bolt')));
   G.player.inHouse.ix = G.ROOM_W / 2; G.player.inHouse.iy = G.ROOM_H - 30; press('KeyE');
